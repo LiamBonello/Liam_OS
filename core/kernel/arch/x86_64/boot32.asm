@@ -94,8 +94,8 @@ long_mode_entry:
     mov gs, ax
     mov ss, ax
     mov rsp, boot_stack_top
-    mov edi, [boot_magic]
-    mov esi, [boot_info]
+    mov edi, [rel boot_magic]
+    mov esi, [rel boot_info]
 
     call x86_64_start
 
@@ -119,7 +119,7 @@ gdt64_descriptor:
     dq gdt64_start
 
 section .bss
-align 4096
+alignb 4096
 pml4_table:
     resq 512
 pdpt_table:
@@ -127,13 +127,13 @@ pdpt_table:
 pd_table:
     resq 512
 
-align 4
+alignb 4
 boot_magic:
     resd 1
 boot_info:
     resd 1
 
-align 16
+alignb 16
 boot_stack_bottom:
     resb 16384
 boot_stack_top:
