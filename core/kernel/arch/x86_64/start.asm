@@ -1,9 +1,9 @@
-global _start
+global x86_64_start
 
 section .text
 bits 64
 
-_start:
+x86_64_start:
     mov rdi, 0xB8000
     mov rsi, boot_message
     mov ah, 0x0F
@@ -23,4 +23,4 @@ _start:
 
 section .rodata
 boot_message:
-    db 'Liam_OS x86_64 experimental kernel artifact', 0
+    db 'Liam_OS x86_64 long mode online', 0
