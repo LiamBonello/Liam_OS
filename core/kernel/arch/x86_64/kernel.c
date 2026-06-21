@@ -66,6 +66,21 @@ static void report_memory_layout(const struct x86_64_memory_layout *layout)
     x86_64_serial_write_hex64("Identity map bytes: 0x", layout->bootstrap_identity_map_bytes);
 }
 
+static void report_pmm_plan(const struct x86_64_pmm_plan *plan)
+{
+    x86_64_console_write_u32(15, 0, "PMM usable regions: ", plan->usable_region_count);
+    x86_64_console_write_hex64(16, 0, "PMM first page: 0x", plan->first_free_page);
+    x86_64_console_write_hex64(17, 0, "PMM pages: 0x", plan->managed_pages);
+    x86_64_console_write_hex64(18, 0, "PMM bytes: 0x", plan->managed_bytes);
+    x86_64_console_write_hex64(19, 0, "Reserved below: 0x", plan->reserved_below);
+
+    x86_64_serial_write_u32("PMM usable regions: ", plan->usable_region_count);
+    x86_64_serial_write_hex64("PMM first page: 0x", plan->first_free_page);
+    x86_64_serial_write_hex64("PMM pages: 0x", plan->managed_pages);
+    x86_64_serial_write_hex64("PMM bytes: 0x", plan->managed_bytes);
+    x86_64_serial_write_hex64("Reserved below: 0x", plan->reserved_below);
+}
+
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
@@ -77,13 +92,14 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_boot_context_init(boot_magic, boot_info, &context);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: boot context + IDT + memory summary", 1, 0);
+    x86_64_console_write_at("Stage: PMM plan + boot context", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: boot context + IDT + memory summary");
+    x86_64_serial_write_line("Stage: PMM plan + boot context");
 
     report_boot_summary(&context.boot_info);
     report_memory_layout(&context.memory_layout);
+    report_pmm_plan(&context.pmm_plan);
 
     for (;;) {
         __asm__ volatile ("hlt");
