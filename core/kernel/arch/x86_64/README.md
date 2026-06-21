@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, and writes VGA text:
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, captures Multiboot2 boot state, and writes VGA/serial diagnostics:
 
 ```sh
 cd core
@@ -35,10 +35,14 @@ Expected screen messages:
 
 ```txt
 Liam_OS x86_64 C kernel entry online
-Stage: long mode -> freestanding C
+Stage: boot state + early console/serial
+Multiboot2 magic: ok
+Boot info pointer: 0x........
 ```
 
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode and a minimal C entry. It does not initialize the shared kernel runtime, interrupts, paging subsystem, heap, processes, syscalls, or userspace.
+`make x86_64-run` also routes COM1 serial output to the terminal.
+
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, and early boot diagnostics. It does not initialize the shared kernel runtime, interrupts, paging subsystem, heap, processes, syscalls, or userspace.
 
 ## Milestones
 
