@@ -21,6 +21,19 @@ static uint32_t align_up(uint32_t value, uint32_t alignment)
     return (value + alignment - 1) & ~(alignment - 1);
 }
 
+static int pmm_free_stack_contains(uint32_t page_address)
+{
+    for (uint32_t i = 0; i < pmm_stats.free_stack_count; i++)
+    {
+        if (free_stack[i] == page_address)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 void pmm_initialize(const boot_info_t *boot_info)
 {
     pmm_stats.total_regions = 0;
@@ -160,6 +173,18 @@ void pmm_free_page(void *page)
     if (page_address < pmm_stats.allocation_start || page_address >= pmm_stats.allocation_end)
     {
         log_warning("PMM ignored out-of-range free page request");
+        return;
+    }
+
+    if (page_address >= pmm_stats.next_free_page)
+    {
+        log_warning("PMM ignored free for never-allocated page");
+        return;
+    }
+
+    if (pmm_free_stack_contains(page_address))
+    {
+        log_warning("PMM ignored duplicate free page request");
         return;
     }
 
