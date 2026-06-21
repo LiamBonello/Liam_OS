@@ -16,12 +16,13 @@ X86_64_CONSOLE_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/console.o
 X86_64_BOOT_INFO_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot_info.o
 X86_64_BOOT_CONTEXT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot_context.o
 X86_64_GDT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/gdt.o
+X86_64_TSS_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/tss.o
 X86_64_MEMORY_LAYOUT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/memory_layout.o
 X86_64_PAGING_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/paging.o
 X86_64_PMM_PLAN_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/pmm_plan.o
 X86_64_PMM_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/pmm.o
 X86_64_IDT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/idt.o
-X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_IDT_STUBS_OBJ) $(X86_64_KERNEL_C_OBJ) $(X86_64_CONSOLE_OBJ) $(X86_64_BOOT_INFO_OBJ) $(X86_64_BOOT_CONTEXT_OBJ) $(X86_64_GDT_OBJ) $(X86_64_MEMORY_LAYOUT_OBJ) $(X86_64_PAGING_OBJ) $(X86_64_PMM_PLAN_OBJ) $(X86_64_PMM_OBJ) $(X86_64_IDT_OBJ)
+X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_IDT_STUBS_OBJ) $(X86_64_KERNEL_C_OBJ) $(X86_64_CONSOLE_OBJ) $(X86_64_BOOT_INFO_OBJ) $(X86_64_BOOT_CONTEXT_OBJ) $(X86_64_GDT_OBJ) $(X86_64_TSS_OBJ) $(X86_64_MEMORY_LAYOUT_OBJ) $(X86_64_PAGING_OBJ) $(X86_64_PMM_PLAN_OBJ) $(X86_64_PMM_OBJ) $(X86_64_IDT_OBJ)
 
 ARCH ?= i386
 SUPPORTED_ARCHES := i386 x86_64
@@ -163,14 +164,14 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path now reports bootstrap paging and GDT state plus the early PMM allocator smoke test."
+	@echo "Liam_OS x86_64 path now reports bootstrap paging, GDT state, TSS planning state, and the early PMM allocator smoke test."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
 	@echo "Run target: make x86_64-run"
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
-	@echo "Expected x86_64 screen messages: PMM smoke free: 1, Paging huge pages: 512, GDT selectors ok: 1"
+	@echo "Expected x86_64 screen messages: PMM smoke free: 1, Paging huge pages: 512, GDT/TSS plan ok: 1"
 	@echo "Serial output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
@@ -213,7 +214,7 @@ $(X86_64_IDT_STUBS_OBJ): kernel/arch/x86_64/idt_stubs.asm | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
 
-$(X86_64_KERNEL_C_OBJ): kernel/arch/x86_64/kernel.c kernel/arch/x86_64/boot_context.h kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/console.h kernel/arch/x86_64/gdt.h kernel/arch/x86_64/idt.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/paging.h kernel/arch/x86_64/pmm.h kernel/arch/x86_64/pmm_plan.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_KERNEL_C_OBJ): kernel/arch/x86_64/kernel.c kernel/arch/x86_64/boot_context.h kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/console.h kernel/arch/x86_64/gdt.h kernel/arch/x86_64/idt.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/paging.h kernel/arch/x86_64/pmm.h kernel/arch/x86_64/pmm_plan.h kernel/arch/x86_64/tss.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
@@ -230,6 +231,10 @@ $(X86_64_BOOT_CONTEXT_OBJ): kernel/arch/x86_64/boot_context.c kernel/arch/x86_64
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
 $(X86_64_GDT_OBJ): kernel/arch/x86_64/gdt.c kernel/arch/x86_64/gdt.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS_x86_64) -c $< -o $@
+
+$(X86_64_TSS_OBJ): kernel/arch/x86_64/tss.c kernel/arch/x86_64/tss.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
