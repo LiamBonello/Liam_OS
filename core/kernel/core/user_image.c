@@ -3,6 +3,7 @@
 #include "../fs/vfs.h"
 #include "../loader/flat_binary.h"
 #include "../loader/elf32.h"
+#include "../arch/i386/ring3.h"
 
 typedef struct
 {
@@ -198,6 +199,51 @@ kernel_status_t user_image_get_at(uint32_t index, user_image_t* out_image)
 
     user_image_info.last_status = KERNEL_OK;
     return KERNEL_OK;
+}
+
+kernel_status_t user_image_lookup(const char* path, user_image_t* out_image)
+{
+    if (path == 0 || out_image == 0)
+    {
+        return KERNEL_ERROR_INVALID_ARGUMENT;
+    }
+
+    user_image_info.resolve_attempts++;
+    string_copy(user_image_info.last_path, path, USER_IMAGE_PATH_MAX);
+
+    for (uint32_t i = 0; i < user_image_count(); i++)
+    {
+        if (!string_equals(path, registered_images[i].path))
+        {
+            continue;
+        }
+
+        const registered_user_image_t* registration = &registered_images[i];
+        const vfs_node_t* node = 0;
+        kernel_status_t status = user_image_resolve_registered_node(registration, &node);
+
+        if (status != KERNEL_OK)
+        {
+            user_image_info.resolve_failures++;
+            user_image_info.last_status = status;
+            return status;
+        }
+
+        out_image->path = registration->path;
+        out_image->name = registration->name;
+        out_image->kind = registration->kind;
+        out_image->entry = RING3_USER_CODE_VIRTUAL;
+        out_image->user_stack_top = RING3_USER_STACK_VIRTUAL;
+        out_image->image_size = node->size;
+        out_image->flags = 0;
+
+        user_image_info.last_status = KERNEL_OK;
+        return KERNEL_OK;
+    }
+
+    user_image_info.resolve_failures++;
+    user_image_info.last_status = KERNEL_ERROR_NOT_FOUND;
+    return KERNEL_ERROR_NOT_FOUND;
 }
 
 kernel_status_t user_image_resolve(const char* path, user_image_t* out_image)

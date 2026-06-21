@@ -39,6 +39,7 @@ void user_image_initialize(void);
 
 uint32_t user_image_count(void);
 kernel_status_t user_image_get_at(uint32_t index, user_image_t* out_image);
+kernel_status_t user_image_lookup(const char* path, user_image_t* out_image);
 kernel_status_t user_image_resolve(const char* path, user_image_t* out_image);
 
 const user_image_info_t* user_image_get_info(void);

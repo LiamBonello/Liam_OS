@@ -32,7 +32,7 @@ kernel_status_t exec_create_with_args(
     string_copy(exec_info.last_path, path, 64);
 
     user_image_t image;
-    kernel_status_t status = user_image_resolve(path, &image);
+    kernel_status_t status = user_image_lookup(path, &image);
 
     if (status != KERNEL_OK)
     {
@@ -56,6 +56,17 @@ kernel_status_t exec_create_with_args(
         exec_info.failed_spawns++;
         exec_info.last_status = status;
         exec_info.last_pid = PROCESS_INVALID_PID;
+        return status;
+    }
+
+    status = process_configure_image_path(process, path);
+
+    if (status != KERNEL_OK)
+    {
+        exec_info.failed_spawns++;
+        exec_info.last_status = status;
+        exec_info.last_pid = process->pid;
+        *out_process = process;
         return status;
     }
 

@@ -11,6 +11,7 @@
 #define PROCESS_MAX_ARGUMENTS 8
 #define PROCESS_ARGUMENT_MAX 64
 #define PROCESS_ARGUMENT_LINE_MAX 128
+#define PROCESS_IMAGE_PATH_MAX 64
 
 typedef struct
 {
@@ -37,6 +38,7 @@ typedef struct
 
     uint32_t entry;
     uint32_t user_stack;
+    char image_path[PROCESS_IMAGE_PATH_MAX];
 
     int32_t exit_code;
     kernel_status_t last_status;
@@ -89,6 +91,7 @@ kernel_status_t process_create(
     process_t** out_process
 );
 
+kernel_status_t process_configure_image_path(process_t* process, const char* path);
 kernel_status_t process_configure_arguments(process_t* process, const char* arguments);
 kernel_status_t process_run(process_t* process);
 void process_mark_exit(int32_t exit_code);

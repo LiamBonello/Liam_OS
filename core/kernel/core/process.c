@@ -2,6 +2,7 @@
 #include "string.h"
 #include "log.h"
 #include "fd_table.h"
+#include "user_image.h"
 #include "../arch/i386/ring3.h"
 
 static process_t process_table[PROCESS_MAX_PROCESSES];
@@ -93,6 +94,7 @@ static void process_reset_slot(process_t* process)
     process->state = PROCESS_UNUSED;
     process->entry = 0;
     process->user_stack = 0;
+    string_clear(process->image_path, PROCESS_IMAGE_PATH_MAX);
     process->exit_code = 0;
     process->last_status = KERNEL_OK;
     process->runs = 0;
@@ -137,6 +139,7 @@ kernel_status_t process_create(
     process->state = PROCESS_READY;
     process->entry = entry;
     process->user_stack = user_stack;
+    string_clear(process->image_path, PROCESS_IMAGE_PATH_MAX);
     process->exit_code = 0;
     process->last_status = KERNEL_OK;
     process->runs = 0;
@@ -156,6 +159,17 @@ kernel_status_t process_create(
 
     *out_process = process;
 
+    return KERNEL_OK;
+}
+
+kernel_status_t process_configure_image_path(process_t* process, const char* path)
+{
+    if (process == 0 || path == 0)
+    {
+        return KERNEL_ERROR_INVALID_ARGUMENT;
+    }
+
+    string_copy(process->image_path, path, PROCESS_IMAGE_PATH_MAX);
     return KERNEL_OK;
 }
 
@@ -268,6 +282,26 @@ kernel_status_t process_run(process_t* process)
         process_info.last_run_pid = process->pid;
         process_info.last_status = KERNEL_ERROR_INVALID_STATE;
         return KERNEL_ERROR_INVALID_STATE;
+    }
+
+    if (process->image_path[0] != '\0')
+    {
+        user_image_t image;
+        kernel_status_t load_status = user_image_resolve(process->image_path, &image);
+
+        if (load_status != KERNEL_OK)
+        {
+            process_info.failed_runs++;
+            process_info.last_run_pid = process->pid;
+            process_info.last_status = load_status;
+            process->last_status = load_status;
+            process->state = PROCESS_FAILED;
+            process_info.failed_processes++;
+            return load_status;
+        }
+
+        process->entry = image.entry;
+        process->user_stack = image.user_stack_top;
     }
 
     process->state = PROCESS_RUNNING;
