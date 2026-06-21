@@ -1,4 +1,4 @@
-#include "boot_info.h"
+#include "boot_context.h"
 #include "console.h"
 #include "idt.h"
 
@@ -51,25 +51,39 @@ static void report_boot_summary(const struct x86_64_boot_summary *summary)
     }
 }
 
+static void report_memory_layout(const struct x86_64_memory_layout *layout)
+{
+    x86_64_console_write_at("IDT: exceptions installed", 10, 0);
+    x86_64_console_write_hex64(11, 0, "Kernel start: 0x", layout->kernel_start);
+    x86_64_console_write_hex64(12, 0, "Kernel end: 0x", layout->kernel_end);
+    x86_64_console_write_hex64(13, 0, "Kernel bytes: 0x", layout->kernel_size_bytes);
+    x86_64_console_write_hex64(14, 0, "Identity map bytes: 0x", layout->bootstrap_identity_map_bytes);
+
+    x86_64_serial_write_line("x86_64 IDT: exceptions installed");
+    x86_64_serial_write_hex64("Kernel start: 0x", layout->kernel_start);
+    x86_64_serial_write_hex64("Kernel end: 0x", layout->kernel_end);
+    x86_64_serial_write_hex64("Kernel bytes: 0x", layout->kernel_size_bytes);
+    x86_64_serial_write_hex64("Identity map bytes: 0x", layout->bootstrap_identity_map_bytes);
+}
+
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
-    struct x86_64_boot_summary summary;
+    struct x86_64_boot_context context;
 
     x86_64_console_init();
     x86_64_serial_init();
     x86_64_idt_init();
 
-    x86_64_boot_info_parse(boot_magic, boot_info, &summary);
+    x86_64_boot_context_init(boot_magic, boot_info, &context);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: IDT exceptions + boot memory summary", 1, 0);
+    x86_64_console_write_at("Stage: boot context + IDT + memory summary", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: IDT exceptions + boot memory summary");
-    x86_64_serial_write_line("x86_64 IDT: exceptions installed");
+    x86_64_serial_write_line("Stage: boot context + IDT + memory summary");
 
-    report_boot_summary(&summary);
-    x86_64_console_write_at("IDT: exceptions installed", 10, 0);
+    report_boot_summary(&context.boot_info);
+    report_memory_layout(&context.memory_layout);
 
     for (;;) {
         __asm__ volatile ("hlt");
