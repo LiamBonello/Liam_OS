@@ -1,5 +1,6 @@
 #include "boot_info.h"
 #include "console.h"
+#include "idt.h"
 
 static void report_boot_summary(const struct x86_64_boot_summary *summary)
 {
@@ -56,16 +57,19 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 
     x86_64_console_init();
     x86_64_serial_init();
+    x86_64_idt_init();
 
     x86_64_boot_info_parse(boot_magic, boot_info, &summary);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: Multiboot2 parser + memory summary", 1, 0);
+    x86_64_console_write_at("Stage: IDT exceptions + boot memory summary", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: Multiboot2 parser + memory summary");
+    x86_64_serial_write_line("Stage: IDT exceptions + boot memory summary");
+    x86_64_serial_write_line("x86_64 IDT: exceptions installed");
 
     report_boot_summary(&summary);
+    x86_64_console_write_at("IDT: exceptions installed", 10, 0);
 
     for (;;) {
         __asm__ volatile ("hlt");
