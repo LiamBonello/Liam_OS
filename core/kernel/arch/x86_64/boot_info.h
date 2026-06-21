@@ -1,0 +1,25 @@
+#ifndef LIAM_OS_X86_64_BOOT_INFO_H
+#define LIAM_OS_X86_64_BOOT_INFO_H
+
+#include "types.h"
+
+#define X86_64_BOOTLOADER_NAME_MAX 64U
+
+struct x86_64_boot_summary {
+    u32 magic;
+    u32 boot_info_addr;
+    u32 multiboot2_valid;
+    u32 total_size;
+    u32 bootloader_name_found;
+    char bootloader_name[X86_64_BOOTLOADER_NAME_MAX];
+    u32 basic_meminfo_found;
+    u32 mem_lower_kib;
+    u32 mem_upper_kib;
+    u32 mmap_found;
+    u32 mmap_entry_count;
+    u64 usable_memory_bytes;
+};
+
+void x86_64_boot_info_parse(u32 magic, u32 boot_info_addr, struct x86_64_boot_summary *summary);
+
+#endif
