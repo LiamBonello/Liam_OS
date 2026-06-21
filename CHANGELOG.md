@@ -548,6 +548,12 @@
 - Added `proc-info <pid>` shell command.
 - Improved `ps` status output to print status names instead of raw numeric values.
 
+### Notes
+
+- Process slots are still retained after exit.
+- There is no process reaping or PID recycling yet.
+- This milestone improves observability before process cleanup and address-space isolation work.
+
 ## Core 0.2.4-dev
 
 ### Added
