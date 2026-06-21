@@ -12,10 +12,10 @@ static u16 vga_entry(char c)
     return (u16)c | (u16)(VGA_ATTR << 8);
 }
 
-static char hex_digit(u32 value)
+static char hex_digit(u64 value)
 {
-    value &= 0xFU;
-    return value < 10U ? (char)('0' + value) : (char)('A' + value - 10U);
+    value &= 0xFULL;
+    return value < 10ULL ? (char)('0' + value) : (char)('A' + value - 10ULL);
 }
 
 static void outb(u16 port, u8 value)
@@ -38,6 +38,56 @@ static void serial_write_char(char c)
             return;
         }
     }
+}
+
+static void make_hex32(char *buffer, u32 value)
+{
+    for (u32 i = 0; i < 8U; ++i) {
+        u32 shift = 28U - (i * 4U);
+        buffer[i] = hex_digit(value >> shift);
+    }
+    buffer[8] = '\0';
+}
+
+static void make_hex64(char *buffer, u64 value)
+{
+    for (u32 i = 0; i < 16U; ++i) {
+        u32 shift = 60U - (i * 4U);
+        buffer[i] = hex_digit(value >> shift);
+    }
+    buffer[16] = '\0';
+}
+
+static void make_u32(char *buffer, u32 value)
+{
+    char scratch[10];
+    u32 count = 0;
+
+    if (value == 0U) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return;
+    }
+
+    while (value != 0U && count < sizeof(scratch)) {
+        scratch[count++] = (char)('0' + (value % 10U));
+        value /= 10U;
+    }
+
+    for (u32 i = 0; i < count; ++i) {
+        buffer[i] = scratch[count - 1U - i];
+    }
+    buffer[count] = '\0';
+}
+
+static usize append_label(char *buffer, const char *label)
+{
+    usize index = 0;
+    while (label[index] != '\0') {
+        buffer[index] = label[index];
+        ++index;
+    }
+    return index;
 }
 
 void x86_64_console_init(void)
@@ -63,21 +113,27 @@ void x86_64_console_write_at(const char *message, usize row, usize column)
     }
 }
 
+void x86_64_console_write_u32(usize row, usize column, const char *label, u32 value)
+{
+    char buffer[64];
+    usize index = append_label(buffer, label);
+    make_u32(buffer + index, value);
+    x86_64_console_write_at(buffer, row, column);
+}
+
 void x86_64_console_write_hex32(usize row, usize column, const char *label, u32 value)
 {
-    char buffer[9];
+    char buffer[64];
+    usize index = append_label(buffer, label);
+    make_hex32(buffer + index, value);
+    x86_64_console_write_at(buffer, row, column);
+}
 
-    for (u32 i = 0; i < 8U; ++i) {
-        u32 shift = 28U - (i * 4U);
-        buffer[i] = hex_digit(value >> shift);
-    }
-    buffer[8] = '\0';
-
-    x86_64_console_write_at(label, row, column);
-    while (*label != '\0') {
-        ++column;
-        ++label;
-    }
+void x86_64_console_write_hex64(usize row, usize column, const char *label, u64 value)
+{
+    char buffer[80];
+    usize index = append_label(buffer, label);
+    make_hex64(buffer + index, value);
     x86_64_console_write_at(buffer, row, column);
 }
 
@@ -106,16 +162,26 @@ void x86_64_serial_write_line(const char *message)
     serial_write_char('\n');
 }
 
+void x86_64_serial_write_u32(const char *label, u32 value)
+{
+    char buffer[64];
+    usize index = append_label(buffer, label);
+    make_u32(buffer + index, value);
+    x86_64_serial_write_line(buffer);
+}
+
 void x86_64_serial_write_hex32(const char *label, u32 value)
 {
-    char buffer[9];
+    char buffer[64];
+    usize index = append_label(buffer, label);
+    make_hex32(buffer + index, value);
+    x86_64_serial_write_line(buffer);
+}
 
-    for (u32 i = 0; i < 8U; ++i) {
-        u32 shift = 28U - (i * 4U);
-        buffer[i] = hex_digit(value >> shift);
-    }
-    buffer[8] = '\0';
-
-    x86_64_serial_write(label);
+void x86_64_serial_write_hex64(const char *label, u64 value)
+{
+    char buffer[80];
+    usize index = append_label(buffer, label);
+    make_hex64(buffer + index, value);
     x86_64_serial_write_line(buffer);
 }
