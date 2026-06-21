@@ -1,4 +1,7 @@
 global _start
+global x86_64_boot_pml4_table
+global x86_64_boot_pdpt_table
+global x86_64_boot_pd_table
 extern x86_64_start
 
 MULTIBOOT2_MAGIC equ 0xE85250D6
@@ -46,7 +49,7 @@ _start:
     or eax, CR4_PAE
     mov cr4, eax
 
-    mov eax, pml4_table
+    mov eax, x86_64_boot_pml4_table
     mov cr3, eax
 
     mov ecx, EFER_MSR
@@ -61,17 +64,17 @@ _start:
     jmp CODE64_SEL:long_mode_entry
 
 setup_identity_paging:
-    mov eax, pdpt_table
+    mov eax, x86_64_boot_pdpt_table
     or eax, PAGE_PRESENT | PAGE_WRITABLE
-    mov [pml4_table], eax
-    mov dword [pml4_table + 4], 0
+    mov [x86_64_boot_pml4_table], eax
+    mov dword [x86_64_boot_pml4_table + 4], 0
 
-    mov eax, pd_table
+    mov eax, x86_64_boot_pd_table
     or eax, PAGE_PRESENT | PAGE_WRITABLE
-    mov [pdpt_table], eax
-    mov dword [pdpt_table + 4], 0
+    mov [x86_64_boot_pdpt_table], eax
+    mov dword [x86_64_boot_pdpt_table + 4], 0
 
-    mov edi, pd_table
+    mov edi, x86_64_boot_pd_table
     mov ecx, 512
     xor eax, eax
 
@@ -120,11 +123,11 @@ gdt64_descriptor:
 
 section .bss
 alignb 4096
-pml4_table:
+x86_64_boot_pml4_table:
     resq 512
-pdpt_table:
+x86_64_boot_pdpt_table:
     resq 512
-pd_table:
+x86_64_boot_pd_table:
     resq 512
 
 alignb 4
