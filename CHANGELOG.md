@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.5-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/` as the initial architecture scaffold for the future 64-bit kernel path.
+- Added `docs/core/x86_64-migration-plan.md` with a staged plan from scaffold to long-mode boot and later userspace work.
+- Added Makefile architecture metadata for `i386` and `x86_64`.
+- Added `make x86_64-info` to describe the current x86_64 migration status.
+
+### Changed
+
+- Kept `ARCH=i386` as the default and only bootable build path.
+- Made accidental `ARCH=x86_64` builds fail clearly until a real x86_64 bootstrap exists.
+- Updated Liam_OS version to `0.8.5-dev`.
+
+### Notes
+
+- This milestone does not claim x86_64 boot support yet.
+- The next x86_64 milestone should add a separate linker script and long-mode bootstrap experiment while preserving the i386 ISO path.
+
 ## Core 0.8.4-dev
 
 ### Added
