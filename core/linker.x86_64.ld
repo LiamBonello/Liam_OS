@@ -4,6 +4,7 @@ OUTPUT_FORMAT(elf64-x86-64)
 SECTIONS
 {
     . = 1M;
+    _x86_64_kernel_start = .;
 
     .multiboot ALIGN(8) :
     {
@@ -30,4 +31,6 @@ SECTIONS
         *(COMMON)
         *(.bss*)
     }
+
+    _x86_64_kernel_end = .;
 }
