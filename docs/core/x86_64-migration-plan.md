@@ -79,21 +79,23 @@ Remaining work:
 
 ## Stage 6: descriptor and interrupt strategy
 
-Status: started for maintained GDT, loaded TSS, double-fault IST routing, and CPU exceptions.
+Status: started for maintained GDT, loaded TSS, critical-exception IST routing, and CPU exceptions.
 
 - Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
 - Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
-- Installed interrupt-gate descriptors for CPU exceptions after the C console and serial paths initialize.
+- Installed interrupt-gate descriptors for CPU exceptions after the maintained GDT/TSS path initializes.
 - Added VGA and serial exception diagnostics with vector, error code, and exception name.
 - Added `core/kernel/arch/x86_64/gdt.c` and `gdt.h` to install a maintained x86_64 GDT from C.
 - Added `core/kernel/arch/x86_64/tss.c` and `tss.h` to build a packed 64-bit TSS image and planned IST stacks for dangerous exceptions.
 - Added a 64-bit TSS descriptor to the maintained GDT and load it with `ltr`.
 - Routed the double-fault exception gate through IST1.
-- The x86_64 C entry reports IDTR state, double-fault IST routing, GDT selector validation, current task-register selector, and TSS load validation.
+- Routed the NMI exception gate through IST2.
+- Routed the page-fault exception gate through IST3.
+- The x86_64 C entry reports IDTR state, critical-exception IST routing, GDT selector validation, current task-register selector, and TSS load validation.
 
 Remaining work:
 
-- Decide whether NMI and page fault get dedicated IST entries at this stage or after paging becomes architecture-owned.
+- Add safe exception-path smoke tests only after the panic/reporting path is ready for intentional faults.
 - Add IRQ routing deliberately, deciding what remains legacy PIC/PIT and what moves toward APIC later.
 - Keep interrupts disabled until the IRQ and timer strategy is explicit.
 
