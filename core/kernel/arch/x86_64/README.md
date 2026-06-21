@@ -1,6 +1,6 @@
 # Liam_OS x86_64 Architecture Scaffold
 
-This directory contains the staged x86_64 kernel path. The i386 path in `core/kernel/arch/i386/` remains the stable baseline while this directory grows in small, testable stages.
+This directory contains the staged x86_64 kernel path. The i386 path in `core/kernel/arch/i386/` remains the stable baseline while this directory grows in coherent, testable stages.
 
 ## Current status
 
@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, captures Multiboot2 boot state, and writes VGA/serial diagnostics:
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, parses boot information, and writes VGA/serial diagnostics:
 
 ```sh
 cd core
@@ -31,18 +31,22 @@ The ISO is written to:
 core/build/x86_64/liam_os_x86_64.iso
 ```
 
-Expected screen messages:
+Expected screen messages include:
 
 ```txt
-Liam_OS x86_64 C kernel entry online
-Stage: boot state + early console/serial
-Multiboot2 magic: ok
+Liam_OS x86_64 kernel diagnostics
+Stage: Multiboot2 parser + memory summary
+Multiboot2: ok
+Bootloader: ...
 Boot info pointer: 0x........
+Boot info bytes: ...
+Memory map entries: ...
+Usable bytes: 0x................
 ```
 
 `make x86_64-run` also routes COM1 serial output to the terminal.
 
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, and early boot diagnostics. It does not initialize the shared kernel runtime, interrupts, paging subsystem, heap, processes, syscalls, or userspace.
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, and Multiboot2 tag parsing. It does not initialize the shared kernel runtime, interrupts, paging subsystem, heap, processes, syscalls, or userspace.
 
 ## Milestones
 
@@ -50,9 +54,10 @@ This is not the full x86_64 kernel yet. The current path proves an assembly hand
 2. Add a separate linker script and boot objects for the x86_64 path. Done for the first experimental path.
 3. Enter long mode from a 32-bit bootstrap. Started.
 4. Bring up a minimal 64-bit C console path. Started.
-5. Add x86_64 GDT/IDT/interrupt handling.
-6. Port paging and memory layout to 64-bit addresses.
-7. Revisit syscalls and userspace after the 64-bit kernel path is stable.
+5. Parse Multiboot2 boot information and memory map. Started.
+6. Add x86_64 GDT/IDT/interrupt handling.
+7. Port paging and memory layout to 64-bit addresses.
+8. Revisit syscalls and userspace after the 64-bit kernel path is stable.
 
 ## Guardrails
 
