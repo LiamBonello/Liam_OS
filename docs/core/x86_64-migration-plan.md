@@ -79,7 +79,7 @@ Remaining work:
 
 ## Stage 6: descriptor and interrupt strategy
 
-Status: started for maintained GDT, loaded TSS, IST planning, and CPU exceptions.
+Status: started for maintained GDT, loaded TSS, double-fault IST routing, and CPU exceptions.
 
 - Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
 - Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
@@ -88,12 +88,12 @@ Status: started for maintained GDT, loaded TSS, IST planning, and CPU exceptions
 - Added `core/kernel/arch/x86_64/gdt.c` and `gdt.h` to install a maintained x86_64 GDT from C.
 - Added `core/kernel/arch/x86_64/tss.c` and `tss.h` to build a packed 64-bit TSS image and planned IST stacks for dangerous exceptions.
 - Added a 64-bit TSS descriptor to the maintained GDT and load it with `ltr`.
-- The x86_64 C entry reports GDT selector validation, current task-register selector, and TSS load validation.
+- Routed the double-fault exception gate through IST1.
+- The x86_64 C entry reports IDTR state, double-fault IST routing, GDT selector validation, current task-register selector, and TSS load validation.
 
 Remaining work:
 
-- Wire selected exception gates to IST entries after the loaded TSS remains stable.
-- Decide which exceptions get dedicated IST stacks first, starting with double fault.
+- Decide whether NMI and page fault get dedicated IST entries at this stage or after paging becomes architecture-owned.
 - Add IRQ routing deliberately, deciding what remains legacy PIC/PIT and what moves toward APIC later.
 - Keep interrupts disabled until the IRQ and timer strategy is explicit.
 
