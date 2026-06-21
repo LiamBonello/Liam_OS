@@ -7,6 +7,8 @@ extern uint8_t ring3_hello_image_start[];
 extern uint8_t ring3_hello_image_end[];
 extern uint8_t ring3_syscheck_image_start[];
 extern uint8_t ring3_syscheck_image_end[];
+extern uint8_t ring3_sysbadptr_image_start[];
+extern uint8_t ring3_sysbadptr_image_end[];
 extern uint8_t ring3_pid_image_start[];
 extern uint8_t ring3_pid_image_end[];
 extern uint8_t ring3_ticks_image_start[];
@@ -123,6 +125,7 @@ static vfs_node_t init_node;
 static vfs_node_t hello_node;
 static vfs_node_t hello_elf_node;
 static vfs_node_t syscheck_node;
+static vfs_node_t sysbadptr_node;
 static vfs_node_t pid_node;
 static vfs_node_t ticks_node;
 static vfs_node_t about_node;
@@ -154,6 +157,7 @@ static const vfs_node_t* bin_children[] = {
     &hello_node,
     &hello_elf_node,
     &syscheck_node,
+    &sysbadptr_node,
     &pid_node,
     &ticks_node,
     &about_node,
@@ -292,6 +296,17 @@ static void initramfs_define_nodes(void)
     syscheck_node.parent = &bin_node;
     syscheck_node.children = 0;
     syscheck_node.child_count = 0;
+
+    sysbadptr_node.name = "sysbadptr";
+    sysbadptr_node.path = "/bin/sysbadptr";
+    sysbadptr_node.type = VFS_NODE_FILE;
+    sysbadptr_node.data = ring3_sysbadptr_image_start;
+    sysbadptr_node.size = (uint32_t)(ring3_sysbadptr_image_end - ring3_sysbadptr_image_start);
+    sysbadptr_node.mode = 0755;
+    sysbadptr_node.flags = 0;
+    sysbadptr_node.parent = &bin_node;
+    sysbadptr_node.children = 0;
+    sysbadptr_node.child_count = 0;
 
     pid_node.name = "pid";
     pid_node.path = "/bin/pid";
@@ -454,7 +469,7 @@ void initramfs_initialize(void)
 
     initramfs_info.initialized = 1;
     initramfs_info.last_status = KERNEL_OK;
-    initramfs_info.node_count = 24;
+    initramfs_info.node_count = 25;
     initramfs_info.mount_count = 0;
 }
 
