@@ -36,19 +36,28 @@ Status: started.
 
 - Added `make x86_64-iso` to create `core/build/x86_64/liam_os_x86_64.iso`.
 - Added `make x86_64-run` to boot the experimental ISO in `qemu-system-x86_64`.
-- The expected screen message is `Liam_OS x86_64 long mode online`.
-- This path is still experimental and does not yet enter the shared kernel C runtime.
+- The handoff enters long mode, sets 64-bit segments, installs a temporary stack, and calls the x86_64 entry shim.
+- This path is still experimental and uses temporary identity-mapped paging.
 
 Remaining work:
 
 - Validate the long-mode handoff in QEMU.
 - Add explicit failure diagnostics for unsupported CPUs or malformed boot state.
-- Establish a 64-bit C entry contract after the assembly handoff is proven.
+- Replace temporary bootstrap paging with a planned x86_64 memory layout.
 
 ## Stage 4: early 64-bit kernel entry
 
-- Add a minimal `kernel_main_x86_64` or architecture entry contract.
-- Bring up enough VGA/serial logging to prove 64-bit C execution.
+Status: started.
+
+- Added `core/kernel/arch/x86_64/kernel.c` with a minimal freestanding C entry point.
+- The expected screen messages are `Liam_OS x86_64 C kernel entry online` and `Stage: long mode -> freestanding C`.
+- The current C entry clears VGA text mode and halts cleanly.
+
+Remaining work:
+
+- Split the x86_64 console helper out once more early runtime code needs it.
+- Add serial logging for easier automated boot validation.
+- Add a real x86_64 C entry contract for boot information and early architecture state.
 - Avoid porting scheduler, userspace, or syscalls until basic boot and diagnostics are stable.
 
 ## Stage 5: descriptor and interrupt strategy
