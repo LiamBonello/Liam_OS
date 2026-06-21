@@ -36,6 +36,7 @@ _start:
     db '  /bin/os-release  Print OS release metadata', 10
     db '  /bin/pid         Print the current process ID', 10
     db '  /bin/sh          Run userspace shell syscall demo', 10
+    db '  /bin/sysbadptr   Run bad pointer syscall regression tests', 10
     db '  /bin/syscheck    Run syscall smoke tests', 10
     db '  /bin/ticks       Print kernel tick count', 10
     db '  /bin/uptime      Print system uptime ticks', 10

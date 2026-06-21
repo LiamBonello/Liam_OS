@@ -13,6 +13,8 @@ global ring3_ticks_image_start
 global ring3_ticks_image_end
 global ring3_syscheck_image_start
 global ring3_syscheck_image_end
+global ring3_sysbadptr_image_start
+global ring3_sysbadptr_image_end
 global ring3_os_release_image_start
 global ring3_os_release_image_end
 global ring3_cat_image_start
@@ -59,6 +61,11 @@ align 16
 ring3_syscheck_image_start:
     incbin "build/userland/syscheck.bin"
 ring3_syscheck_image_end:
+
+align 16
+ring3_sysbadptr_image_start:
+    incbin "build/userland/sysbadptr.bin"
+ring3_sysbadptr_image_end:
 
 align 16
 ring3_os_release_image_start:

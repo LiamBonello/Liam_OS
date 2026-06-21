@@ -1,5 +1,28 @@
 # Liam_OS Changelog
 
+## Core 0.8.4-dev
+
+### Added
+
+- Added `/bin/sysbadptr` as a userspace bad-pointer syscall regression test.
+- Added `docs/core/i386-architecture-assumptions.md` to document current i386 boot, memory, syscall, and userspace assumptions before the x86_64 migration.
+
+### Changed
+
+- Hardened syscall pointer handling for `write`, `open`, `read`, `stat`, `get_arg`, and `exec` by copying user data through kernel-owned buffers after ring-3 range checks.
+- Updated `/bin/help` to list `/bin/sysbadptr`.
+- Updated Liam_OS version to `0.8.4-dev`.
+
+### Fixed
+
+- Rejected duplicate PMM frees so one physical page cannot be reinserted into the free stack twice.
+- Rolled back partially mapped heap growth attempts when a later page allocation or mapping fails.
+
+### Notes
+
+- `/bin/sysbadptr` should return clean errors for invalid syscall pointers without causing a page fault, panic, or hang.
+- This is a kernel-hardening milestone before deeper process isolation and x86_64 boot work.
+
 ## Core 0.8.3-dev
 
 ### Added
