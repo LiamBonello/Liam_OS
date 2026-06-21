@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.15-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/paging.h` and `paging.c` to capture bootstrap paging state from C.
+- Added named x86_64 bootstrap paging table symbols for the PML4, PDPT, and PD tables.
+- Added VGA and COM1 serial diagnostics for the bootstrap CR3 and huge-page identity map.
+
+### Changed
+
+- Updated the x86_64 C entry to report `Stage: paging baseline + PMM`.
+- Wired the x86_64 paging diagnostics into `make x86_64-kernel`, `make x86_64-iso`, and `make x86_64-run`.
+- Updated `make x86_64-info` to describe the bootstrap paging baseline milestone.
+- Updated Liam_OS version to `0.8.15-dev`.
+
+### Notes
+
+- This still uses the temporary bootstrap identity map; it makes that state explicit before replacing it with a permanent x86_64 paging model.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.14-dev
 
 ### Added
