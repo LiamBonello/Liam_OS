@@ -1,5 +1,44 @@
 # Liam_OS Changelog
 
+## Core 0.8.21-dev
+
+### Added
+
+- Added `core/scripts/x86_64_smoke.sh` to boot the experimental x86_64 ISO headlessly in QEMU and validate required COM1 serial markers.
+- Added `make x86_64-smoke` as the automated x86_64 boot smoke target.
+- Added `.github/workflows/core-x86_64-smoke.yml` to run the x86_64 headless boot smoke test in GitHub Actions and upload the serial log.
+
+### Changed
+
+- Added serial output for the x86_64 `Desc/IST ok` summary so headless boot tests can validate the same descriptor health marker shown on VGA.
+- Updated `make x86_64-info`, README, and x86_64 architecture notes to document the headless smoke target and log location.
+- Updated Liam_OS version to `0.8.21-dev`.
+
+### Notes
+
+- The smoke target validates the current x86_64 boot path without requiring a local QEMU window or screenshots.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
+## Core 0.8.20-dev
+
+### Added
+
+- Routed the x86_64 NMI exception gate through IST2.
+- Routed the x86_64 page-fault exception gate through IST3.
+- Added combined IDT diagnostics for NMI, double-fault, and page-fault IST gate routing.
+
+### Changed
+
+- Loaded the maintained x86_64 GDT/TSS before installing the IST-backed IDT.
+- Updated the x86_64 C entry to report `Stage: IST gates + descriptor + PMM`.
+- Updated `make x86_64-info` to describe the critical-exception IST milestone.
+- Updated Liam_OS version to `0.8.20-dev`.
+
+### Notes
+
+- This milestone validates descriptor routing without intentionally triggering NMI, double fault, or page fault exceptions.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.19-dev
 
 ### Added
