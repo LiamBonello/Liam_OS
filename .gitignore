@@ -1,0 +1,18 @@
+# Build artifacts
+core/build/
+dist/
+*.iso
+*.bin
+*.o
+*.elf
+*.map
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local environment
+.env
+.env.*
