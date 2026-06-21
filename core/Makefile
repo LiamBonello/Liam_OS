@@ -4,7 +4,8 @@ USERLAND_BUILD_DIR := $(BUILD_DIR)/userland
 KERNEL := $(BUILD_DIR)/kernel.bin
 ISO := $(BUILD_DIR)/liam_os.iso
 
-ARCH := i386
+ARCH ?= i386
+SUPPORTED_ARCHES := i386 x86_64
 ARCH_DIR := kernel/arch/$(ARCH)
 
 ASM := nasm
@@ -12,10 +13,29 @@ CC := clang
 LD := ld.lld
 QEMU := qemu-system-i386
 
-ASMFLAGS := -f elf32
-BASE_CFLAGS := -target i386-elf -ffreestanding -fno-stack-protector -fno-pic -fno-builtin -mno-sse -mno-mmx -Wall -Wextra -O0
+ASMFLAGS_i386 := -f elf32
+CFLAGS_i386 := -target i386-elf -ffreestanding -fno-stack-protector -fno-pic -fno-builtin -mno-sse -mno-mmx -Wall -Wextra -O0
+LDFLAGS_i386 := -T linker.ld -nostdlib -m elf_i386
+QEMU_i386 := qemu-system-i386
+
+ASMFLAGS_x86_64 := -f elf64
+CFLAGS_x86_64 := -target x86_64-elf -ffreestanding -fno-stack-protector -fno-pic -fno-builtin -mno-red-zone -Wall -Wextra -O0
+LDFLAGS_x86_64 := -T linker.x86_64.ld -nostdlib -m elf_x86_64
+QEMU_x86_64 := qemu-system-x86_64
+
+ASMFLAGS := $(ASMFLAGS_$(ARCH))
+BASE_CFLAGS := $(CFLAGS_$(ARCH))
 CFLAGS := $(BASE_CFLAGS)
-LDFLAGS := -T linker.ld -nostdlib -m elf_i386
+LDFLAGS := $(LDFLAGS_$(ARCH))
+QEMU := $(QEMU_$(ARCH))
+
+ifneq ($(filter $(ARCH),$(SUPPORTED_ARCHES)),$(ARCH))
+$(error Unsupported ARCH '$(ARCH)'. Supported: $(SUPPORTED_ARCHES))
+endif
+
+ifeq ($(ARCH),x86_64)
+$(error ARCH=x86_64 is scaffolded but not bootable yet. Use 'make x86_64-info' for the staged migration plan.)
+endif
 
 ASM_SRC := \
 	$(ARCH_DIR)/start.asm \
@@ -96,7 +116,7 @@ VPATH := \
 	kernel/memory \
 	kernel/userland
 
-.PHONY: all clean run run-debug debug check-tools userland
+.PHONY: all clean run run-debug debug check-tools userland x86_64-info
 
 all: $(ISO)
 
@@ -109,6 +129,12 @@ check-tools:
 	@command -v $(LD) >/dev/null || (echo "Missing tool: $(LD)" && exit 1)
 	@command -v grub-mkrescue >/dev/null || (echo "Missing tool: grub-mkrescue" && exit 1)
 	@command -v $(QEMU) >/dev/null || (echo "Missing tool: $(QEMU)" && exit 1)
+
+x86_64-info:
+	@echo "Liam_OS x86_64 path is scaffolded but not bootable yet."
+	@echo "Current bootable default remains: ARCH=i386"
+	@echo "Next milestone: add linker.x86_64.ld and a long-mode bootstrap under kernel/arch/x86_64/."
+	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
