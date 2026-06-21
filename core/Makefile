@@ -3,6 +3,9 @@ ISO_DIR := $(BUILD_DIR)/iso
 USERLAND_BUILD_DIR := $(BUILD_DIR)/userland
 KERNEL := $(BUILD_DIR)/kernel.bin
 ISO := $(BUILD_DIR)/liam_os.iso
+X86_64_BUILD_DIR := $(BUILD_DIR)/x86_64
+X86_64_KERNEL := $(X86_64_BUILD_DIR)/kernel.elf
+X86_64_BOOT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/start.o
 
 ARCH ?= i386
 SUPPORTED_ARCHES := i386 x86_64
@@ -34,7 +37,7 @@ $(error Unsupported ARCH '$(ARCH)'. Supported: $(SUPPORTED_ARCHES))
 endif
 
 ifeq ($(ARCH),x86_64)
-$(error ARCH=x86_64 is scaffolded but not bootable yet. Use 'make x86_64-info' for the staged migration plan.)
+$(error ARCH=x86_64 is scaffolded but not bootable yet. Use 'make x86_64-info' or 'make x86_64-kernel' for staged migration work.)
 endif
 
 ASM_SRC := \
@@ -116,7 +119,7 @@ VPATH := \
 	kernel/memory \
 	kernel/userland
 
-.PHONY: all clean run run-debug debug check-tools userland x86_64-info
+.PHONY: all clean run run-debug debug check-tools userland x86_64-info x86_64-check-tools x86_64-kernel
 
 all: $(ISO)
 
@@ -130,14 +133,26 @@ check-tools:
 	@command -v grub-mkrescue >/dev/null || (echo "Missing tool: grub-mkrescue" && exit 1)
 	@command -v $(QEMU) >/dev/null || (echo "Missing tool: $(QEMU)" && exit 1)
 
+x86_64-check-tools:
+	@command -v $(ASM) >/dev/null || (echo "Missing tool: $(ASM)" && exit 1)
+	@command -v $(LD) >/dev/null || (echo "Missing tool: $(LD)" && exit 1)
+
 x86_64-info:
-	@echo "Liam_OS x86_64 path is scaffolded but not bootable yet."
+	@echo "Liam_OS x86_64 path can build an experimental ELF64 kernel artifact, but it is not bootable yet."
 	@echo "Current bootable default remains: ARCH=i386"
-	@echo "Next milestone: add linker.x86_64.ld and a long-mode bootstrap under kernel/arch/x86_64/."
+	@echo "Artifact target: make x86_64-kernel"
+	@echo "Artifact output: $(X86_64_KERNEL)"
+	@echo "Next milestone: add a real boot handoff and long-mode transition path."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
+
+x86_64-kernel: x86_64-check-tools $(X86_64_KERNEL)
+	@echo "Built experimental x86_64 kernel artifact: $(X86_64_KERNEL)"
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+$(X86_64_BUILD_DIR): | $(BUILD_DIR)
+	mkdir -p $(X86_64_BUILD_DIR)
 
 $(USERLAND_BUILD_DIR): | $(BUILD_DIR)
 	mkdir -p $(USERLAND_BUILD_DIR)
@@ -150,6 +165,13 @@ $(USERLAND_BUILD_DIR)/$(1).bin: userland/flat/$(1)/$(1).asm | $(USERLAND_BUILD_D
 endef
 
 $(foreach name,$(USERLAND_FLAT_NAMES),$(eval $(call BUILD_USERLAND_FLAT,$(name))))
+
+$(X86_64_BOOT_OBJ): kernel/arch/x86_64/start.asm | $(X86_64_BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
+
+$(X86_64_KERNEL): linker.x86_64.ld $(X86_64_BOOT_OBJ)
+	$(LD) $(LDFLAGS_x86_64) $(X86_64_BOOT_OBJ) -o $@
 
 $(BUILD_DIR)/kernel/userland/userland_images.o: kernel/userland/userland_images.asm $(USERLAND_FLAT_BIN) | $(BUILD_DIR)
 	mkdir -p $(dir $@)
