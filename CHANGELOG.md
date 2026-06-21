@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.9-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/types.h` for local x86_64 fixed-width types.
+- Added `core/kernel/arch/x86_64/console.h` and `console.c` for early VGA text output and COM1 serial output.
+- Captured GRUB's Multiboot2 magic and boot information pointer in the x86_64 bootstrap.
+- Passed the captured Multiboot2 boot state into `kernel_main_x86_64`.
+
+### Changed
+
+- Updated the x86_64 C entry to report `Multiboot2 magic: ok` and the boot-info pointer.
+- Updated `make x86_64-run` to route serial output to the terminal with `-serial stdio`.
+- Updated Liam_OS version to `0.8.9-dev`.
+
+### Notes
+
+- This is still an experimental x86_64 path, but it now has enough boot-state and serial diagnostics to support the next boot-info parsing and runtime setup work.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.8-dev
 
 ### Added
@@ -527,12 +547,6 @@
 - Added `proc-status` shell command.
 - Added `proc-info <pid>` shell command.
 - Improved `ps` status output to print status names instead of raw numeric values.
-
-### Notes
-
-- Process slots are still retained after exit.
-- There is no process reaping or PID recycling yet.
-- This milestone improves observability before process cleanup and address-space isolation work.
 
 ## Core 0.2.4-dev
 
