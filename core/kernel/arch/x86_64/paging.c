@@ -12,7 +12,7 @@ extern u64 x86_64_boot_pd_table[];
 static u64 read_cr3(void)
 {
     u64 value;
-    __asm__ volatile ("mov %%cr3, %0" : "=r" (value));
+    __asm__ volatile ("movq %%cr3, %0" : "=r" (value));
     return value;
 }
 
