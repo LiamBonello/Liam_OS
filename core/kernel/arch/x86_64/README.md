@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, installs an early exception IDT, builds an architecture boot context, parses boot information, computes an early PMM plan, initializes an isolated bounded PMM page allocator, and writes VGA/serial diagnostics:
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, installs an early exception IDT, builds an architecture boot context, parses boot information, computes an early PMM plan, initializes an isolated bounded PMM page allocator, captures bootstrap paging state, and writes VGA/serial diagnostics:
 
 ```sh
 cd core
@@ -35,7 +35,7 @@ Expected screen messages include:
 
 ```txt
 Liam_OS x86_64 kernel diagnostics
-Stage: PMM allocator smoke test
+Stage: paging baseline + PMM
 Multiboot2: ok
 Bootloader: ...
 Boot info pointer: 0x........
@@ -55,13 +55,15 @@ Reserved below: 0x................
 PMM tracked pages: ...
 PMM smoke page: 0x................
 PMM smoke free: 1
+Paging huge pages: 512
+Paging CR3: 0x................
 ```
 
 If an early CPU exception fires after IDT installation, the handler prints the exception name over VGA and the full vector/error-code diagnostics over serial.
 
-`make x86_64-run` also routes COM1 serial output to the terminal.
+`make x86_64-run` also routes COM1 serial output to the terminal, including full paging table diagnostics for CR3, PML4, PDPT, PD, huge-page count, and identity-map span.
 
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, an architecture-owned boot context, a planning PMM view over retained memory-map regions, and an isolated physical page allocator smoke test. It does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke test, and C-visible bootstrap paging-state diagnostics. It does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
 
 ## Milestones
 
@@ -71,7 +73,7 @@ This is not the full x86_64 kernel yet. The current path proves an assembly hand
 4. Bring up a minimal 64-bit C console path. Started.
 5. Parse Multiboot2 boot information and memory map. Started.
 6. Add x86_64 GDT/IDT/interrupt handling. Started with exception IDT only.
-7. Port paging and memory layout to 64-bit addresses. Started with boot-context layout, PMM planning diagnostics, and an isolated PMM allocator smoke test.
+7. Port paging and memory layout to 64-bit addresses. Started with boot-context layout, PMM planning diagnostics, an isolated PMM allocator smoke test, and bootstrap paging-state diagnostics.
 8. Revisit syscalls and userspace after the 64-bit kernel path is stable.
 
 ## Guardrails
