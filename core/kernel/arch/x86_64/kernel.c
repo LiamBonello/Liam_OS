@@ -1,6 +1,7 @@
 #include "boot_context.h"
 #include "console.h"
 #include "idt.h"
+#include "pmm.h"
 
 static void report_boot_summary(const struct x86_64_boot_summary *summary)
 {
@@ -81,6 +82,27 @@ static void report_pmm_plan(const struct x86_64_pmm_plan *plan)
     x86_64_serial_write_hex64("Reserved below: 0x", plan->reserved_below);
 }
 
+static void report_pmm_allocator(void)
+{
+    const struct x86_64_pmm_state *state = x86_64_pmm_get_state();
+    u64 page = x86_64_pmm_alloc_page();
+    u32 free_ok = x86_64_pmm_free_page(page);
+
+    x86_64_console_write_u32(20, 0, "PMM tracked pages: ", state->tracked_pages);
+    x86_64_console_write_hex64(21, 0, "PMM smoke page: 0x", page);
+    x86_64_console_write_u32(22, 0, "PMM smoke free: ", free_ok);
+
+    x86_64_serial_write_line("x86_64 PMM allocator online");
+    x86_64_serial_write_u32("PMM tracked pages: ", state->tracked_pages);
+    x86_64_serial_write_u32("PMM free pages: ", state->free_pages);
+    x86_64_serial_write_u32("PMM dropped pages: ", state->dropped_pages);
+    x86_64_serial_write_u32("PMM duplicate rejects: ", state->duplicate_free_rejects);
+    x86_64_serial_write_hex64("PMM lowest page: 0x", state->lowest_page);
+    x86_64_serial_write_hex64("PMM highest page: 0x", state->highest_page);
+    x86_64_serial_write_hex64("PMM smoke page: 0x", page);
+    x86_64_serial_write_u32("PMM smoke free: ", free_ok);
+}
+
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
@@ -90,16 +112,18 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_idt_init();
 
     x86_64_boot_context_init(boot_magic, boot_info, &context);
+    x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: PMM plan + boot context", 1, 0);
+    x86_64_console_write_at("Stage: PMM allocator smoke test", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: PMM plan + boot context");
+    x86_64_serial_write_line("Stage: PMM allocator smoke test");
 
     report_boot_summary(&context.boot_info);
     report_memory_layout(&context.memory_layout);
     report_pmm_plan(&context.pmm_plan);
+    report_pmm_allocator();
 
     for (;;) {
         __asm__ volatile ("hlt");
