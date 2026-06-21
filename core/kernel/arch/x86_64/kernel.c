@@ -55,15 +55,27 @@ static void report_boot_summary(const struct x86_64_boot_summary *summary)
     }
 }
 
+static void report_idt_state(const struct x86_64_idt_state *state)
+{
+    x86_64_console_write_u32(10, 0, "IDT DF IST: ", state->double_fault_ist);
+
+    x86_64_serial_write_line("x86_64 IDT: exceptions installed");
+    x86_64_serial_write_hex64("IDT base: 0x", state->idtr_base);
+    x86_64_serial_write_u32("IDT limit: ", state->idtr_limit);
+    x86_64_serial_write_u32("IDT exception gates: ", state->exception_gates);
+    x86_64_serial_write_u32("IDT double fault vector: ", state->double_fault_vector);
+    x86_64_serial_write_u32("IDT double fault IST: ", state->double_fault_ist);
+    x86_64_serial_write_u32("IDT double fault present: ", state->double_fault_present);
+    x86_64_serial_write_u32("IDT double fault IST ok: ", state->double_fault_ist_ok);
+}
+
 static void report_memory_layout(const struct x86_64_memory_layout *layout)
 {
-    x86_64_console_write_at("IDT: exceptions installed", 10, 0);
     x86_64_console_write_hex64(11, 0, "Kernel start: 0x", layout->kernel_start);
     x86_64_console_write_hex64(12, 0, "Kernel end: 0x", layout->kernel_end);
     x86_64_console_write_hex64(13, 0, "Kernel bytes: 0x", layout->kernel_size_bytes);
     x86_64_console_write_hex64(14, 0, "Identity map bytes: 0x", layout->bootstrap_identity_map_bytes);
 
-    x86_64_serial_write_line("x86_64 IDT: exceptions installed");
     x86_64_serial_write_hex64("Kernel start: 0x", layout->kernel_start);
     x86_64_serial_write_hex64("Kernel end: 0x", layout->kernel_end);
     x86_64_serial_write_hex64("Kernel bytes: 0x", layout->kernel_size_bytes);
@@ -150,8 +162,6 @@ static void report_tss_state(const struct x86_64_tss_state *state, const struct 
                      (state->initialized != 0U) && (limit_ok != 0U) &&
                      (state->loaded != 0U)) ? 1U : 0U;
 
-    x86_64_console_write_u32(24, 0, "GDT/TSS loaded ok: ", loaded_ok);
-
     x86_64_serial_write_line("x86_64 bootstrap TSS loaded");
     x86_64_serial_write_hex64("TSS base: 0x", state->tss_base);
     x86_64_serial_write_u32("TSS limit: ", state->tss_limit);
@@ -163,12 +173,29 @@ static void report_tss_state(const struct x86_64_tss_state *state, const struct 
     x86_64_serial_write_hex64("TSS stack bytes: 0x", state->ist_stack_bytes);
     x86_64_serial_write_u32("TSS initialized: ", state->initialized);
     x86_64_serial_write_u32("TSS loaded: ", state->loaded);
+    x86_64_serial_write_u32("GDT/TSS loaded ok: ", loaded_ok);
+}
+
+static void report_descriptor_summary(const struct x86_64_idt_state *idt_state,
+                                      const struct x86_64_gdt_state *gdt_state,
+                                      const struct x86_64_tss_state *tss_state)
+{
+    u32 limit_ok = (tss_state->tss_limit == X86_64_TSS_EXPECTED_LIMIT) ? 1U : 0U;
+    u32 descriptor_ok = ((idt_state->double_fault_present != 0U) &&
+                         (idt_state->double_fault_ist_ok != 0U) &&
+                         (gdt_state->selectors_ok != 0U) &&
+                         (gdt_state->tss_loaded != 0U) &&
+                         (tss_state->loaded != 0U) &&
+                         (limit_ok != 0U)) ? 1U : 0U;
+
+    x86_64_console_write_u32(24, 0, "Desc/IST ok: ", descriptor_ok);
 }
 
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
     struct x86_64_gdt_state gdt_state;
+    struct x86_64_idt_state idt_state;
     struct x86_64_paging_state paging_state;
     struct x86_64_tss_state tss_state;
 
@@ -177,6 +204,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_idt_init();
 
     x86_64_boot_context_init(boot_magic, boot_info, &context);
+    x86_64_idt_get_state(&idt_state);
     x86_64_paging_state_init(&paging_state);
     x86_64_tss_init(&tss_state);
     x86_64_gdt_load_tss(&tss_state, &gdt_state);
@@ -184,18 +212,20 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: descriptor load + paging + PMM", 1, 0);
+    x86_64_console_write_at("Stage: DF IST + descriptor + PMM", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: descriptor load + paging + PMM");
+    x86_64_serial_write_line("Stage: DF IST + descriptor + PMM");
 
     report_boot_summary(&context.boot_info);
+    report_idt_state(&idt_state);
     report_memory_layout(&context.memory_layout);
     report_pmm_plan(&context.pmm_plan);
     report_pmm_allocator();
     report_paging_state(&paging_state);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
+    report_descriptor_summary(&idt_state, &gdt_state, &tss_state);
 
     for (;;) {
         __asm__ volatile ("hlt");
