@@ -5,7 +5,6 @@
 #define MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME 2U
 #define MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO 4U
 #define MULTIBOOT2_TAG_TYPE_MMAP 6U
-#define MULTIBOOT2_MEMORY_AVAILABLE 1U
 
 struct multiboot2_info_header {
     u32 total_size;
@@ -60,6 +59,18 @@ static void copy_bootloader_name(char *destination, const char *source, u32 sour
     destination[i] = '\0';
 }
 
+static void retain_memory_region(const struct multiboot2_mmap_entry *mmap_entry, struct x86_64_boot_summary *summary)
+{
+    if (summary->memory_region_count >= X86_64_MEMORY_REGION_MAX) {
+        return;
+    }
+
+    struct x86_64_memory_region *region = &summary->memory_regions[summary->memory_region_count++];
+    region->base = mmap_entry->base_addr;
+    region->length = mmap_entry->length;
+    region->type = mmap_entry->type;
+}
+
 static void parse_mmap_tag(const struct multiboot2_mmap_tag *tag, struct x86_64_boot_summary *summary)
 {
     if (tag->entry_size < sizeof(struct multiboot2_mmap_entry) || tag->size < sizeof(*tag)) {
@@ -75,7 +86,9 @@ static void parse_mmap_tag(const struct multiboot2_mmap_tag *tag, struct x86_64_
         const struct multiboot2_mmap_entry *mmap_entry = (const struct multiboot2_mmap_entry *)entry;
 
         ++summary->mmap_entry_count;
-        if (mmap_entry->type == MULTIBOOT2_MEMORY_AVAILABLE) {
+        retain_memory_region(mmap_entry, summary);
+
+        if (mmap_entry->type == X86_64_MEMORY_REGION_AVAILABLE) {
             summary->usable_memory_bytes += mmap_entry->length;
         }
 
