@@ -10,7 +10,8 @@ X86_64_ISO := $(X86_64_BUILD_DIR)/liam_os_x86_64.iso
 X86_64_GRUB_CFG := boot/grub-x86_64.cfg
 X86_64_BOOT32_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot32.o
 X86_64_START_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/start.o
-X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ)
+X86_64_KERNEL_C_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/kernel.o
+X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_KERNEL_C_OBJ)
 
 ARCH ?= i386
 SUPPORTED_ARCHES := i386 x86_64
@@ -141,6 +142,7 @@ check-tools:
 
 x86_64-check-tools:
 	@command -v $(ASM) >/dev/null || (echo "Missing tool: $(ASM)" && exit 1)
+	@command -v $(CC) >/dev/null || (echo "Missing tool: $(CC)" && exit 1)
 	@command -v $(LD) >/dev/null || (echo "Missing tool: $(LD)" && exit 1)
 	@command -v $(GRUB_FILE) >/dev/null || (echo "Missing tool: $(GRUB_FILE)" && exit 1)
 
@@ -151,14 +153,14 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path has an experimental Multiboot2 long-mode ISO path."
+	@echo "Liam_OS x86_64 path has an experimental Multiboot2 long-mode ISO path with a freestanding C entry."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
 	@echo "Run target: make x86_64-run"
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
-	@echo "Expected x86_64 screen message: Liam_OS x86_64 long mode online"
+	@echo "Expected x86_64 screen message: Liam_OS x86_64 C kernel entry online"
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
 x86_64-kernel: x86_64-check-tools $(X86_64_KERNEL)
@@ -195,6 +197,10 @@ $(X86_64_BOOT32_OBJ): kernel/arch/x86_64/boot32.asm | $(X86_64_BUILD_DIR)
 $(X86_64_START_OBJ): kernel/arch/x86_64/start.asm | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
+
+$(X86_64_KERNEL_C_OBJ): kernel/arch/x86_64/kernel.c | $(X86_64_BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
 $(X86_64_KERNEL): linker.x86_64.ld $(X86_64_BOOT_OBJ)
 	$(LD) $(LDFLAGS_x86_64) $(X86_64_BOOT_OBJ) -o $@
