@@ -63,7 +63,35 @@ If an early CPU exception fires after IDT installation, the handler prints the e
 
 `make x86_64-run` also routes COM1 serial output to the terminal, including full paging table diagnostics for CR3, PML4, PDPT, PD, huge-page count, identity-map span, IDTR base/limit, NMI/double-fault/page-fault IST routing, GDTR base/limit, active selectors, current task-register selector, descriptor values, TSS base/limit, and planned IST stack addresses.
 
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, dedicated critical-exception IST routing, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke test, C-visible bootstrap paging-state diagnostics, and a C-visible bootstrap TSS/IST plan. It does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
+The x86_64 path also has a headless smoke target for CI and automated agent testing:
+
+```sh
+cd core
+make x86_64-smoke
+```
+
+That target runs QEMU without a window, captures serial output to `core/build/x86_64/x86_64-smoke.log`, and validates these serial markers:
+
+```txt
+Liam_OS x86_64 kernel diagnostics
+Stage: IST gates + descriptor + PMM
+Multiboot2: ok
+IDT NMI IST: 2
+IDT NMI IST ok: 1
+IDT double fault IST: 1
+IDT double fault IST ok: 1
+IDT page fault IST: 3
+IDT page fault IST ok: 1
+IDT IST gates ok: 1
+PMM smoke free: 1
+Paging huge pages: 512
+GDT/TSS loaded ok: 1
+Desc/IST ok: 1
+```
+
+GitHub Actions runs the same smoke target and uploads the serial log when the workflow completes.
+
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, dedicated critical-exception IST routing, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke test, C-visible bootstrap paging-state diagnostics, a C-visible bootstrap TSS/IST plan, and automated headless boot validation. It does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
 
 ## Milestones
 
