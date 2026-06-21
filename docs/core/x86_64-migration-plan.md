@@ -68,10 +68,11 @@ Status: started.
 - Parse Multiboot2 total size, bootloader name, basic memory info, and memory map tags.
 - Report bootloader name, boot-info size, memory-map entry count, and total usable memory bytes over VGA and serial.
 - Added `core/kernel/arch/x86_64/boot_context.c` and `boot_context.h` to preserve parsed boot information inside an architecture-owned boot context.
+- Retain a bounded copy of Multiboot2 memory-map regions for later architecture initialization.
 
 Remaining work:
 
-- Convert memory-map data into an x86_64 physical memory initialization contract.
+- Convert memory-map data into a real x86_64 physical page allocator.
 - Keep the boot context alive as the handoff into PMM, paging, and later kernel runtime initialization grows.
 
 ## Stage 6: descriptor and interrupt strategy
@@ -92,17 +93,21 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
-Status: started for layout reporting only.
+Status: started for layout and PMM planning only.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
 - Report current kernel image bounds, kernel image size, bootstrap identity-map span, boot stack size, and page-size constants through the boot context.
+- Added `core/kernel/arch/x86_64/pmm_plan.c` and `pmm_plan.h`.
+- Compute a planning-only PMM view from retained Multiboot2 memory regions by reserving everything below the aligned kernel image end.
+- Report PMM usable region count, first planned free page, managed page count, managed bytes, and reserved-below boundary.
 
 Remaining work:
 
 - Replace 32-bit page-directory/page-table assumptions with PML4-based paging for x86_64.
 - Introduce pointer-width-safe address types where needed.
 - Define the permanent x86_64 virtual memory map separately from i386 constants.
+- Turn the PMM plan into a real page allocator once diagnostics are stable.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
 
 ## Stage 8: process and userspace model
