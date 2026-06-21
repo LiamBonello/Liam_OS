@@ -34,6 +34,11 @@ static const registered_user_image_t registered_images[] = {
         USER_IMAGE_KIND_FLAT_BINARY
     },
     {
+        "/bin/sysbadptr",
+        "sysbadptr",
+        USER_IMAGE_KIND_FLAT_BINARY
+    },
+    {
         "/bin/pid",
         "pid",
         USER_IMAGE_KIND_FLAT_BINARY
