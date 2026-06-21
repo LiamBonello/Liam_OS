@@ -11,7 +11,7 @@ This split keeps the original kernel work intact while giving the commercial des
 
 `core/` is the active buildable project. It is a freestanding i386 kernel with GRUB Multiboot booting, protected-mode setup, interrupts, paging, memory management, basic scheduling/process abstractions, VFS/initramfs foundations, flat userspace image loading, and an early syscall path.
 
-An x86_64 architecture path is now scaffolded for staged migration planning. It can build an experimental ELF64 kernel artifact, but it is not bootable yet. The default and only bootable Core build remains i386.
+An x86_64 architecture path is now scaffolded for staged migration planning. It can build an experimental ELF64 kernel artifact and an experimental Multiboot2 long-mode ISO. The default stable Core build remains i386.
 
 `desktop/` is intentionally a planning/skeleton area. It should not pretend to be an installable commercial OS yet.
 
@@ -65,6 +65,20 @@ The generated artifact is written to:
 
 ```txt
 core/build/x86_64/kernel.elf
+```
+
+To build and run the current experimental x86_64 long-mode ISO:
+
+```sh
+cd core
+make x86_64-iso
+make x86_64-run
+```
+
+The generated experimental ISO is written to:
+
+```txt
+core/build/x86_64/liam_os_x86_64.iso
 ```
 
 ## Repository layout
