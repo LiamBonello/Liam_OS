@@ -113,10 +113,10 @@ void x86_64_exception_handler(u64 vector, u64 error_code)
 {
     const char *name = exception_name(vector);
 
-    x86_64_console_write_at("x86_64 exception", 16, 0);
-    x86_64_console_write_at(name, 17, 0);
-    x86_64_console_write_hex64(18, 0, "Vector: 0x", vector);
-    x86_64_console_write_hex64(19, 0, "Error code: 0x", error_code);
+    x86_64_console_write_at("x86_64 exception", 21, 0);
+    x86_64_console_write_at(name, 22, 0);
+    x86_64_console_write_hex64(23, 0, "Vector: 0x", vector);
+    x86_64_console_write_hex64(24, 0, "Error code: 0x", error_code);
 
     x86_64_serial_write_line("x86_64 exception");
     x86_64_serial_write("Name: ");
