@@ -42,7 +42,7 @@ static void track_page(u64 page)
 
 static void track_range(u64 start, u64 end)
 {
-    if (end <= start) {
+    if (end <= start || end - start < X86_64_PAGE_SIZE) {
         return;
     }
 
