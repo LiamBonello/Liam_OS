@@ -460,6 +460,49 @@ kernel_status_t process_run_by_pid(uint32_t pid, process_t** out_process)
     return process_run(process);
 }
 
+kernel_status_t process_run_all_ready(uint32_t max_runs, uint32_t* out_run_count)
+{
+    if (out_run_count == 0)
+    {
+        return KERNEL_ERROR_INVALID_ARGUMENT;
+    }
+
+    *out_run_count = 0;
+
+    if (max_runs == 0)
+    {
+        max_runs = PROCESS_MAX_PROCESSES;
+    }
+
+    for (uint32_t i = 0; i < max_runs; i++)
+    {
+        process_t* process = process_find_next_ready();
+
+        if (process == 0)
+        {
+            return (*out_run_count == 0)
+                ? KERNEL_ERROR_NOT_FOUND
+                : KERNEL_OK;
+        }
+
+        kernel_status_t status = process_run(process);
+
+        if (status != KERNEL_OK)
+        {
+            return status;
+        }
+
+        (*out_run_count)++;
+    }
+
+    if (process_find_next_ready() != 0)
+    {
+        return KERNEL_ERROR_BUSY;
+    }
+
+    return KERNEL_OK;
+}
+
 uint32_t process_clear_exited(void)
 {
     uint32_t cleared = 0;

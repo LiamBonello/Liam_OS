@@ -165,6 +165,7 @@ static void shell_print_help(void) {
     vga_write_line("  proc-clear-exited Clear exited/failed process slots");
     vga_write_line("  wait-last        Show last exited process result");
     vga_write_line("  run-ready        Run the next READY userspace process");
+    vga_write_line("  run-all-ready    Run all READY userspace processes");
     vga_write_line("  run-pid <pid>    Run a READY userspace process by PID");
     vga_write_line("  exec <path>      Start a userspace image");
     vga_write_line("  exec /bin/hello  Run the flat hello userspace program");
@@ -956,6 +957,28 @@ static void shell_handle_run_ready(void)
         vga_write(" state=");
         vga_write_line(process_state_name(process->state));
     }
+}
+
+static void shell_handle_run_all_ready(void)
+{
+    uint32_t run_count = 0;
+    kernel_status_t status = process_run_all_ready(
+        PROCESS_MAX_PROCESSES,
+        &run_count
+    );
+
+    if (status == KERNEL_ERROR_NOT_FOUND)
+    {
+        vga_write_line("No READY processes found.");
+        return;
+    }
+
+    vga_write("run-all-ready result: ");
+    shell_print_status_code(status);
+
+    vga_write("Processes run: ");
+    vga_write_u32(run_count);
+    vga_write_line("");
 }
 
 static void shell_handle_run_pid(const char* args)
@@ -3641,6 +3664,11 @@ static void shell_execute_command(const char* input) {
 
     if (string_equals(command.name, "run-ready")) {
         shell_handle_run_ready();
+        return;
+    }
+
+    if (string_equals(command.name, "run-all-ready")) {
+        shell_handle_run_all_ready();
         return;
     }
 

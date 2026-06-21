@@ -12,8 +12,8 @@ _start:
     call .write_buffer
 
     mov ebx, esi
-    add ebx, .exec_message - .get_eip
-    mov ecx, .exec_message_len
+    add ebx, .echo_message - .get_eip
+    mov ecx, .echo_message_len
     call .write_buffer
 
     mov ebx, esi
@@ -42,6 +42,36 @@ _start:
     call .write_buffer
 
     mov ebx, esi
+    add ebx, .uptime_message - .get_eip
+    mov ecx, .uptime_message_len
+    call .write_buffer
+
+    mov ebx, esi
+    add ebx, .uptime_path - .get_eip
+    mov ecx, esi
+    add ecx, .empty_args - .get_eip
+    mov edx, 0
+    mov eax, 12             ; LIAM_SYSCALL_EXEC
+    int 0x80
+    test eax, eax
+    js .uptime_exec_failed
+
+    mov edi, eax
+
+    mov ebx, esi
+    add ebx, .pid_prefix - .get_eip
+    mov ecx, .pid_prefix_len
+    call .write_buffer
+
+    mov eax, edi
+    call .write_u32_decimal
+
+    mov ebx, esi
+    add ebx, .newline - .get_eip
+    mov ecx, .newline_len
+    call .write_buffer
+
+    mov ebx, esi
     add ebx, .done_message - .get_eip
     mov ecx, .done_message_len
     call .write_buffer
@@ -51,6 +81,25 @@ _start:
     mov edx, 0
     mov eax, 1              ; LIAM_SYSCALL_EXIT
     int 0x80
+
+.uptime_exec_failed:
+    mov edi, eax
+
+    mov ebx, esi
+    add ebx, .uptime_failed_message - .get_eip
+    mov ecx, .uptime_failed_message_len
+    call .write_buffer
+
+    mov eax, edi
+    neg eax
+    call .write_u32_decimal
+
+    mov ebx, esi
+    add ebx, .newline - .get_eip
+    mov ecx, .newline_len
+    call .write_buffer
+
+    jmp .exec_failed
 
 .exec_failed:
     mov ebx, esi
@@ -125,17 +174,25 @@ _start:
     db 'Liam_OS userspace shell', 10
 .banner_len equ $ - .banner
 
-.exec_message:
+.echo_message:
     db 'sh: creating /bin/echo through LIAM_SYSCALL_EXEC', 10
-.exec_message_len equ $ - .exec_message
+.echo_message_len equ $ - .echo_message
+
+.uptime_message:
+    db 'sh: creating /bin/uptime through LIAM_SYSCALL_EXEC', 10
+.uptime_message_len equ $ - .uptime_message
 
 .pid_prefix:
     db 'sh: child pid='
 .pid_prefix_len equ $ - .pid_prefix
 
 .done_message:
-    db 'sh: child process created in ready state', 10
+    db 'sh: child processes created in ready state', 10
 .done_message_len equ $ - .done_message
+
+.uptime_failed_message:
+    db 'sh: /bin/uptime exec failed code=-'
+.uptime_failed_message_len equ $ - .uptime_failed_message
 
 .exec_failed_message:
     db 'sh: exec syscall failed', 10
@@ -146,6 +203,12 @@ _start:
 
 .echo_args:
     db 'hello from /bin/sh via syscall exec', 0
+
+.uptime_path:
+    db '/bin/uptime', 0
+
+.empty_args:
+    db 0
 
 .newline:
     db 10

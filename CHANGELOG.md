@@ -1,5 +1,23 @@
 # Liam_OS Changelog
 
+## Core 0.8.3-dev
+
+### Added
+
+- Added `process_run_all_ready`.
+- Added kernel shell command `run-all-ready`.
+- Updated `/bin/sh` to create multiple READY child processes through `LIAM_SYSCALL_EXEC`.
+
+### Changed
+
+- Updated `/bin/help` to list `run-all-ready`.
+- Updated Liam_OS version to `0.8.3-dev`.
+
+### Notes
+
+- `run-all-ready` safely drains READY userspace processes after returning to the kernel shell.
+- This is a scheduler stepping stone before automatic userspace process scheduling.
+
 ## Core 0.8.2-dev
 
 ### Added

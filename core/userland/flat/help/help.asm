@@ -47,5 +47,6 @@ _start:
     db '  proc-status      Show process subsystem status', 10
     db '  wait-last        Wait for the most recent process result', 10
     db '  run-ready        Run the next READY process', 10
+    db '  run-all-ready    Run all READY processes', 10
     db '  run-pid <pid>    Run a READY process by PID', 10
 .help_message_len equ $ - .help_message

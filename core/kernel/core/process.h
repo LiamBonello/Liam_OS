@@ -110,6 +110,7 @@ process_t* process_find_by_pid_mutable(uint32_t pid);
 process_t* process_find_next_ready(void);
 kernel_status_t process_run_next_ready(process_t** out_process);
 kernel_status_t process_run_by_pid(uint32_t pid, process_t** out_process);
+kernel_status_t process_run_all_ready(uint32_t max_runs, uint32_t* out_run_count);
 const process_info_t* process_get_info(void);
 uint32_t process_clear_exited(void);
 
