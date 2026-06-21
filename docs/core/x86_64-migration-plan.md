@@ -37,12 +37,12 @@ Status: started.
 - Added `make x86_64-iso` to create `core/build/x86_64/liam_os_x86_64.iso`.
 - Added `make x86_64-run` to boot the experimental ISO in `qemu-system-x86_64`.
 - The handoff enters long mode, sets 64-bit segments, installs a temporary stack, and calls the x86_64 entry shim.
+- The handoff now preserves GRUB's Multiboot2 magic and boot information pointer for C.
 - This path is still experimental and uses temporary identity-mapped paging.
 
 Remaining work:
 
-- Validate the long-mode handoff in QEMU.
-- Add explicit failure diagnostics for unsupported CPUs or malformed boot state.
+- Add explicit failure diagnostics for unsupported CPUs or malformed boot state before enabling long mode.
 - Replace temporary bootstrap paging with a planned x86_64 memory layout.
 
 ## Stage 4: early 64-bit kernel entry
@@ -50,14 +50,16 @@ Remaining work:
 Status: started.
 
 - Added `core/kernel/arch/x86_64/kernel.c` with a minimal freestanding C entry point.
-- The expected screen messages are `Liam_OS x86_64 C kernel entry online` and `Stage: long mode -> freestanding C`.
-- The current C entry clears VGA text mode and halts cleanly.
+- Added `core/kernel/arch/x86_64/console.c` and `console.h` for early VGA text and COM1 serial output.
+- Added `core/kernel/arch/x86_64/types.h` for local fixed-width types.
+- The expected screen messages include `Liam_OS x86_64 C kernel entry online`, `Multiboot2 magic: ok`, and the boot-info pointer.
+- `make x86_64-run` routes serial output to the terminal with `-serial stdio`.
 
 Remaining work:
 
-- Split the x86_64 console helper out once more early runtime code needs it.
-- Add serial logging for easier automated boot validation.
-- Add a real x86_64 C entry contract for boot information and early architecture state.
+- Add a real x86_64 C entry contract for boot information parsing and early architecture state.
+- Parse the Multiboot2 information tags instead of only printing the pointer.
+- Add stronger serial-driven boot validation.
 - Avoid porting scheduler, userspace, or syscalls until basic boot and diagnostics are stable.
 
 ## Stage 5: descriptor and interrupt strategy
