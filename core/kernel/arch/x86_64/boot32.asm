@@ -34,6 +34,8 @@ section .text
 bits 32
 _start:
     cli
+    mov [boot_magic], eax
+    mov [boot_info], ebx
     mov esp, boot_stack_top
 
     call setup_identity_paging
@@ -92,6 +94,8 @@ long_mode_entry:
     mov gs, ax
     mov ss, ax
     mov rsp, boot_stack_top
+    mov edi, [boot_magic]
+    mov esi, [boot_info]
 
     call x86_64_start
 
@@ -122,6 +126,12 @@ pdpt_table:
     resq 512
 pd_table:
     resq 512
+
+align 4
+boot_magic:
+    resd 1
+boot_info:
+    resd 1
 
 align 16
 boot_stack_bottom:
