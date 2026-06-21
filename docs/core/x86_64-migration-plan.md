@@ -11,7 +11,7 @@ Liam_OS must move toward a real x86_64 kernel path without breaking the current 
 
 ## Stage 1: architecture scaffolding
 
-Status: started.
+Status: complete for the initial scaffold.
 
 - Keep `core/kernel/arch/i386/` untouched as the bootable path.
 - Add `core/kernel/arch/x86_64/` as a real architecture directory, initially documentation-only.
@@ -22,8 +22,15 @@ Status: started.
 
 ## Stage 2: x86_64 boot objects
 
-- Add `core/linker.x86_64.ld` for a 64-bit kernel image layout.
-- Add `core/kernel/arch/x86_64/start.asm` as a real bootstrap file.
+Status: started with a non-bootable ELF64 artifact.
+
+- Added `core/linker.x86_64.ld` for a 64-bit kernel image layout.
+- Added `core/kernel/arch/x86_64/start.asm` as the first x86_64 entry object.
+- Added `make x86_64-kernel` to build `core/build/x86_64/kernel.elf` without changing the i386 ISO path.
+- The artifact is an ELF64 kernel experiment only. It assumes 64-bit execution already exists and is not yet a real boot path.
+
+Remaining work:
+
 - Decide whether the first x86_64 boot path uses Multiboot2 or a transitional Multiboot handoff.
 - Build only the minimal boot objects needed for a controlled long-mode entry experiment.
 - Keep the i386 ISO path unchanged.
