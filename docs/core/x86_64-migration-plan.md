@@ -40,6 +40,7 @@ Status: started.
 - The handoff preserves GRUB's Multiboot2 magic and boot information pointer for C.
 - This path is still experimental and uses temporary identity-mapped paging.
 - The bootstrap assembly now uses BSS-safe alignment and explicit 64-bit boot-state reads to keep assembly diagnostics clean.
+- The bootstrap PML4, PDPT, and PD tables now have named symbols that C diagnostics can inspect.
 
 Remaining work:
 
@@ -93,7 +94,7 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
-Status: started with layout, PMM planning, and an isolated allocator smoke test.
+Status: started with layout, PMM planning, an isolated allocator smoke test, and bootstrap paging-state diagnostics.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
@@ -104,13 +105,15 @@ Status: started with layout, PMM planning, and an isolated allocator smoke test.
 - Added `core/kernel/arch/x86_64/pmm.c` and `pmm.h` as an isolated bounded page-stack allocator for early x86_64 physical pages.
 - The allocator rejects duplicate frees, unaligned pages, invalid pages, and obvious out-of-range frees.
 - The x86_64 C entry performs a one-page allocate/free smoke test and reports the result over VGA and serial.
+- Added `core/kernel/arch/x86_64/paging.c` and `paging.h` to capture the bootstrap CR3 and identity-mapped huge-page table state.
+- The x86_64 C entry reports the current bootstrap paging baseline before a permanent paging model is introduced.
 
 Remaining work:
 
-- Replace 32-bit page-directory/page-table assumptions with PML4-based paging for x86_64.
+- Replace the temporary identity map with an architecture-owned PML4 bootstrap builder.
 - Introduce pointer-width-safe address types where needed.
 - Define the permanent x86_64 virtual memory map separately from i386 constants.
-- Connect the x86_64 PMM to a real paging bootstrap only after the smoke-tested allocator stays stable.
+- Connect the x86_64 PMM to page-table allocation only after the bootstrap paging baseline stays stable.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
 
 ## Stage 8: process and userspace model
