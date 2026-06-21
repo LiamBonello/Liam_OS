@@ -72,8 +72,8 @@ Status: started.
 
 Remaining work:
 
-- Convert memory-map data into a real x86_64 physical page allocator.
 - Keep the boot context alive as the handoff into PMM, paging, and later kernel runtime initialization grows.
+- Expand memory-map validation before relying on the allocator for core kernel subsystems.
 
 ## Stage 6: descriptor and interrupt strategy
 
@@ -93,21 +93,24 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
-Status: started for layout and PMM planning only.
+Status: started with layout, PMM planning, and an isolated allocator smoke test.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
 - Report current kernel image bounds, kernel image size, bootstrap identity-map span, boot stack size, and page-size constants through the boot context.
 - Added `core/kernel/arch/x86_64/pmm_plan.c` and `pmm_plan.h`.
-- Compute a planning-only PMM view from retained Multiboot2 memory regions by reserving everything below the aligned kernel image end.
+- Compute a planning PMM view from retained Multiboot2 memory regions by reserving everything below the aligned kernel image end.
 - Report PMM usable region count, first planned free page, managed page count, managed bytes, and reserved-below boundary.
+- Added `core/kernel/arch/x86_64/pmm.c` and `pmm.h` as an isolated bounded page-stack allocator for early x86_64 physical pages.
+- The allocator rejects duplicate frees, unaligned pages, invalid pages, and obvious out-of-range frees.
+- The x86_64 C entry performs a one-page allocate/free smoke test and reports the result over VGA and serial.
 
 Remaining work:
 
 - Replace 32-bit page-directory/page-table assumptions with PML4-based paging for x86_64.
 - Introduce pointer-width-safe address types where needed.
 - Define the permanent x86_64 virtual memory map separately from i386 constants.
-- Turn the PMM plan into a real page allocator once diagnostics are stable.
+- Connect the x86_64 PMM to a real paging bootstrap only after the smoke-tested allocator stays stable.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
 
 ## Stage 8: process and userspace model
