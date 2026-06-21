@@ -7,15 +7,15 @@ bits 64
 %macro ISR_NOERR 1
 global x86_64_isr%1
 x86_64_isr%1:
-    push qword 0
-    push qword %1
+    push 0
+    push %1
     jmp x86_64_isr_common
 %endmacro
 
 %macro ISR_ERR 1
 global x86_64_isr%1
 x86_64_isr%1:
-    push qword %1
+    push %1
     jmp x86_64_isr_common
 %endmacro
 
