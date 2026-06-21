@@ -18,21 +18,21 @@ static void read_gdtr(struct x86_64_gdtr_snapshot *gdtr)
 static u16 read_cs(void)
 {
     u16 value;
-    __asm__ volatile ("mov %%cs, %0" : "=r" (value));
+    __asm__ volatile ("movw %%cs, %0" : "=rm" (value));
     return value;
 }
 
 static u16 read_ds(void)
 {
     u16 value;
-    __asm__ volatile ("mov %%ds, %0" : "=r" (value));
+    __asm__ volatile ("movw %%ds, %0" : "=rm" (value));
     return value;
 }
 
 static u16 read_ss(void)
 {
     u16 value;
-    __asm__ volatile ("mov %%ss, %0" : "=r" (value));
+    __asm__ volatile ("movw %%ss, %0" : "=rm" (value));
     return value;
 }
 
