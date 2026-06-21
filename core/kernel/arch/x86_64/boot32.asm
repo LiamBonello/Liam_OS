@@ -93,7 +93,7 @@ long_mode_entry:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov rsp, boot_stack_top
+    lea rsp, [rel boot_stack_top]
     mov edi, [rel boot_magic]
     mov esi, [rel boot_info]
 
