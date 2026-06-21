@@ -41,6 +41,7 @@ Status: started.
 - This path is still experimental and uses temporary identity-mapped paging.
 - The bootstrap assembly now uses BSS-safe alignment and explicit 64-bit boot-state reads to keep assembly diagnostics clean.
 - The bootstrap PML4, PDPT, and PD tables now have named symbols that C diagnostics can inspect.
+- The bootstrap GDT entries now have named symbols that C diagnostics can inspect.
 
 Remaining work:
 
@@ -78,12 +79,14 @@ Remaining work:
 
 ## Stage 6: descriptor and interrupt strategy
 
-Status: started for CPU exceptions only.
+Status: started for bootstrap GDT and CPU exceptions.
 
 - Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
 - Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
 - Installed interrupt-gate descriptors for CPU exceptions after the C console and serial paths initialize.
 - Added VGA and serial exception diagnostics with vector, error code, and exception name.
+- Added `core/kernel/arch/x86_64/gdt.c` and `gdt.h` to capture GDTR, active segment selectors, and bootstrap descriptor values from C.
+- The x86_64 C entry reports GDT selector validation before a maintained descriptor module and TSS are introduced.
 
 Remaining work:
 
