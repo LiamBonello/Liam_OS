@@ -197,6 +197,7 @@ static void report_descriptor_summary(const struct x86_64_idt_state *idt_state,
                          (limit_ok != 0U)) ? 1U : 0U;
 
     x86_64_console_write_u32(24, 0, "Desc/IST ok: ", descriptor_ok);
+    x86_64_serial_write_u32("Desc/IST ok: ", descriptor_ok);
 }
 
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
