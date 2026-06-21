@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.19-dev
+
+### Added
+
+- Routed the x86_64 double-fault exception gate through IST1.
+- Added IDT state diagnostics for IDTR base/limit, installed exception-gate count, double-fault vector, double-fault IST, and double-fault gate presence.
+- Added a combined descriptor summary that validates double-fault IST routing plus the maintained GDT/TSS state.
+
+### Changed
+
+- Updated the x86_64 C entry to report `Stage: DF IST + descriptor + PMM`.
+- Updated `make x86_64-info` to describe the double-fault IST milestone.
+- Updated Liam_OS version to `0.8.19-dev`.
+
+### Notes
+
+- This milestone does not deliberately trigger a double fault; it validates the IDT descriptor routing without risking an intentional fault storm.
+- NMI and page-fault IST policy remains a future decision after the descriptor path stays stable.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.18-dev
 
 ### Added
