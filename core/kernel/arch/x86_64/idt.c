@@ -5,6 +5,7 @@
 #define X86_64_EXCEPTION_COUNT 32U
 #define X86_64_KERNEL_CODE_SELECTOR 0x08U
 #define X86_64_INTERRUPT_GATE 0x8EU
+#define X86_64_IDT_IST_MASK 0x07U
 
 struct idt_entry {
     u16 offset_low;
@@ -78,13 +79,13 @@ static void zero_idt(void)
     }
 }
 
-static void set_idt_gate(u32 vector, void (*handler)(void))
+static void set_idt_gate(u32 vector, void (*handler)(void), u8 ist)
 {
     u64 address = (u64)handler;
 
     idt[vector].offset_low = (u16)(address & 0xFFFFU);
     idt[vector].selector = X86_64_KERNEL_CODE_SELECTOR;
-    idt[vector].ist = 0U;
+    idt[vector].ist = ist & X86_64_IDT_IST_MASK;
     idt[vector].type_attr = X86_64_INTERRUPT_GATE;
     idt[vector].offset_mid = (u16)((address >> 16U) & 0xFFFFU);
     idt[vector].offset_high = (u32)(address >> 32U);
@@ -96,17 +97,53 @@ static void load_idt(const struct idt_descriptor *descriptor)
     __asm__ volatile ("lidt (%0)" : : "r"(descriptor) : "memory");
 }
 
+static void read_idtr(struct idt_descriptor *descriptor)
+{
+    __asm__ volatile ("sidt %0" : "=m" (*descriptor));
+}
+
+static u32 gate_present(u32 vector)
+{
+    return (idt[vector].selector == X86_64_KERNEL_CODE_SELECTOR &&
+            idt[vector].type_attr == X86_64_INTERRUPT_GATE) ? 1U : 0U;
+}
+
 void x86_64_idt_init(void)
 {
     zero_idt();
 
     for (u32 vector = 0; vector < X86_64_EXCEPTION_COUNT; ++vector) {
-        set_idt_gate(vector, x86_64_isr_table[vector]);
+        u8 ist = 0U;
+        if (vector == X86_64_IDT_DOUBLE_FAULT_VECTOR) {
+            ist = X86_64_IDT_DOUBLE_FAULT_IST;
+        }
+        set_idt_gate(vector, x86_64_isr_table[vector], ist);
     }
 
     idt_descriptor.limit = (u16)(sizeof(idt) - 1U);
     idt_descriptor.base = (u64)&idt[0];
     load_idt(&idt_descriptor);
+}
+
+void x86_64_idt_get_state(struct x86_64_idt_state *state)
+{
+    struct idt_descriptor idtr;
+    u32 exception_gates = 0U;
+    u32 double_fault_ist = idt[X86_64_IDT_DOUBLE_FAULT_VECTOR].ist & X86_64_IDT_IST_MASK;
+
+    read_idtr(&idtr);
+
+    for (u32 vector = 0; vector < X86_64_EXCEPTION_COUNT; ++vector) {
+        exception_gates += gate_present(vector);
+    }
+
+    state->idtr_base = idtr.base;
+    state->idtr_limit = idtr.limit;
+    state->exception_gates = exception_gates;
+    state->double_fault_vector = X86_64_IDT_DOUBLE_FAULT_VECTOR;
+    state->double_fault_ist = double_fault_ist;
+    state->double_fault_present = gate_present(X86_64_IDT_DOUBLE_FAULT_VECTOR);
+    state->double_fault_ist_ok = (double_fault_ist == X86_64_IDT_DOUBLE_FAULT_IST) ? 1U : 0U;
 }
 
 void x86_64_exception_handler(u64 vector, u64 error_code)
