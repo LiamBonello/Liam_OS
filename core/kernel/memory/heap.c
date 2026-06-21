@@ -287,6 +287,26 @@ static int heap_virtual_range_has_space(uint32_t pages)
     return 1;
 }
 
+static void heap_rollback_growth(
+    const uint32_t* virtual_pages,
+    void* const* physical_pages,
+    uint32_t mapped_pages,
+    uint32_t original_next_virtual_page,
+    uint32_t original_total_pages,
+    uint32_t original_total_bytes
+)
+{
+    for (uint32_t i = 0; i < mapped_pages; i++)
+    {
+        vmm_unmap_page(virtual_pages[i]);
+        pmm_free_page(physical_pages[i]);
+    }
+
+    heap_stats.next_virtual_page = original_next_virtual_page;
+    heap_stats.total_pages = original_total_pages;
+    heap_stats.total_bytes = original_total_bytes;
+}
+
 static int heap_grow(uint32_t minimum_size)
 {
     uint32_t header_size = heap_header_size();
@@ -310,6 +330,14 @@ static int heap_grow(uint32_t minimum_size)
         return 0;
     }
 
+    uint32_t mapped_virtual_pages[HEAP_MAX_GROW_PAGES];
+    void* allocated_physical_pages[HEAP_MAX_GROW_PAGES];
+    uint32_t mapped_pages = 0;
+
+    uint32_t original_next_virtual_page = heap_stats.next_virtual_page;
+    uint32_t original_total_pages = heap_stats.total_pages;
+    uint32_t original_total_bytes = heap_stats.total_bytes;
+
     heap_block_t* first_new_block = 0;
     heap_block_t* previous_new_block = 0;
 
@@ -320,6 +348,14 @@ static int heap_grow(uint32_t minimum_size)
 
         if (physical_page == 0)
         {
+            heap_rollback_growth(
+                mapped_virtual_pages,
+                allocated_physical_pages,
+                mapped_pages,
+                original_next_virtual_page,
+                original_total_pages,
+                original_total_bytes
+            );
             heap_stats.failed_grow_count++;
             return 0;
         }
@@ -331,9 +367,21 @@ static int heap_grow(uint32_t minimum_size)
         ))
         {
             pmm_free_page(physical_page);
+            heap_rollback_growth(
+                mapped_virtual_pages,
+                allocated_physical_pages,
+                mapped_pages,
+                original_next_virtual_page,
+                original_total_pages,
+                original_total_bytes
+            );
             heap_stats.failed_grow_count++;
             return 0;
         }
+
+        mapped_virtual_pages[mapped_pages] = virtual_address;
+        allocated_physical_pages[mapped_pages] = physical_page;
+        mapped_pages++;
 
         heap_block_t* new_block = (heap_block_t*)virtual_address;
         heap_initialize_block(new_block, PMM_PAGE_SIZE - header_size);
@@ -365,6 +413,14 @@ static int heap_grow(uint32_t minimum_size)
 
         if (last == 0)
         {
+            heap_rollback_growth(
+                mapped_virtual_pages,
+                allocated_physical_pages,
+                mapped_pages,
+                original_next_virtual_page,
+                original_total_pages,
+                original_total_bytes
+            );
             heap_stats.failed_grow_count++;
             return 0;
         }
