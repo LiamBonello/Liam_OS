@@ -71,6 +71,7 @@ USERLAND_FLAT_NAMES := \
 	pid \
 	ticks \
 	syscheck \
+	sysbadptr \
 	os-release \
 	cat \
 	clear \
