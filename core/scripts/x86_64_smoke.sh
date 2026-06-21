@@ -5,6 +5,7 @@ LOG_PATH="${1:-build/x86_64/x86_64-smoke.log}"
 ISO_PATH="${X86_64_ISO:-build/x86_64/liam_os_x86_64.iso}"
 QEMU_BIN="${QEMU_X86_64:-qemu-system-x86_64}"
 TIMEOUT_SECONDS="${LIAM_X86_64_SMOKE_TIMEOUT_SECONDS:-20}"
+SUCCESS_MARKER="Desc/IST ok: 1"
 
 mkdir -p "$(dirname "$LOG_PATH")"
 rm -f "$LOG_PATH"
@@ -12,24 +13,56 @@ rm -f "$LOG_PATH"
 echo "Running x86_64 headless boot smoke test..."
 echo "Serial log: $LOG_PATH"
 
-set +e
-timeout "$TIMEOUT_SECONDS" "$QEMU_BIN" \
+"$QEMU_BIN" \
     -display none \
     -no-reboot \
     -no-shutdown \
     -monitor none \
     -serial "file:$LOG_PATH" \
     -boot d \
-    -cdrom "$ISO_PATH"
-status=$?
-set -e
+    -cdrom "$ISO_PATH" &
+qemu_pid=$!
 
-if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
-    echo "QEMU exited unexpectedly with status $status"
-    if [ -f "$LOG_PATH" ]; then
-        cat "$LOG_PATH"
+cleanup_qemu() {
+    if kill -0 "$qemu_pid" >/dev/null 2>&1; then
+        kill "$qemu_pid" >/dev/null 2>&1 || true
+        wait "$qemu_pid" >/dev/null 2>&1 || true
     fi
-    exit "$status"
+}
+trap cleanup_qemu EXIT INT TERM
+
+elapsed=0
+while [ "$elapsed" -lt "$TIMEOUT_SECONDS" ]; do
+    if [ -f "$LOG_PATH" ] && grep -F "$SUCCESS_MARKER" "$LOG_PATH" >/dev/null 2>&1; then
+        cleanup_qemu
+        trap - EXIT INT TERM
+        break
+    fi
+
+    if ! kill -0 "$qemu_pid" >/dev/null 2>&1; then
+        wait "$qemu_pid" || status=$?
+        echo "QEMU exited before the success marker appeared."
+        if [ "${status:-0}" -ne 0 ]; then
+            echo "QEMU exit status: ${status:-0}"
+        fi
+        if [ -f "$LOG_PATH" ]; then
+            cat "$LOG_PATH"
+        fi
+        exit 1
+    fi
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+done
+
+if [ "$elapsed" -ge "$TIMEOUT_SECONDS" ]; then
+    echo "Timed out waiting for serial success marker: $SUCCESS_MARKER"
+    if [ -f "$LOG_PATH" ]; then
+        echo "--- serial log ---"
+        cat "$LOG_PATH"
+        echo "--- end serial log ---"
+    fi
+    exit 1
 fi
 
 require_line() {
