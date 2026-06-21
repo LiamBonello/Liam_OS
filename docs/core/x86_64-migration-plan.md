@@ -75,9 +75,19 @@ Remaining work:
 
 ## Stage 6: descriptor and interrupt strategy
 
-- Add x86_64 GDT support with long-mode code/data descriptors and TSS planning.
-- Add x86_64 IDT entries and interrupt stubs.
-- Revisit PIC/PIT handling and decide what stays legacy versus what moves toward APIC later.
+Status: started for CPU exceptions only.
+
+- Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
+- Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
+- Installed interrupt-gate descriptors for CPU exceptions after the C console and serial paths initialize.
+- Added VGA and serial exception diagnostics with vector, error code, and exception name.
+
+Remaining work:
+
+- Move the bootstrap GDT into a maintained x86_64 descriptor module.
+- Add x86_64 TSS planning and IST stacks for dangerous exceptions such as double fault.
+- Add IRQ routing deliberately, deciding what remains legacy PIC/PIT and what moves toward APIC later.
+- Keep interrupts disabled until the IRQ and timer strategy is explicit.
 
 ## Stage 7: 64-bit memory model
 
