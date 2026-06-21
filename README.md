@@ -11,6 +11,8 @@ This split keeps the original kernel work intact while giving the commercial des
 
 `core/` is the active buildable project. It is a freestanding i386 kernel with GRUB Multiboot booting, protected-mode setup, interrupts, paging, memory management, basic scheduling/process abstractions, VFS/initramfs foundations, flat userspace image loading, and an early syscall path.
 
+An x86_64 architecture path is now scaffolded for staged migration planning, but it is not bootable yet. The default and only bootable Core build remains i386.
+
 `desktop/` is intentionally a planning/skeleton area. It should not pretend to be an installable commercial OS yet.
 
 ## Build Liam_OS Core
@@ -22,7 +24,7 @@ sudo apt update
 sudo apt install nasm clang lld grub-pc-bin grub-common xorriso qemu-system-x86 make mtools
 ```
 
-Then build and run:
+Then build and run the current i386 Core path:
 
 ```sh
 make check-tools
@@ -45,11 +47,20 @@ The generated ISO is written to:
 core/build/liam_os.iso
 ```
 
+To see the staged x86_64 migration status:
+
+```sh
+cd core
+make x86_64-info
+```
+
 ## Repository layout
 
 ```txt
 core/              Original custom kernel project
   kernel/          Kernel source
+    arch/i386/     Current bootable 32-bit architecture path
+    arch/x86_64/   Future 64-bit architecture scaffold
   boot/            GRUB boot configuration
   docs/            Core architecture notes
   Makefile         Core build
