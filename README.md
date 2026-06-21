@@ -11,7 +11,7 @@ This split keeps the original kernel work intact while giving the commercial des
 
 `core/` is the active buildable project. It is a freestanding i386 kernel with GRUB Multiboot booting, protected-mode setup, interrupts, paging, memory management, basic scheduling/process abstractions, VFS/initramfs foundations, flat userspace image loading, and an early syscall path.
 
-An x86_64 architecture path is now scaffolded for staged migration planning. It can build an experimental ELF64 kernel artifact and an experimental Multiboot2 long-mode ISO with an early freestanding C entry, VGA diagnostics, COM1 serial output, parsed Multiboot2 boot information, and early CPU exception IDT diagnostics. The default stable Core build remains i386.
+An x86_64 architecture path is now scaffolded for staged migration planning. It can build an experimental ELF64 kernel artifact and an experimental Multiboot2 long-mode ISO with an early freestanding C entry, VGA diagnostics, COM1 serial output, parsed Multiboot2 boot information, early CPU exception IDT diagnostics, and an architecture-owned boot context with initial memory-layout reporting. The default stable Core build remains i386.
 
 `desktop/` is intentionally a planning/skeleton area. It should not pretend to be an installable commercial OS yet.
 
