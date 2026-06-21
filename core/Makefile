@@ -12,7 +12,8 @@ X86_64_BOOT32_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot32.o
 X86_64_START_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/start.o
 X86_64_KERNEL_C_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/kernel.o
 X86_64_CONSOLE_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/console.o
-X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_KERNEL_C_OBJ) $(X86_64_CONSOLE_OBJ)
+X86_64_BOOT_INFO_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot_info.o
+X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_KERNEL_C_OBJ) $(X86_64_CONSOLE_OBJ) $(X86_64_BOOT_INFO_OBJ)
 
 ARCH ?= i386
 SUPPORTED_ARCHES := i386 x86_64
@@ -154,14 +155,14 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path captures Multiboot2 boot state in freestanding C."
+	@echo "Liam_OS x86_64 path parses Multiboot2 boot information in freestanding C."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
 	@echo "Run target: make x86_64-run"
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
-	@echo "Expected x86_64 screen message: Multiboot2 magic: ok"
+	@echo "Expected x86_64 screen messages: Multiboot2: ok, Bootloader, Memory map entries"
 	@echo "Serial output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
@@ -200,11 +201,15 @@ $(X86_64_START_OBJ): kernel/arch/x86_64/start.asm | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
 
-$(X86_64_KERNEL_C_OBJ): kernel/arch/x86_64/kernel.c kernel/arch/x86_64/console.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_KERNEL_C_OBJ): kernel/arch/x86_64/kernel.c kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/console.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
 $(X86_64_CONSOLE_OBJ): kernel/arch/x86_64/console.c kernel/arch/x86_64/console.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS_x86_64) -c $< -o $@
+
+$(X86_64_BOOT_INFO_OBJ): kernel/arch/x86_64/boot_info.c kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
