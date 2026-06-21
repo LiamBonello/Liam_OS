@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.8-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/kernel.c` as the first minimal freestanding x86_64 C kernel entry.
+- Added x86_64 C object compilation to the experimental `make x86_64-kernel` path.
+
+### Changed
+
+- Updated `core/kernel/arch/x86_64/start.asm` to call `kernel_main_x86_64` after the long-mode handoff.
+- Updated `make x86_64-info` to report the new C-entry screen message.
+- Updated Liam_OS version to `0.8.8-dev`.
+
+### Notes
+
+- The x86_64 path now proves long-mode assembly can enter freestanding C and write to VGA text memory.
+- This still does not initialize the shared kernel runtime, interrupts, heap, processes, syscalls, or userspace.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.7-dev
 
 ### Added
@@ -437,7 +456,6 @@
 - Added `/bin/about` as a userspace command.
 - Registered `/bin/pid`, `/bin/ticks`, and `/bin/about` in the userspace image registry.
 - Added `/bin/pid`, `/bin/ticks`, and `/bin/about` to the static initramfs.
-- Updated shell help text with the new userspace commands.
 
 ### Notes
 
