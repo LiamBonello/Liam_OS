@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.16-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/gdt.h` and `gdt.c` to capture bootstrap GDT state from C.
+- Added named x86_64 bootstrap GDT symbols for the null, code, data, and end descriptors.
+- Added VGA and COM1 serial diagnostics for GDTR, active segment selectors, and descriptor values.
+
+### Changed
+
+- Updated the x86_64 C entry to report `Stage: descriptor + paging + PMM`.
+- Wired the x86_64 GDT diagnostics into `make x86_64-kernel`, `make x86_64-iso`, and `make x86_64-run`.
+- Updated `make x86_64-info` to describe the descriptor diagnostics milestone.
+- Updated Liam_OS version to `0.8.16-dev`.
+
+### Notes
+
+- This still uses the bootstrap GDT; it makes descriptor state explicit before introducing a maintained x86_64 descriptor/TSS module.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.15-dev
 
 ### Added
