@@ -60,24 +60,35 @@ static void make_hex64(char *buffer, u64 value)
 
 static void make_u32(char *buffer, u32 value)
 {
-    char scratch[10];
-    u32 count = 0;
+    static const u32 powers[] = {
+        1000000000U,
+        100000000U,
+        10000000U,
+        1000000U,
+        100000U,
+        10000U,
+        1000U,
+        100U,
+        10U,
+        1U,
+    };
+    u32 index = 0;
+    u32 started = 0;
 
-    if (value == 0U) {
-        buffer[0] = '0';
-        buffer[1] = '\0';
-        return;
+    for (u32 i = 0; i < 10U; ++i) {
+        u32 digit = 0;
+        while (value >= powers[i]) {
+            value -= powers[i];
+            ++digit;
+        }
+
+        if (digit != 0U || started != 0U || powers[i] == 1U) {
+            buffer[index++] = (char)('0' + digit);
+            started = 1U;
+        }
     }
 
-    while (value != 0U && count < sizeof(scratch)) {
-        scratch[count++] = (char)('0' + (value % 10U));
-        value /= 10U;
-    }
-
-    for (u32 i = 0; i < count; ++i) {
-        buffer[i] = scratch[count - 1U - i];
-    }
-    buffer[count] = '\0';
+    buffer[index] = '\0';
 }
 
 static usize append_label(char *buffer, const char *label)
