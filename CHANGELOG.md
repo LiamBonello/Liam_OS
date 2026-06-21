@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.10-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/boot_info.h` and `boot_info.c` for Multiboot2 boot-information parsing.
+- Parsed Multiboot2 bootloader name, total boot-info size, basic memory info, and memory-map tags.
+- Added early x86_64 memory-map summary output over VGA and COM1 serial.
+- Extended x86_64 early console helpers with decimal, 32-bit hex, and 64-bit hex formatting.
+
+### Changed
+
+- Updated the x86_64 C entry to report bootloader name, boot-info size, memory-map entry count, and usable memory bytes.
+- Updated `make x86_64-info` to describe the Multiboot2 parser milestone.
+- Updated Liam_OS version to `0.8.10-dev`.
+
+### Notes
+
+- This larger x86_64 milestone moves beyond raw boot-state printing into real Multiboot2 tag parsing and memory discovery.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.9-dev
 
 ### Added
