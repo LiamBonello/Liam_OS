@@ -1,6 +1,7 @@
 #include "boot_context.h"
 #include "console.h"
 #include "idt.h"
+#include "paging.h"
 #include "pmm.h"
 
 static void report_boot_summary(const struct x86_64_boot_summary *summary)
@@ -103,27 +104,48 @@ static void report_pmm_allocator(void)
     x86_64_serial_write_u32("PMM smoke free: ", free_ok);
 }
 
+static void report_paging_state(const struct x86_64_paging_state *state)
+{
+    x86_64_console_write_u32(23, 0, "Paging huge pages: ", state->huge_pages_present);
+    x86_64_console_write_hex64(24, 0, "Paging CR3: 0x", state->cr3);
+
+    x86_64_serial_write_line("x86_64 bootstrap paging online");
+    x86_64_serial_write_hex64("Paging CR3: 0x", state->cr3);
+    x86_64_serial_write_hex64("Paging PML4: 0x", state->pml4_table);
+    x86_64_serial_write_hex64("Paging PDPT: 0x", state->pdpt_table);
+    x86_64_serial_write_hex64("Paging PD: 0x", state->pd_table);
+    x86_64_serial_write_u32("Paging PML4 present: ", state->pml4_present);
+    x86_64_serial_write_u32("Paging PDPT present: ", state->pdpt_present);
+    x86_64_serial_write_u32("Paging huge pages: ", state->huge_pages_present);
+    x86_64_serial_write_hex64("Paging first huge page: 0x", state->first_huge_page);
+    x86_64_serial_write_hex64("Paging last huge page: 0x", state->last_huge_page);
+    x86_64_serial_write_hex64("Paging identity bytes: 0x", state->identity_map_bytes);
+}
+
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
+    struct x86_64_paging_state paging_state;
 
     x86_64_console_init();
     x86_64_serial_init();
     x86_64_idt_init();
 
     x86_64_boot_context_init(boot_magic, boot_info, &context);
+    x86_64_paging_state_init(&paging_state);
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: PMM allocator smoke test", 1, 0);
+    x86_64_console_write_at("Stage: paging baseline + PMM", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: PMM allocator smoke test");
+    x86_64_serial_write_line("Stage: paging baseline + PMM");
 
     report_boot_summary(&context.boot_info);
     report_memory_layout(&context.memory_layout);
     report_pmm_plan(&context.pmm_plan);
     report_pmm_allocator();
+    report_paging_state(&paging_state);
 
     for (;;) {
         __asm__ volatile ("hlt");
