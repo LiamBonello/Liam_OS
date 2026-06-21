@@ -42,7 +42,11 @@ static void track_page(u64 page)
 
 static void track_range(u64 start, u64 end)
 {
-    for (u64 page = start; page + X86_64_PAGE_SIZE <= end; page += X86_64_PAGE_SIZE) {
+    if (end <= start) {
+        return;
+    }
+
+    for (u64 page = start; page <= end - X86_64_PAGE_SIZE; page += X86_64_PAGE_SIZE) {
         track_page(page);
     }
 }
@@ -107,6 +111,10 @@ u32 x86_64_pmm_free_page(u64 page)
     }
 
     if ((page & (X86_64_PAGE_SIZE - 1ULL)) != 0ULL) {
+        return 0U;
+    }
+
+    if (page < pmm_state.lowest_page || page > pmm_state.highest_page) {
         return 0U;
     }
 
