@@ -11,7 +11,7 @@ This split keeps the original kernel work intact while giving the commercial des
 
 `core/` is the active buildable project. It is a freestanding i386 kernel with GRUB Multiboot booting, protected-mode setup, interrupts, paging, memory management, basic scheduling/process abstractions, VFS/initramfs foundations, flat userspace image loading, and an early syscall path.
 
-An x86_64 architecture path is now scaffolded for staged migration planning. It can build an experimental ELF64 kernel artifact and an experimental Multiboot2 long-mode ISO with an early freestanding C entry, VGA diagnostics, COM1 serial output, parsed Multiboot2 boot information, early CPU exception IDT diagnostics, dedicated NMI/double-fault/page-fault IST routing, a maintained GDT with a loaded TSS descriptor, bootstrap IST planning diagnostics, an architecture-owned boot context, initial memory-layout reporting, early PMM planning diagnostics, an isolated early PMM page-allocator smoke test, and bootstrap paging-state diagnostics. The default stable Core build remains i386.
+An x86_64 architecture path is now scaffolded for staged migration planning. It can build an experimental ELF64 kernel artifact and an experimental Multiboot2 long-mode ISO with an early freestanding C entry, VGA diagnostics, COM1 serial output, parsed Multiboot2 boot information, early CPU exception IDT diagnostics, dedicated NMI/double-fault/page-fault IST routing, a maintained GDT with a loaded TSS descriptor, bootstrap IST planning diagnostics, an architecture-owned boot context, initial memory-layout reporting, early PMM planning diagnostics, an isolated early PMM page-allocator smoke test, bootstrap paging-state diagnostics, and a headless QEMU smoke target that validates serial boot markers in CI. The default stable Core build remains i386.
 
 `desktop/` is intentionally a planning/skeleton area. It should not pretend to be an installable commercial OS yet.
 
@@ -82,6 +82,19 @@ core/build/x86_64/liam_os_x86_64.iso
 ```
 
 `make x86_64-run` also routes COM1 serial output to the terminal.
+
+To run the x86_64 boot smoke test without a QEMU window:
+
+```sh
+cd core
+make x86_64-smoke
+```
+
+The smoke test captures serial output in:
+
+```txt
+core/build/x86_64/x86_64-smoke.log
+```
 
 ## Repository layout
 
