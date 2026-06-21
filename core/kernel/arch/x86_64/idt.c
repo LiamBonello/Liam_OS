@@ -79,6 +79,23 @@ static void zero_idt(void)
     }
 }
 
+static u8 exception_ist(u32 vector)
+{
+    if (vector == X86_64_IDT_DOUBLE_FAULT_VECTOR) {
+        return X86_64_IDT_DOUBLE_FAULT_IST;
+    }
+
+    if (vector == X86_64_IDT_NMI_VECTOR) {
+        return X86_64_IDT_NMI_IST;
+    }
+
+    if (vector == X86_64_IDT_PAGE_FAULT_VECTOR) {
+        return X86_64_IDT_PAGE_FAULT_IST;
+    }
+
+    return 0U;
+}
+
 static void set_idt_gate(u32 vector, void (*handler)(void), u8 ist)
 {
     u64 address = (u64)handler;
@@ -108,16 +125,17 @@ static u32 gate_present(u32 vector)
             idt[vector].type_attr == X86_64_INTERRUPT_GATE) ? 1U : 0U;
 }
 
+static u32 gate_ist(u32 vector)
+{
+    return (u32)(idt[vector].ist & X86_64_IDT_IST_MASK);
+}
+
 void x86_64_idt_init(void)
 {
     zero_idt();
 
     for (u32 vector = 0; vector < X86_64_EXCEPTION_COUNT; ++vector) {
-        u8 ist = 0U;
-        if (vector == X86_64_IDT_DOUBLE_FAULT_VECTOR) {
-            ist = X86_64_IDT_DOUBLE_FAULT_IST;
-        }
-        set_idt_gate(vector, x86_64_isr_table[vector], ist);
+        set_idt_gate(vector, x86_64_isr_table[vector], exception_ist(vector));
     }
 
     idt_descriptor.limit = (u16)(sizeof(idt) - 1U);
@@ -129,7 +147,9 @@ void x86_64_idt_get_state(struct x86_64_idt_state *state)
 {
     struct idt_descriptor idtr;
     u32 exception_gates = 0U;
-    u32 double_fault_ist = idt[X86_64_IDT_DOUBLE_FAULT_VECTOR].ist & X86_64_IDT_IST_MASK;
+    u32 nmi_ist = gate_ist(X86_64_IDT_NMI_VECTOR);
+    u32 double_fault_ist = gate_ist(X86_64_IDT_DOUBLE_FAULT_VECTOR);
+    u32 page_fault_ist = gate_ist(X86_64_IDT_PAGE_FAULT_VECTOR);
 
     read_idtr(&idtr);
 
@@ -140,10 +160,28 @@ void x86_64_idt_get_state(struct x86_64_idt_state *state)
     state->idtr_base = idtr.base;
     state->idtr_limit = idtr.limit;
     state->exception_gates = exception_gates;
+
+    state->nmi_vector = X86_64_IDT_NMI_VECTOR;
+    state->nmi_ist = nmi_ist;
+    state->nmi_present = gate_present(X86_64_IDT_NMI_VECTOR);
+    state->nmi_ist_ok = (nmi_ist == X86_64_IDT_NMI_IST) ? 1U : 0U;
+
     state->double_fault_vector = X86_64_IDT_DOUBLE_FAULT_VECTOR;
     state->double_fault_ist = double_fault_ist;
     state->double_fault_present = gate_present(X86_64_IDT_DOUBLE_FAULT_VECTOR);
     state->double_fault_ist_ok = (double_fault_ist == X86_64_IDT_DOUBLE_FAULT_IST) ? 1U : 0U;
+
+    state->page_fault_vector = X86_64_IDT_PAGE_FAULT_VECTOR;
+    state->page_fault_ist = page_fault_ist;
+    state->page_fault_present = gate_present(X86_64_IDT_PAGE_FAULT_VECTOR);
+    state->page_fault_ist_ok = (page_fault_ist == X86_64_IDT_PAGE_FAULT_IST) ? 1U : 0U;
+
+    state->ist_gates_ok = ((state->nmi_present != 0U) &&
+                           (state->nmi_ist_ok != 0U) &&
+                           (state->double_fault_present != 0U) &&
+                           (state->double_fault_ist_ok != 0U) &&
+                           (state->page_fault_present != 0U) &&
+                           (state->page_fault_ist_ok != 0U)) ? 1U : 0U;
 }
 
 void x86_64_exception_handler(u64 vector, u64 error_code)
