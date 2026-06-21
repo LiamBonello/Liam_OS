@@ -39,6 +39,7 @@ Status: started.
 - The handoff enters long mode, sets 64-bit segments, installs a temporary stack, and calls the x86_64 entry shim.
 - The handoff preserves GRUB's Multiboot2 magic and boot information pointer for C.
 - This path is still experimental and uses temporary identity-mapped paging.
+- The bootstrap assembly now uses BSS-safe alignment and explicit 64-bit boot-state reads to keep assembly diagnostics clean.
 
 Remaining work:
 
@@ -66,12 +67,12 @@ Status: started.
 - Added `core/kernel/arch/x86_64/boot_info.c` and `boot_info.h`.
 - Parse Multiboot2 total size, bootloader name, basic memory info, and memory map tags.
 - Report bootloader name, boot-info size, memory-map entry count, and total usable memory bytes over VGA and serial.
+- Added `core/kernel/arch/x86_64/boot_context.c` and `boot_context.h` to preserve parsed boot information inside an architecture-owned boot context.
 
 Remaining work:
 
-- Preserve parsed boot information in a durable architecture boot context.
 - Convert memory-map data into an x86_64 physical memory initialization contract.
-- Define the x86_64 kernel virtual memory layout before enabling higher-half mappings.
+- Keep the boot context alive as the handoff into PMM, paging, and later kernel runtime initialization grows.
 
 ## Stage 6: descriptor and interrupt strategy
 
@@ -91,9 +92,17 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
+Status: started for layout reporting only.
+
+- Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
+- Exposed linker-provided x86_64 kernel image start and end symbols.
+- Report current kernel image bounds, kernel image size, bootstrap identity-map span, boot stack size, and page-size constants through the boot context.
+
+Remaining work:
+
 - Replace 32-bit page-directory/page-table assumptions with PML4-based paging for x86_64.
 - Introduce pointer-width-safe address types where needed.
-- Define an x86_64 memory layout separately from i386 constants.
+- Define the permanent x86_64 virtual memory map separately from i386 constants.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
 
 ## Stage 8: process and userspace model
