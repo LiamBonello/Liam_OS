@@ -1,8 +1,6 @@
 # Liam_OS x86_64 Architecture Scaffold
 
-This directory is reserved for the real x86_64 kernel path. It is intentionally not wired into the default bootable build yet.
-
-The i386 path in `core/kernel/arch/i386/` remains the known-good baseline while this directory grows in small, testable stages.
+This directory contains the staged x86_64 kernel path. The i386 path in `core/kernel/arch/i386/` remains the stable baseline while this directory grows in small, testable stages.
 
 ## Current status
 
@@ -19,14 +17,34 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-This is not a bootable x86_64 kernel yet. `start.asm` is currently a 64-bit entry experiment that assumes the CPU is already in long mode. The next milestone must add a real boot handoff and long-mode transition path.
+It can also build and run an experimental Multiboot2 ISO that enters long mode and writes a VGA text message:
+
+```sh
+cd core
+make x86_64-iso
+make x86_64-run
+```
+
+The ISO is written to:
+
+```txt
+core/build/x86_64/liam_os_x86_64.iso
+```
+
+Expected screen message:
+
+```txt
+Liam_OS x86_64 long mode online
+```
+
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, then halts. It does not initialize the shared C kernel runtime, interrupts, paging subsystem, heap, processes, syscalls, or userspace.
 
 ## Milestones
 
 1. Add x86_64 build metadata without changing the default i386 build. Done.
-2. Add a separate linker script and boot objects for the x86_64 path. Started.
-3. Enter long mode from a 32-bit bootstrap.
-4. Bring up a minimal 64-bit console path.
+2. Add a separate linker script and boot objects for the x86_64 path. Done for the first experimental path.
+3. Enter long mode from a 32-bit bootstrap. Started.
+4. Bring up a minimal 64-bit C console path.
 5. Add x86_64 GDT/IDT/interrupt handling.
 6. Port paging and memory layout to 64-bit addresses.
 7. Revisit syscalls and userspace after the 64-bit kernel path is stable.
