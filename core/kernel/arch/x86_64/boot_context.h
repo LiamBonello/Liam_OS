@@ -3,11 +3,13 @@
 
 #include "boot_info.h"
 #include "memory_layout.h"
+#include "pmm_plan.h"
 #include "types.h"
 
 struct x86_64_boot_context {
     struct x86_64_boot_summary boot_info;
     struct x86_64_memory_layout memory_layout;
+    struct x86_64_pmm_plan pmm_plan;
 };
 
 void x86_64_boot_context_init(u32 magic, u32 boot_info_addr, struct x86_64_boot_context *context);
