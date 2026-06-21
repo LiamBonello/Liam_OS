@@ -37,7 +37,7 @@ Status: started.
 - Added `make x86_64-iso` to create `core/build/x86_64/liam_os_x86_64.iso`.
 - Added `make x86_64-run` to boot the experimental ISO in `qemu-system-x86_64`.
 - The handoff enters long mode, sets 64-bit segments, installs a temporary stack, and calls the x86_64 entry shim.
-- The handoff now preserves GRUB's Multiboot2 magic and boot information pointer for C.
+- The handoff preserves GRUB's Multiboot2 magic and boot information pointer for C.
 - This path is still experimental and uses temporary identity-mapped paging.
 
 Remaining work:
@@ -52,30 +52,41 @@ Status: started.
 - Added `core/kernel/arch/x86_64/kernel.c` with a minimal freestanding C entry point.
 - Added `core/kernel/arch/x86_64/console.c` and `console.h` for early VGA text and COM1 serial output.
 - Added `core/kernel/arch/x86_64/types.h` for local fixed-width types.
-- The expected screen messages include `Liam_OS x86_64 C kernel entry online`, `Multiboot2 magic: ok`, and the boot-info pointer.
 - `make x86_64-run` routes serial output to the terminal with `-serial stdio`.
 
 Remaining work:
 
-- Add a real x86_64 C entry contract for boot information parsing and early architecture state.
-- Parse the Multiboot2 information tags instead of only printing the pointer.
 - Add stronger serial-driven boot validation.
 - Avoid porting scheduler, userspace, or syscalls until basic boot and diagnostics are stable.
 
-## Stage 5: descriptor and interrupt strategy
+## Stage 5: Multiboot2 and memory discovery
+
+Status: started.
+
+- Added `core/kernel/arch/x86_64/boot_info.c` and `boot_info.h`.
+- Parse Multiboot2 total size, bootloader name, basic memory info, and memory map tags.
+- Report bootloader name, boot-info size, memory-map entry count, and total usable memory bytes over VGA and serial.
+
+Remaining work:
+
+- Preserve parsed boot information in a durable architecture boot context.
+- Convert memory-map data into an x86_64 physical memory initialization contract.
+- Define the x86_64 kernel virtual memory layout before enabling higher-half mappings.
+
+## Stage 6: descriptor and interrupt strategy
 
 - Add x86_64 GDT support with long-mode code/data descriptors and TSS planning.
 - Add x86_64 IDT entries and interrupt stubs.
 - Revisit PIC/PIT handling and decide what stays legacy versus what moves toward APIC later.
 
-## Stage 6: 64-bit memory model
+## Stage 7: 64-bit memory model
 
 - Replace 32-bit page-directory/page-table assumptions with PML4-based paging for x86_64.
 - Introduce pointer-width-safe address types where needed.
 - Define an x86_64 memory layout separately from i386 constants.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
 
-## Stage 7: process and userspace model
+## Stage 8: process and userspace model
 
 - Keep 32-bit userspace out of the first x86_64 kernel boot milestone.
 - Decide whether early x86_64 userspace starts as 64-bit flat binaries, ELF64, or compatibility-mode experiments.
