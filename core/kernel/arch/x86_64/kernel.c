@@ -125,7 +125,7 @@ static void report_paging_state(const struct x86_64_paging_state *state)
 
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
-    x86_64_serial_write_line("x86_64 bootstrap GDT online");
+    x86_64_serial_write_line("x86_64 maintained GDT online");
     x86_64_serial_write_hex64("GDT base: 0x", state->gdtr_base);
     x86_64_serial_write_u32("GDT limit: ", state->gdtr_limit);
     x86_64_serial_write_u32("GDT entries: ", state->entry_count);
@@ -134,20 +134,25 @@ static void report_gdt_state(const struct x86_64_gdt_state *state)
     x86_64_serial_write_u32("GDT current CS: ", state->current_cs);
     x86_64_serial_write_u32("GDT current DS: ", state->current_ds);
     x86_64_serial_write_u32("GDT current SS: ", state->current_ss);
+    x86_64_serial_write_u32("GDT current TR: ", state->current_tr);
+    x86_64_serial_write_u32("GDT TSS loaded: ", state->tss_loaded);
     x86_64_serial_write_hex64("GDT null descriptor: 0x", state->null_descriptor);
     x86_64_serial_write_hex64("GDT code descriptor: 0x", state->code_descriptor);
     x86_64_serial_write_hex64("GDT data descriptor: 0x", state->data_descriptor);
+    x86_64_serial_write_hex64("GDT TSS low descriptor: 0x", state->tss_descriptor_low);
+    x86_64_serial_write_hex64("GDT TSS high descriptor: 0x", state->tss_descriptor_high);
 }
 
 static void report_tss_state(const struct x86_64_tss_state *state, const struct x86_64_gdt_state *gdt_state)
 {
     u32 limit_ok = (state->tss_limit == X86_64_TSS_EXPECTED_LIMIT) ? 1U : 0U;
-    u32 plan_ok = ((gdt_state->selectors_ok != 0U) && (state->initialized != 0U) &&
-                   (limit_ok != 0U) && (state->loaded == 0U)) ? 1U : 0U;
+    u32 loaded_ok = ((gdt_state->selectors_ok != 0U) && (gdt_state->tss_loaded != 0U) &&
+                     (state->initialized != 0U) && (limit_ok != 0U) &&
+                     (state->loaded != 0U)) ? 1U : 0U;
 
-    x86_64_console_write_u32(24, 0, "GDT/TSS plan ok: ", plan_ok);
+    x86_64_console_write_u32(24, 0, "GDT/TSS loaded ok: ", loaded_ok);
 
-    x86_64_serial_write_line("x86_64 bootstrap TSS plan online");
+    x86_64_serial_write_line("x86_64 bootstrap TSS loaded");
     x86_64_serial_write_hex64("TSS base: 0x", state->tss_base);
     x86_64_serial_write_u32("TSS limit: ", state->tss_limit);
     x86_64_serial_write_u32("TSS limit ok: ", limit_ok);
@@ -172,16 +177,17 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_idt_init();
 
     x86_64_boot_context_init(boot_magic, boot_info, &context);
-    x86_64_gdt_state_init(&gdt_state);
     x86_64_paging_state_init(&paging_state);
     x86_64_tss_init(&tss_state);
+    x86_64_gdt_load_tss(&tss_state, &gdt_state);
+    tss_state.loaded = gdt_state.tss_loaded;
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: descriptor plan + paging + PMM", 1, 0);
+    x86_64_console_write_at("Stage: descriptor load + paging + PMM", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: descriptor plan + paging + PMM");
+    x86_64_serial_write_line("Stage: descriptor load + paging + PMM");
 
     report_boot_summary(&context.boot_info);
     report_memory_layout(&context.memory_layout);
