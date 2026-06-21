@@ -1,5 +1,26 @@
 # Liam_OS Changelog
 
+## Core 0.8.18-dev
+
+### Added
+
+- Added a maintained x86_64 GDT built from C with null, kernel code, kernel data, and 64-bit TSS descriptor entries.
+- Added `ltr` loading for the staged x86_64 TSS descriptor.
+- Added COM1 serial diagnostics for the current task-register selector and TSS descriptor words.
+
+### Changed
+
+- Updated the x86_64 C entry to report `Stage: descriptor load + paging + PMM`.
+- Updated the x86_64 descriptor diagnostics to validate `GDT/TSS loaded ok: 1` instead of only validating the TSS plan.
+- Updated `make x86_64-info` to describe the loaded GDT/TSS milestone.
+- Updated Liam_OS version to `0.8.18-dev`.
+
+### Notes
+
+- The CPU may mark the TSS descriptor busy after `ltr`; validation is based on `TR == 0x18`, selector state, and TSS limit/state diagnostics.
+- Exception gates are not wired to IST entries yet; that is the next descriptor/interrupt milestone.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.17-dev
 
 ### Added
