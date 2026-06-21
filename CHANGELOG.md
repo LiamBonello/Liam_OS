@@ -1,5 +1,26 @@
 # Liam_OS Changelog
 
+## Core 0.8.12-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/boot_context.h` and `boot_context.c` to preserve parsed boot state in an architecture-owned boot context.
+- Added `core/kernel/arch/x86_64/memory_layout.h` and `memory_layout.c` for initial x86_64 memory-layout constants.
+- Exposed x86_64 linker-provided kernel image start and end symbols.
+- Added x86_64 boot diagnostics for kernel image bounds, kernel image size, and bootstrap identity-map span.
+
+### Changed
+
+- Updated the x86_64 C entry to consume a boot context instead of a loose boot-info summary.
+- Cleaned x86_64 bootstrap assembly warnings by using BSS-safe alignment and explicit 64-bit boot-state reads.
+- Updated `make x86_64-info` to describe the boot-context milestone.
+- Updated Liam_OS version to `0.8.12-dev`.
+
+### Notes
+
+- This milestone prepares the x86_64 path for PMM and paging work by making early memory facts explicit.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.11-dev
 
 ### Added
