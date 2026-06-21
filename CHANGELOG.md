@@ -1,5 +1,23 @@
 # Liam_OS Changelog
 
+## Core 0.8.6-dev
+
+### Added
+
+- Added `core/linker.x86_64.ld` for the experimental ELF64 kernel artifact layout.
+- Added `make x86_64-kernel` to build `core/build/x86_64/kernel.elf` without changing the i386 ISO path.
+- Documented the experimental x86_64 artifact target in the root README and x86_64 architecture notes.
+
+### Changed
+
+- Updated `make x86_64-info` to report the new artifact target and next migration milestone.
+- Updated Liam_OS version to `0.8.6-dev`.
+
+### Notes
+
+- The x86_64 artifact is not bootable yet. It is a controlled build milestone before adding a real boot handoff and long-mode transition.
+- The default bootable path remains `ARCH=i386` through GRUB Multiboot.
+
 ## Core 0.8.5-dev
 
 ### Added
@@ -207,7 +225,6 @@
 - Added `core/userland/flat/clear/clear.asm`.
 - Added `/bin/clear` as a flat userspace program.
 - Added `clear.bin` to the generated userland build pipeline.
-- Added `/bin/clear` to initramfs and user image registration.
 
 ### Changed
 
