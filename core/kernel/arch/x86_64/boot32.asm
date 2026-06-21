@@ -2,6 +2,10 @@ global _start
 global x86_64_boot_pml4_table
 global x86_64_boot_pdpt_table
 global x86_64_boot_pd_table
+global x86_64_boot_gdt_start
+global x86_64_boot_gdt_code
+global x86_64_boot_gdt_data
+global x86_64_boot_gdt_end
 extern x86_64_start
 
 MULTIBOOT2_MAGIC equ 0xE85250D6
@@ -17,8 +21,8 @@ PAGE_PRESENT equ 0x001
 PAGE_WRITABLE equ 0x002
 PAGE_HUGE equ 0x080
 PAGE_SIZE_2M equ 0x200000
-CODE64_SEL equ gdt64_code - gdt64_start
-DATA64_SEL equ gdt64_data - gdt64_start
+CODE64_SEL equ x86_64_boot_gdt_code - x86_64_boot_gdt_start
+DATA64_SEL equ x86_64_boot_gdt_data - x86_64_boot_gdt_start
 
 section .multiboot
 align 8
@@ -109,17 +113,17 @@ long_mode_entry:
 
 section .rodata
 align 8
-gdt64_start:
+x86_64_boot_gdt_start:
     dq 0x0000000000000000
-gdt64_code:
+x86_64_boot_gdt_code:
     dq 0x00209A0000000000
-gdt64_data:
+x86_64_boot_gdt_data:
     dq 0x0000920000000000
-gdt64_end:
+x86_64_boot_gdt_end:
 
 gdt64_descriptor:
-    dw gdt64_end - gdt64_start - 1
-    dq gdt64_start
+    dw x86_64_boot_gdt_end - x86_64_boot_gdt_start - 1
+    dq x86_64_boot_gdt_start
 
 section .bss
 alignb 4096
