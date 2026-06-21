@@ -162,6 +162,7 @@ x86_64-info:
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
 	@echo "Expected x86_64 screen message: Multiboot2 magic: ok"
+	@echo "Serial output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
 x86_64-kernel: x86_64-check-tools $(X86_64_KERNEL)
@@ -171,7 +172,7 @@ x86_64-iso: x86_64-iso-check-tools $(X86_64_ISO)
 	@echo "Built experimental x86_64 ISO: $(X86_64_ISO)"
 
 x86_64-run: x86_64-run-check-tools $(X86_64_ISO)
-	$(QEMU_x86_64) -boot d -cdrom $(X86_64_ISO)
+	$(QEMU_x86_64) -serial stdio -boot d -cdrom $(X86_64_ISO)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
