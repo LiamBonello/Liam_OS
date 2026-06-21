@@ -4,6 +4,7 @@
 #include "idt.h"
 #include "paging.h"
 #include "pmm.h"
+#include "tss.h"
 
 static void report_boot_summary(const struct x86_64_boot_summary *summary)
 {
@@ -124,8 +125,6 @@ static void report_paging_state(const struct x86_64_paging_state *state)
 
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
-    x86_64_console_write_u32(24, 0, "GDT selectors ok: ", state->selectors_ok);
-
     x86_64_serial_write_line("x86_64 bootstrap GDT online");
     x86_64_serial_write_hex64("GDT base: 0x", state->gdtr_base);
     x86_64_serial_write_u32("GDT limit: ", state->gdtr_limit);
@@ -140,11 +139,33 @@ static void report_gdt_state(const struct x86_64_gdt_state *state)
     x86_64_serial_write_hex64("GDT data descriptor: 0x", state->data_descriptor);
 }
 
+static void report_tss_state(const struct x86_64_tss_state *state, const struct x86_64_gdt_state *gdt_state)
+{
+    u32 limit_ok = (state->tss_limit == X86_64_TSS_EXPECTED_LIMIT) ? 1U : 0U;
+    u32 plan_ok = ((gdt_state->selectors_ok != 0U) && (state->initialized != 0U) &&
+                   (limit_ok != 0U) && (state->loaded == 0U)) ? 1U : 0U;
+
+    x86_64_console_write_u32(24, 0, "GDT/TSS plan ok: ", plan_ok);
+
+    x86_64_serial_write_line("x86_64 bootstrap TSS plan online");
+    x86_64_serial_write_hex64("TSS base: 0x", state->tss_base);
+    x86_64_serial_write_u32("TSS limit: ", state->tss_limit);
+    x86_64_serial_write_u32("TSS limit ok: ", limit_ok);
+    x86_64_serial_write_hex64("TSS RSP0: 0x", state->rsp0);
+    x86_64_serial_write_hex64("TSS IST1: 0x", state->ist1);
+    x86_64_serial_write_hex64("TSS IST2: 0x", state->ist2);
+    x86_64_serial_write_hex64("TSS IST3: 0x", state->ist3);
+    x86_64_serial_write_hex64("TSS stack bytes: 0x", state->ist_stack_bytes);
+    x86_64_serial_write_u32("TSS initialized: ", state->initialized);
+    x86_64_serial_write_u32("TSS loaded: ", state->loaded);
+}
+
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
     struct x86_64_gdt_state gdt_state;
     struct x86_64_paging_state paging_state;
+    struct x86_64_tss_state tss_state;
 
     x86_64_console_init();
     x86_64_serial_init();
@@ -153,13 +174,14 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_boot_context_init(boot_magic, boot_info, &context);
     x86_64_gdt_state_init(&gdt_state);
     x86_64_paging_state_init(&paging_state);
+    x86_64_tss_init(&tss_state);
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: descriptor + paging + PMM", 1, 0);
+    x86_64_console_write_at("Stage: descriptor plan + paging + PMM", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: descriptor + paging + PMM");
+    x86_64_serial_write_line("Stage: descriptor plan + paging + PMM");
 
     report_boot_summary(&context.boot_info);
     report_memory_layout(&context.memory_layout);
@@ -167,6 +189,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_pmm_allocator();
     report_paging_state(&paging_state);
     report_gdt_state(&gdt_state);
+    report_tss_state(&tss_state, &gdt_state);
 
     for (;;) {
         __asm__ volatile ("hlt");
