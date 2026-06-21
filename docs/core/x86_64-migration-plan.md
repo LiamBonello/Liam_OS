@@ -56,10 +56,12 @@ Status: started.
 - Added `core/kernel/arch/x86_64/console.c` and `console.h` for early VGA text and COM1 serial output.
 - Added `core/kernel/arch/x86_64/types.h` for local fixed-width types.
 - `make x86_64-run` routes serial output to the terminal with `-serial stdio`.
+- Added `make x86_64-smoke` to boot QEMU headlessly, capture COM1 serial output, and assert required boot markers.
+- Added a GitHub Actions workflow that runs the x86_64 headless smoke target and uploads the serial log.
 
 Remaining work:
 
-- Add stronger serial-driven boot validation.
+- Expand serial-driven boot validation as new subsystems come online.
 - Avoid porting scheduler, userspace, or syscalls until basic boot and diagnostics are stable.
 
 ## Stage 5: Multiboot2 and memory discovery
@@ -92,6 +94,7 @@ Status: started for maintained GDT, loaded TSS, critical-exception IST routing, 
 - Routed the NMI exception gate through IST2.
 - Routed the page-fault exception gate through IST3.
 - The x86_64 C entry reports IDTR state, critical-exception IST routing, GDT selector validation, current task-register selector, and TSS load validation.
+- The headless smoke test validates the critical IST, PMM, paging, and descriptor serial markers before accepting the boot.
 
 Remaining work:
 
