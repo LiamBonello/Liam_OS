@@ -19,6 +19,7 @@ ARCH_DIR := kernel/arch/$(ARCH)
 ASM := nasm
 CC := clang
 LD := ld.lld
+GRUB_FILE := grub-file
 QEMU := qemu-system-i386
 
 ASMFLAGS_i386 := -f elf32
@@ -141,6 +142,7 @@ check-tools:
 x86_64-check-tools:
 	@command -v $(ASM) >/dev/null || (echo "Missing tool: $(ASM)" && exit 1)
 	@command -v $(LD) >/dev/null || (echo "Missing tool: $(LD)" && exit 1)
+	@command -v $(GRUB_FILE) >/dev/null || (echo "Missing tool: $(GRUB_FILE)" && exit 1)
 
 x86_64-iso-check-tools: x86_64-check-tools
 	@command -v grub-mkrescue >/dev/null || (echo "Missing tool: grub-mkrescue" && exit 1)
@@ -196,6 +198,7 @@ $(X86_64_START_OBJ): kernel/arch/x86_64/start.asm | $(X86_64_BUILD_DIR)
 
 $(X86_64_KERNEL): linker.x86_64.ld $(X86_64_BOOT_OBJ)
 	$(LD) $(LDFLAGS_x86_64) $(X86_64_BOOT_OBJ) -o $@
+	$(GRUB_FILE) --is-x86-multiboot2 $@
 
 $(X86_64_ISO): $(X86_64_KERNEL) $(X86_64_GRUB_CFG)
 	rm -rf $(X86_64_ISO_DIR)
