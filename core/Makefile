@@ -164,14 +164,14 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path now loads a maintained GDT/TSS and reports bootstrap paging plus the early PMM allocator smoke test."
+	@echo "Liam_OS x86_64 path now routes double fault through IST1 while keeping the maintained GDT/TSS, bootstrap paging, and early PMM smoke test online."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
 	@echo "Run target: make x86_64-run"
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
-	@echo "Expected x86_64 screen messages: PMM smoke free: 1, Paging huge pages: 512, GDT/TSS loaded ok: 1"
+	@echo "Expected x86_64 screen messages: IDT DF IST: 1, PMM smoke free: 1, Paging huge pages: 512, Desc/IST ok: 1"
 	@echo "Serial output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
