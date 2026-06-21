@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.13-dev
+
+### Added
+
+- Added retained x86_64 Multiboot2 memory-map regions to the boot summary.
+- Added `core/kernel/arch/x86_64/pmm_plan.h` and `pmm_plan.c` for planning-only physical memory management diagnostics.
+- Added PMM plan reporting for usable region count, first planned free page, managed page count, managed bytes, and reserved-below boundary.
+
+### Changed
+
+- Extended the x86_64 boot context to include the PMM plan.
+- Updated the x86_64 C entry to report `Stage: PMM plan + boot context`.
+- Updated `make x86_64-info` to describe the PMM planning milestone.
+- Updated Liam_OS version to `0.8.13-dev`.
+
+### Notes
+
+- This does not enable a real x86_64 physical page allocator yet; it validates the memory-map interpretation and allocator boundary first.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.12-dev
 
 ### Added
