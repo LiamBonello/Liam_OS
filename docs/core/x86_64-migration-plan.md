@@ -79,19 +79,21 @@ Remaining work:
 
 ## Stage 6: descriptor and interrupt strategy
 
-Status: started for bootstrap GDT and CPU exceptions.
+Status: started for bootstrap GDT, TSS planning, and CPU exceptions.
 
 - Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
 - Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
 - Installed interrupt-gate descriptors for CPU exceptions after the C console and serial paths initialize.
 - Added VGA and serial exception diagnostics with vector, error code, and exception name.
 - Added `core/kernel/arch/x86_64/gdt.c` and `gdt.h` to capture GDTR, active segment selectors, and bootstrap descriptor values from C.
-- The x86_64 C entry reports GDT selector validation before a maintained descriptor module and TSS are introduced.
+- Added `core/kernel/arch/x86_64/tss.c` and `tss.h` to build a packed 64-bit TSS image and planned IST stacks for dangerous exceptions.
+- The x86_64 C entry reports GDT selector validation and TSS plan validation before a maintained descriptor module loads the task register.
 
 Remaining work:
 
 - Move the bootstrap GDT into a maintained x86_64 descriptor module.
-- Add x86_64 TSS planning and IST stacks for dangerous exceptions such as double fault.
+- Add a 64-bit TSS descriptor to the maintained GDT and load it with `ltr` after the descriptor state is proven.
+- Wire selected exception gates to IST entries after the TSS is loaded.
 - Add IRQ routing deliberately, deciding what remains legacy PIC/PIT and what moves toward APIC later.
 - Keep interrupts disabled until the IRQ and timer strategy is explicit.
 
