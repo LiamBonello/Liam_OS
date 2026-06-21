@@ -1,5 +1,31 @@
 # Liam_OS Changelog
 
+## Core 0.8.14-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/pmm.h` and `pmm.c` as an isolated bounded page-stack allocator for early x86_64 physical pages.
+- Added an x86_64 PMM allocate/free smoke test with VGA and COM1 serial diagnostics.
+- Added x86_64 PMM diagnostics for tracked pages, free pages, dropped pages, duplicate-free rejects, lowest page, highest page, and the smoke-test page.
+
+### Changed
+
+- Wired the x86_64 PMM allocator into `make x86_64-kernel`, `make x86_64-iso`, and `make x86_64-run`.
+- Updated the x86_64 C entry to report `Stage: PMM allocator smoke test`.
+- Updated x86_64 exception VGA diagnostics to leave room for allocator smoke-test output while preserving full exception details over serial.
+- Updated `make x86_64-info` to describe the allocator smoke-test milestone.
+- Updated Liam_OS version to `0.8.14-dev`.
+
+### Fixed
+
+- Hardened the early x86_64 PMM free path against duplicate frees, invalid pages, unaligned pages, and obvious out-of-range pages.
+- Avoided an overflow-prone page-range loop condition while building the allocator free stack.
+
+### Notes
+
+- This allocator is intentionally isolated from the i386 runtime and is not yet connected to x86_64 paging, heap, processes, syscalls, or userspace.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.13-dev
 
 ### Added
@@ -326,7 +352,7 @@
 
 - Added `core/userland/flat/uptime/uptime.asm`.
 - Added `/bin/uptime` as a flat userspace program.
-- Added `uptime.bin` to the generated userland build pipeline.
+- Added `uptime.bin` to the userland build pipeline.
 - Added `/bin/uptime` to initramfs and user image registration.
 
 ### Changed
@@ -632,7 +658,6 @@
 
 - Process slots are still retained after exit.
 - There is no process reaping or PID recycling yet.
-- This milestone improves observability before process cleanup and address-space isolation work.
 
 ## Core 0.2.4-dev
 
