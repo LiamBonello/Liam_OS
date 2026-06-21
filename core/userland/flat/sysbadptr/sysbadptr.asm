@@ -244,5 +244,5 @@ _start:
 .empty_args:
     db 0
 
-stat_buffer:
+.stat_buffer:
     times 20 db 0
