@@ -51,10 +51,10 @@ static void zero_summary(struct x86_64_boot_summary *summary)
     }
 }
 
-static void copy_bootloader_name(char *destination, const char *source)
+static void copy_bootloader_name(char *destination, const char *source, u32 source_size)
 {
     u32 i = 0;
-    for (; i + 1U < X86_64_BOOTLOADER_NAME_MAX && source[i] != '\0'; ++i) {
+    for (; i + 1U < X86_64_BOOTLOADER_NAME_MAX && i < source_size && source[i] != '\0'; ++i) {
         destination[i] = source[i];
     }
     destination[i] = '\0';
@@ -71,7 +71,7 @@ static void parse_mmap_tag(const struct multiboot2_mmap_tag *tag, struct x86_64_
 
     summary->mmap_found = 1U;
 
-    while (entry + sizeof(struct multiboot2_mmap_entry) <= end) {
+    while (entry + tag->entry_size <= end) {
         const struct multiboot2_mmap_entry *mmap_entry = (const struct multiboot2_mmap_entry *)entry;
 
         ++summary->mmap_entry_count;
@@ -125,7 +125,7 @@ void x86_64_boot_info_parse(u32 magic, u32 boot_info_addr, struct x86_64_boot_su
         if (tag->type == MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME) {
             const char *name = (const char *)(tag + 1);
             summary->bootloader_name_found = 1U;
-            copy_bootloader_name(summary->bootloader_name, name);
+            copy_bootloader_name(summary->bootloader_name, name, tag->size - sizeof(*tag));
         } else if (tag->type == MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO) {
             const struct multiboot2_basic_meminfo_tag *meminfo = (const struct multiboot2_basic_meminfo_tag *)tag;
             if (meminfo->size >= sizeof(*meminfo)) {
