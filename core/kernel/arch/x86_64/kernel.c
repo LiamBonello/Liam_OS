@@ -1,5 +1,6 @@
 #include "boot_context.h"
 #include "console.h"
+#include "gdt.h"
 #include "idt.h"
 #include "paging.h"
 #include "pmm.h"
@@ -107,7 +108,6 @@ static void report_pmm_allocator(void)
 static void report_paging_state(const struct x86_64_paging_state *state)
 {
     x86_64_console_write_u32(23, 0, "Paging huge pages: ", state->huge_pages_present);
-    x86_64_console_write_hex64(24, 0, "Paging CR3: 0x", state->cr3);
 
     x86_64_serial_write_line("x86_64 bootstrap paging online");
     x86_64_serial_write_hex64("Paging CR3: 0x", state->cr3);
@@ -122,9 +122,28 @@ static void report_paging_state(const struct x86_64_paging_state *state)
     x86_64_serial_write_hex64("Paging identity bytes: 0x", state->identity_map_bytes);
 }
 
+static void report_gdt_state(const struct x86_64_gdt_state *state)
+{
+    x86_64_console_write_u32(24, 0, "GDT selectors ok: ", state->selectors_ok);
+
+    x86_64_serial_write_line("x86_64 bootstrap GDT online");
+    x86_64_serial_write_hex64("GDT base: 0x", state->gdtr_base);
+    x86_64_serial_write_u32("GDT limit: ", state->gdtr_limit);
+    x86_64_serial_write_u32("GDT entries: ", state->entry_count);
+    x86_64_serial_write_u32("GDT limit ok: ", state->limit_ok);
+    x86_64_serial_write_u32("GDT selectors ok: ", state->selectors_ok);
+    x86_64_serial_write_u32("GDT current CS: ", state->current_cs);
+    x86_64_serial_write_u32("GDT current DS: ", state->current_ds);
+    x86_64_serial_write_u32("GDT current SS: ", state->current_ss);
+    x86_64_serial_write_hex64("GDT null descriptor: 0x", state->null_descriptor);
+    x86_64_serial_write_hex64("GDT code descriptor: 0x", state->code_descriptor);
+    x86_64_serial_write_hex64("GDT data descriptor: 0x", state->data_descriptor);
+}
+
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
+    struct x86_64_gdt_state gdt_state;
     struct x86_64_paging_state paging_state;
 
     x86_64_console_init();
@@ -132,20 +151,22 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_idt_init();
 
     x86_64_boot_context_init(boot_magic, boot_info, &context);
+    x86_64_gdt_state_init(&gdt_state);
     x86_64_paging_state_init(&paging_state);
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: paging baseline + PMM", 1, 0);
+    x86_64_console_write_at("Stage: descriptor + paging + PMM", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: paging baseline + PMM");
+    x86_64_serial_write_line("Stage: descriptor + paging + PMM");
 
     report_boot_summary(&context.boot_info);
     report_memory_layout(&context.memory_layout);
     report_pmm_plan(&context.pmm_plan);
     report_pmm_allocator();
     report_paging_state(&paging_state);
+    report_gdt_state(&gdt_state);
 
     for (;;) {
         __asm__ volatile ("hlt");
