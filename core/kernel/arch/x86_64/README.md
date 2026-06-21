@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, installs an early exception IDT, builds an architecture boot context, parses boot information, and writes VGA/serial diagnostics:
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, installs an early exception IDT, builds an architecture boot context, parses boot information, computes an early PMM plan, and writes VGA/serial diagnostics:
 
 ```sh
 cd core
@@ -35,7 +35,7 @@ Expected screen messages include:
 
 ```txt
 Liam_OS x86_64 kernel diagnostics
-Stage: boot context + IDT + memory summary
+Stage: PMM plan + boot context
 Multiboot2: ok
 Bootloader: ...
 Boot info pointer: 0x........
@@ -47,13 +47,18 @@ Kernel start: 0x................
 Kernel end: 0x................
 Kernel bytes: 0x................
 Identity map bytes: 0x................
+PMM usable regions: ...
+PMM first page: 0x................
+PMM pages: 0x................
+PMM bytes: 0x................
+Reserved below: 0x................
 ```
 
 If an early CPU exception fires after IDT installation, the handler prints a named exception, vector, and error code over VGA and serial.
 
 `make x86_64-run` also routes COM1 serial output to the terminal.
 
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, and an architecture-owned boot context with initial memory-layout constants. It does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, an architecture-owned boot context, and a planning-only PMM view over retained memory-map regions. It does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, userspace, or a real page allocator.
 
 ## Milestones
 
@@ -63,7 +68,7 @@ This is not the full x86_64 kernel yet. The current path proves an assembly hand
 4. Bring up a minimal 64-bit C console path. Started.
 5. Parse Multiboot2 boot information and memory map. Started.
 6. Add x86_64 GDT/IDT/interrupt handling. Started with exception IDT only.
-7. Port paging and memory layout to 64-bit addresses. Started with boot-context layout reporting.
+7. Port paging and memory layout to 64-bit addresses. Started with boot-context layout and PMM planning diagnostics.
 8. Revisit syscalls and userspace after the 64-bit kernel path is stable.
 
 ## Guardrails
