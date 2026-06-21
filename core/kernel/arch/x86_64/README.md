@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, installs an early exception IDT, loads a maintained GDT with a 64-bit TSS descriptor, builds an architecture boot context, parses boot information, computes an early PMM plan, initializes an isolated bounded PMM page allocator, captures bootstrap paging state, prepares bootstrap IST stacks, and writes VGA/serial diagnostics:
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, installs an early exception IDT, routes double fault through IST1, loads a maintained GDT with a 64-bit TSS descriptor, builds an architecture boot context, parses boot information, computes an early PMM plan, initializes an isolated bounded PMM page allocator, captures bootstrap paging state, prepares bootstrap IST stacks, and writes VGA/serial diagnostics:
 
 ```sh
 cd core
@@ -35,14 +35,14 @@ Expected screen messages include:
 
 ```txt
 Liam_OS x86_64 kernel diagnostics
-Stage: descriptor load + paging + PMM
+Stage: DF IST + descriptor + PMM
 Multiboot2: ok
 Bootloader: ...
 Boot info pointer: 0x........
 Boot info bytes: ...
 Memory map entries: ...
 Usable bytes: 0x................
-IDT: exceptions installed
+IDT DF IST: 1
 Kernel start: 0x................
 Kernel end: 0x................
 Kernel bytes: 0x................
@@ -56,14 +56,14 @@ PMM tracked pages: ...
 PMM smoke page: 0x................
 PMM smoke free: 1
 Paging huge pages: 512
-GDT/TSS loaded ok: 1
+Desc/IST ok: 1
 ```
 
 If an early CPU exception fires after IDT installation, the handler prints the exception name over VGA and the full vector/error-code diagnostics over serial.
 
-`make x86_64-run` also routes COM1 serial output to the terminal, including full paging table diagnostics for CR3, PML4, PDPT, PD, huge-page count, identity-map span, GDTR base/limit, active selectors, current task-register selector, descriptor values, TSS base/limit, and planned IST stack addresses.
+`make x86_64-run` also routes COM1 serial output to the terminal, including full paging table diagnostics for CR3, PML4, PDPT, PD, huge-page count, identity-map span, IDTR base/limit, double-fault IST routing, GDTR base/limit, active selectors, current task-register selector, descriptor values, TSS base/limit, and planned IST stack addresses.
 
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke test, C-visible bootstrap paging-state diagnostics, and a C-visible bootstrap TSS/IST plan. It does not wire exception gates to IST entries yet, initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, double-fault routing through IST1, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke test, C-visible bootstrap paging-state diagnostics, and a C-visible bootstrap TSS/IST plan. It does not wire all exception gates to dedicated IST entries yet, initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
 
 ## Milestones
 
@@ -72,7 +72,7 @@ This is not the full x86_64 kernel yet. The current path proves an assembly hand
 3. Enter long mode from a 32-bit bootstrap. Started.
 4. Bring up a minimal 64-bit C console path. Started.
 5. Parse Multiboot2 boot information and memory map. Started.
-6. Add x86_64 GDT/IDT/interrupt handling. Started with a maintained GDT, loaded TSS, bootstrap IST planning, and exception IDT.
+6. Add x86_64 GDT/IDT/interrupt handling. Started with a maintained GDT, loaded TSS, double-fault IST routing, and exception IDT.
 7. Port paging and memory layout to 64-bit addresses. Started with boot-context layout, PMM planning diagnostics, an isolated PMM allocator smoke test, and bootstrap paging-state diagnostics.
 8. Revisit syscalls and userspace after the 64-bit kernel path is stable.
 
