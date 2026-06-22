@@ -1,5 +1,22 @@
 # Liam_OS Changelog
 
+## Core 0.8.36-dev
+
+### Added
+
+- Added x86_64 IRQ policy diagnostics during early IDT setup.
+- Added serial markers for `IRQ interrupts enabled: 0`, `IRQ interrupts guarded: 1`, planned legacy IRQ vector base/count, planned PIT and keyboard IRQ vectors, `IRQ APIC deferred: 1`, and `IRQ policy ok: 1`.
+
+### Changed
+
+- Kept hardware interrupts disabled while documenting the planned legacy IRQ vector layout for later PIC/APIC/PIT work.
+- Updated Liam_OS version to `0.8.36-dev`.
+
+### Notes
+
+- This milestone makes the interrupt strategy explicit before enabling IRQ delivery.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.35-dev
 
 ### Added
