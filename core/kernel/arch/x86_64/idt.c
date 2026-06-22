@@ -6,6 +6,11 @@
 #define X86_64_KERNEL_CODE_SELECTOR 0x08U
 #define X86_64_INTERRUPT_GATE 0x8EU
 #define X86_64_IDT_IST_MASK 0x07U
+#define X86_64_PAGE_FAULT_PRESENT 0x01ULL
+#define X86_64_PAGE_FAULT_WRITE 0x02ULL
+#define X86_64_PAGE_FAULT_USER 0x04ULL
+#define X86_64_PAGE_FAULT_RESERVED 0x08ULL
+#define X86_64_PAGE_FAULT_INSTRUCTION 0x10ULL
 
 struct idt_entry {
     u16 offset_low;
@@ -119,6 +124,13 @@ static void read_idtr(struct idt_descriptor *descriptor)
     __asm__ volatile ("sidt %0" : "=m" (*descriptor));
 }
 
+static u64 read_cr2(void)
+{
+    u64 value;
+    __asm__ volatile ("movq %%cr2, %0" : "=r" (value));
+    return value;
+}
+
 static u32 gate_present(u32 vector)
 {
     return (idt[vector].selector == X86_64_KERNEL_CODE_SELECTOR &&
@@ -128,6 +140,21 @@ static u32 gate_present(u32 vector)
 static u32 gate_ist(u32 vector)
 {
     return (u32)(idt[vector].ist & X86_64_IDT_IST_MASK);
+}
+
+static void report_page_fault_error(u64 error_code)
+{
+    x86_64_serial_write_hex64("CR2 fault address: 0x", read_cr2());
+    x86_64_serial_write_u32("PF present violation: ",
+                            ((error_code & X86_64_PAGE_FAULT_PRESENT) != 0ULL) ? 1U : 0U);
+    x86_64_serial_write_u32("PF write access: ",
+                            ((error_code & X86_64_PAGE_FAULT_WRITE) != 0ULL) ? 1U : 0U);
+    x86_64_serial_write_u32("PF user access: ",
+                            ((error_code & X86_64_PAGE_FAULT_USER) != 0ULL) ? 1U : 0U);
+    x86_64_serial_write_u32("PF reserved-bit violation: ",
+                            ((error_code & X86_64_PAGE_FAULT_RESERVED) != 0ULL) ? 1U : 0U);
+    x86_64_serial_write_u32("PF instruction fetch: ",
+                            ((error_code & X86_64_PAGE_FAULT_INSTRUCTION) != 0ULL) ? 1U : 0U);
 }
 
 void x86_64_idt_init(void)
@@ -175,6 +202,10 @@ void x86_64_idt_get_state(struct x86_64_idt_state *state)
     state->page_fault_ist = page_fault_ist;
     state->page_fault_present = gate_present(X86_64_IDT_PAGE_FAULT_VECTOR);
     state->page_fault_ist_ok = (page_fault_ist == X86_64_IDT_PAGE_FAULT_IST) ? 1U : 0U;
+    state->page_fault_cr2_reporting = 1U;
+    state->page_fault_error_decode = 1U;
+    state->diagnostics_ok = ((state->page_fault_cr2_reporting != 0U) &&
+                             (state->page_fault_error_decode != 0U)) ? 1U : 0U;
 
     state->ist_gates_ok = ((state->nmi_present != 0U) &&
                            (state->nmi_ist_ok != 0U) &&
@@ -196,6 +227,10 @@ void x86_64_exception_handler(u64 vector, u64 error_code)
     x86_64_serial_write_line(name);
     x86_64_serial_write_hex64("Vector: 0x", vector);
     x86_64_serial_write_hex64("Error code: 0x", error_code);
+
+    if (vector == X86_64_IDT_PAGE_FAULT_VECTOR) {
+        report_page_fault_error(error_code);
+    }
 
     for (;;) {
         __asm__ volatile ("cli; hlt");
