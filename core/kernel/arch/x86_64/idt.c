@@ -8,10 +8,6 @@
 #define X86_64_INTERRUPT_GATE 0x8EU
 #define X86_64_IDT_IST_MASK 0x07U
 #define X86_64_RFLAGS_INTERRUPT_ENABLE (1ULL << 9U)
-#define X86_64_IRQ_VECTOR_BASE 32U
-#define X86_64_IRQ_VECTOR_COUNT 16U
-#define X86_64_IRQ_PIT_VECTOR 32U
-#define X86_64_IRQ_KEYBOARD_VECTOR 33U
 #define X86_64_PIC1_COMMAND 0x20U
 #define X86_64_PIC1_DATA 0x21U
 #define X86_64_PIC2_COMMAND 0xA0U
@@ -20,6 +16,7 @@
 #define X86_64_ICW1_ICW4 0x01U
 #define X86_64_ICW4_8086 0x01U
 #define X86_64_PIC_MASK_ALL 0xFFU
+#define X86_64_PIC_EOI 0x20U
 #define X86_64_PAGE_FAULT_PRESENT 0x01ULL
 #define X86_64_PAGE_FAULT_WRITE 0x02ULL
 #define X86_64_PAGE_FAULT_USER 0x04ULL
@@ -42,6 +39,7 @@ struct idt_descriptor {
 } __attribute__((packed));
 
 extern void (*x86_64_isr_table[])(void);
+extern void (*x86_64_irq_table[])(void);
 
 static struct idt_entry idt[X86_64_IDT_ENTRIES];
 static struct idt_descriptor idt_descriptor;
@@ -49,6 +47,8 @@ static u32 legacy_pic_remapped;
 static u32 legacy_pic_all_masked;
 static u8 legacy_pic_master_mask;
 static u8 legacy_pic_slave_mask;
+static u32 irq_delivery_count;
+static u64 last_irq_vector;
 
 static const char *exception_name(u64 vector)
 {
@@ -184,6 +184,17 @@ static u32 gate_ist(u32 vector)
     return (u32)(idt[vector].ist & X86_64_IDT_IST_MASK);
 }
 
+static u32 count_irq_gates(void)
+{
+    u32 gates = 0U;
+
+    for (u32 irq = 0; irq < X86_64_IRQ_VECTOR_COUNT; ++irq) {
+        gates += gate_present(X86_64_IRQ_VECTOR_BASE + irq);
+    }
+
+    return gates;
+}
+
 static void remap_and_mask_legacy_pic(void)
 {
     outb(X86_64_PIC1_COMMAND, X86_64_ICW1_INIT | X86_64_ICW1_ICW4);
@@ -216,11 +227,27 @@ static void remap_and_mask_legacy_pic(void)
                              (legacy_pic_slave_mask == X86_64_PIC_MASK_ALL)) ? 1U : 0U;
 }
 
+static void send_pic_eoi(u64 vector)
+{
+    if (vector >= (u64)(X86_64_IRQ_VECTOR_BASE + 8U) &&
+        vector < (u64)(X86_64_IRQ_VECTOR_BASE + X86_64_IRQ_VECTOR_COUNT)) {
+        outb(X86_64_PIC2_COMMAND, X86_64_PIC_EOI);
+    }
+
+    if (vector >= (u64)X86_64_IRQ_VECTOR_BASE &&
+        vector < (u64)(X86_64_IRQ_VECTOR_BASE + X86_64_IRQ_VECTOR_COUNT)) {
+        outb(X86_64_PIC1_COMMAND, X86_64_PIC_EOI);
+    }
+}
+
 static void report_irq_policy(void)
 {
     u32 interrupts_enabled = ((read_rflags() & X86_64_RFLAGS_INTERRUPT_ENABLE) != 0ULL) ? 1U : 0U;
     u32 interrupts_guarded = (interrupts_enabled == 0U) ? 1U : 0U;
+    u32 irq_gates = count_irq_gates();
+    u32 irq_gates_ok = (irq_gates == X86_64_IRQ_VECTOR_COUNT) ? 1U : 0U;
     u32 irq_policy_ok = ((interrupts_guarded != 0U) &&
+                         (irq_gates_ok != 0U) &&
                          (legacy_pic_remapped != 0U) &&
                          (legacy_pic_all_masked != 0U)) ? 1U : 0U;
 
@@ -231,6 +258,8 @@ static void report_irq_policy(void)
     x86_64_serial_write_u32("IRQ legacy vector count: ", X86_64_IRQ_VECTOR_COUNT);
     x86_64_serial_write_u32("IRQ PIT planned vector: ", X86_64_IRQ_PIT_VECTOR);
     x86_64_serial_write_u32("IRQ keyboard planned vector: ", X86_64_IRQ_KEYBOARD_VECTOR);
+    x86_64_serial_write_u32("IRQ gates installed: ", irq_gates);
+    x86_64_serial_write_u32("IRQ gates ok: ", irq_gates_ok);
     x86_64_serial_write_u32("IRQ legacy PIC remapped: ", legacy_pic_remapped);
     x86_64_serial_write_hex32("IRQ master mask: 0x", legacy_pic_master_mask);
     x86_64_serial_write_hex32("IRQ slave mask: 0x", legacy_pic_slave_mask);
@@ -272,6 +301,10 @@ void x86_64_idt_init(void)
         set_idt_gate(vector, x86_64_isr_table[vector], exception_ist(vector));
     }
 
+    for (u32 irq = 0; irq < X86_64_IRQ_VECTOR_COUNT; ++irq) {
+        set_idt_gate(X86_64_IRQ_VECTOR_BASE + irq, x86_64_irq_table[irq], 0U);
+    }
+
     idt_descriptor.limit = (u16)(sizeof(idt) - 1U);
     idt_descriptor.base = (u64)&idt[0];
     load_idt(&idt_descriptor);
@@ -295,6 +328,8 @@ void x86_64_idt_get_state(struct x86_64_idt_state *state)
 {
     struct idt_descriptor idtr;
     u32 exception_gates = 0U;
+    u32 irq_gates = count_irq_gates();
+    u32 irq_gates_ok = (irq_gates == X86_64_IRQ_VECTOR_COUNT) ? 1U : 0U;
     u32 nmi_ist = gate_ist(X86_64_IDT_NMI_VECTOR);
     u32 double_fault_ist = gate_ist(X86_64_IDT_DOUBLE_FAULT_VECTOR);
     u32 page_fault_ist = gate_ist(X86_64_IDT_PAGE_FAULT_VECTOR);
@@ -308,6 +343,19 @@ void x86_64_idt_get_state(struct x86_64_idt_state *state)
     state->idtr_base = idtr.base;
     state->idtr_limit = idtr.limit;
     state->exception_gates = exception_gates;
+    state->irq_gates = irq_gates;
+    state->irq_vector_base = X86_64_IRQ_VECTOR_BASE;
+    state->irq_vector_count = X86_64_IRQ_VECTOR_COUNT;
+    state->irq_pit_vector = X86_64_IRQ_PIT_VECTOR;
+    state->irq_keyboard_vector = X86_64_IRQ_KEYBOARD_VECTOR;
+    state->irq_gates_ok = irq_gates_ok;
+    state->legacy_pic_remapped = legacy_pic_remapped;
+    state->legacy_pic_all_masked = legacy_pic_all_masked;
+    state->legacy_pic_master_mask = legacy_pic_master_mask;
+    state->legacy_pic_slave_mask = legacy_pic_slave_mask;
+    state->irq_policy_ok = ((irq_gates_ok != 0U) &&
+                            (legacy_pic_remapped != 0U) &&
+                            (legacy_pic_all_masked != 0U)) ? 1U : 0U;
 
     state->nmi_vector = X86_64_IDT_NMI_VECTOR;
     state->nmi_ist = nmi_ist;
@@ -358,4 +406,17 @@ void x86_64_exception_handler(u64 vector, u64 error_code)
     }
 
     halt_after_exception();
+}
+
+void x86_64_irq_handler(u64 vector)
+{
+    irq_delivery_count += 1U;
+    last_irq_vector = vector;
+
+    x86_64_serial_write_line("x86_64 IRQ received");
+    x86_64_serial_write_hex64("IRQ vector: 0x", vector);
+    x86_64_serial_write_u32("IRQ delivery count: ", irq_delivery_count);
+    x86_64_serial_write_hex64("IRQ last vector: 0x", last_irq_vector);
+
+    send_pic_eoi(vector);
 }
