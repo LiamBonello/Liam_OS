@@ -8,6 +8,7 @@
 #include "paging_builder.h"
 #include "paging_plan.h"
 #include "pmm.h"
+#include "runtime.h"
 #include "tss.h"
 
 static void report_boot_summary(const struct x86_64_boot_summary *summary)
@@ -281,6 +282,31 @@ static void report_higher_half_probe(const struct x86_64_higher_half_probe_state
     x86_64_serial_write_u32("Higher-half handoff ok: ", state->handoff_ok);
 }
 
+static void report_runtime_entry(const struct x86_64_runtime_entry_state *state)
+{
+    x86_64_serial_write_line("x86_64 higher-half runtime entry online");
+    x86_64_serial_write_hex64("Runtime low entry: 0x", state->low_entry);
+    x86_64_serial_write_hex64("Runtime high entry: 0x", state->high_entry);
+    x86_64_serial_write_hex64("Runtime state pointer: 0x", state->state_pointer);
+    x86_64_serial_write_hex64("Runtime expected CR3: 0x", state->expected_cr3);
+    x86_64_serial_write_hex64("Runtime active CR3: 0x", state->active_cr3);
+    x86_64_serial_write_hex64("Runtime arg value: 0x", state->arg_value);
+    x86_64_serial_write_hex64("Runtime stack sample: 0x", state->stack_sample);
+    x86_64_serial_write_hex32("Runtime expected value: 0x", state->expected_value);
+    x86_64_serial_write_hex32("Runtime return value: 0x", state->return_value);
+    x86_64_serial_write_hex32("Runtime entered value: 0x", state->entered_value);
+    x86_64_serial_write_hex32("Runtime scratch value: 0x", state->scratch_value);
+    x86_64_serial_write_u32("Runtime activation ready: ", state->activation_ready);
+    x86_64_serial_write_u32("Runtime high entry ready: ", state->high_entry_ready);
+    x86_64_serial_write_u32("Runtime arg ok: ", state->arg_ok);
+    x86_64_serial_write_u32("Runtime CR3 ok: ", state->cr3_ok);
+    x86_64_serial_write_u32("Runtime return ok: ", state->return_ok);
+    x86_64_serial_write_u32("Runtime entered ok: ", state->entered_ok);
+    x86_64_serial_write_u32("Runtime scratch ok: ", state->scratch_ok);
+    x86_64_serial_write_u32("Runtime stack identity ok: ", state->stack_identity_ok);
+    x86_64_serial_write_u32("Runtime entry ok: ", state->runtime_ok);
+}
+
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
     x86_64_serial_write_line("x86_64 maintained GDT online");
@@ -349,6 +375,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_paging_builder_state paging_builder;
     struct x86_64_paging_activation_state paging_activation;
     struct x86_64_paging_probe_state paging_probe;
+    struct x86_64_runtime_entry_state runtime_entry;
     struct x86_64_tss_state tss_state;
 
     x86_64_console_init();
@@ -370,12 +397,14 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
                                         &context.memory_layout, &paging_plan);
     x86_64_higher_half_probe_run(&higher_half_probe, &paging_activation, &paging_probe,
                                  &context.memory_layout, &paging_plan);
+    x86_64_runtime_enter_higher_half(&runtime_entry, &paging_activation,
+                                     &context.memory_layout, &paging_plan);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: higher-half handoff probe", 1, 0);
+    x86_64_console_write_at("Stage: higher-half runtime entry", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: higher-half handoff probe");
+    x86_64_serial_write_line("Stage: higher-half runtime entry");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
@@ -389,6 +418,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_paging_activation(&paging_activation);
     report_paging_probes(&paging_probe);
     report_higher_half_probe(&higher_half_probe);
+    report_runtime_entry(&runtime_entry);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
     report_descriptor_summary(&idt_state, &gdt_state, &tss_state);
