@@ -6,6 +6,7 @@
 #include "types.h"
 
 #define X86_64_PAGING_BUILDER_ENTRIES 512U
+#define X86_64_PAGING_BUILDER_TABLE_PAGES 8U
 
 struct x86_64_paging_builder_state {
     u64 pml4_table;
@@ -20,6 +21,11 @@ struct x86_64_paging_builder_state {
     u32 identity_huge_pages;
     u32 direct_huge_pages;
     u32 kernel_pages;
+    u32 pmm_backed;
+    u32 allocated_table_pages;
+    u32 pmm_free_pages_before;
+    u32 pmm_free_pages_after;
+    u32 allocation_ok;
     u32 identity_entry_ok;
     u32 direct_map_entry_ok;
     u32 kernel_entry_ok;
