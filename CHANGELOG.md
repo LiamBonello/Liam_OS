@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.47-dev
+
+### Added
+
+- Added a guarded x86_64 syscall entry stub symbol for the future `IA32_LSTAR` target.
+- Added serial diagnostics for syscall entry-stub availability, planned LSTAR target, deferred STAR selector programming, and planned FMASK value.
+
+### Changed
+
+- Tightened the syscall ABI diagnostics so `Syscall entry ready: 1` now requires a concrete guarded entry stub while STAR selector programming remains deferred until x86_64 user GDT entries exist.
+- Updated `make x86_64-info` validation markers for the syscall entry checkpoint.
+- Updated Liam_OS version to `0.8.47-dev`.
+
+### Notes
+
+- This still does not enable user-mode `syscall/sysret`, program syscall MSRs, or enter x86_64 userspace. The stub is intentionally inert and halts if reached before the full user transition path exists.
+- The normal x86_64 boot should report `Syscall entry stub installed: 1`, `Syscall STAR selectors deferred: 1`, `Syscall entry ready: 1`, and `Syscall ABI ok: 1`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.46-dev
 
 ### Added
