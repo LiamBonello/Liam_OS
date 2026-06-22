@@ -2,6 +2,7 @@
 #include "console.h"
 #include "cpuid.h"
 #include "gdt.h"
+#include "higher_half_probe.h"
 #include "idt.h"
 #include "paging.h"
 #include "paging_builder.h"
@@ -240,6 +241,22 @@ static void report_paging_probes(const struct x86_64_paging_probe_state *state)
     x86_64_serial_write_u32("Paging probes ok: ", state->probes_ok);
 }
 
+static void report_higher_half_probe(const struct x86_64_higher_half_probe_state *state)
+{
+    x86_64_serial_write_line("x86_64 higher-half execution probe online");
+    x86_64_serial_write_hex64("Higher-half probe low entry: 0x", state->low_entry);
+    x86_64_serial_write_hex64("Higher-half probe high entry: 0x", state->high_entry);
+    x86_64_serial_write_hex64("Higher-half probe bytes: 0x", state->entry_bytes);
+    x86_64_serial_write_hex32("Higher-half probe expected: 0x", state->expected_value);
+    x86_64_serial_write_hex32("Higher-half probe low result: 0x", state->low_result);
+    x86_64_serial_write_hex32("Higher-half probe high result: 0x", state->high_result);
+    x86_64_serial_write_u32("Higher-half probe activation ready: ", state->activation_ready);
+    x86_64_serial_write_u32("Higher-half probe alias ready: ", state->alias_ready);
+    x86_64_serial_write_u32("Higher-half probe low ok: ", state->low_probe_ok);
+    x86_64_serial_write_u32("Higher-half probe high ok: ", state->high_probe_ok);
+    x86_64_serial_write_u32("Higher-half probe ok: ", state->probe_ok);
+}
+
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
     x86_64_serial_write_line("x86_64 maintained GDT online");
@@ -301,6 +318,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_boot_context context;
     struct x86_64_cpuid_state cpuid_state;
     struct x86_64_gdt_state gdt_state;
+    struct x86_64_higher_half_probe_state higher_half_probe;
     struct x86_64_idt_state idt_state;
     struct x86_64_paging_state paging_state;
     struct x86_64_paging_plan paging_plan;
@@ -326,12 +344,14 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
     x86_64_paging_probe_active_mappings(&paging_probe, &paging_activation,
                                         &context.memory_layout, &paging_plan);
+    x86_64_higher_half_probe_run(&higher_half_probe, &paging_activation, &paging_probe,
+                                 &context.memory_layout, &paging_plan);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: paging probes + descriptor", 1, 0);
+    x86_64_console_write_at("Stage: higher-half probe + descriptor", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: paging probes + descriptor");
+    x86_64_serial_write_line("Stage: higher-half probe + descriptor");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
@@ -344,6 +364,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_paging_builder(&paging_builder);
     report_paging_activation(&paging_activation);
     report_paging_probes(&paging_probe);
+    report_higher_half_probe(&higher_half_probe);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
     report_descriptor_summary(&idt_state, &gdt_state, &tss_state);
