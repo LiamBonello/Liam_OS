@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.44-dev
+
+### Added
+
+- Added an x86_64 architecture-local process table and scheduler smoke model with READY, RUNNING, EXITED, and FAILED process states.
+- Added PMM/heap-backed kernel stack allocation for early x86_64 process records.
+- Added serial diagnostics for process creation, ready count, run attempts, exited count, stack allocation/alignment, worker execution counters, and overall process smoke status.
+
+### Changed
+
+- Wired the process scheduler smoke check to run after the early x86_64 heap smoke passes, without touching the stable i386 scheduler path.
+- Updated `make x86_64-info` validation markers for the process scheduler milestone.
+- Updated Liam_OS version to `0.8.44-dev`.
+
+### Notes
+
+- This is a scheduler/process-model stepping stone only. It proves x86_64 process table transitions and heap-backed kernel stacks; it does not yet perform real x86_64 context switching, syscalls, ELF64 loading, isolated address spaces, or a shell.
+- The normal x86_64 boot should report `Process created: 2`, `Process ready before run: 2`, `Process run count: 2`, `Process exited: 2`, `Process failed: 0`, `Process stack allocations: 2`, `Process worker A count: 1`, `Process worker B count: 1`, and `Process smoke ok: 1`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.43-dev
 
 ### Added
