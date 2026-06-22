@@ -169,7 +169,7 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path validates higher-half instruction fetch after activating C-owned page tables."
+	@echo "Liam_OS x86_64 path validates higher-half C execution after activating C-owned page tables."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
@@ -177,7 +177,7 @@ x86_64-info:
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
 	@echo "Expected x86_64 screen messages: CPU baseline ok: 1, IDT IST gates: 1, PMM smoke free: 1, Desc/IST ok: 1"
-	@echo "Expected serial markers include: Higher-half probe ok: 1, Paging probes ok: 1, Paging activation ok: 1, VM plan ok: 1, Desc/IST ok: 1"
+	@echo "Expected serial markers include: Higher-half C probe ok: 1, Higher-half probe ok: 1, Paging probes ok: 1, Paging activation ok: 1, VM plan ok: 1, Desc/IST ok: 1"
 	@echo "Serial output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
