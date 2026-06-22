@@ -39,6 +39,8 @@ struct x86_64_process_smoke_state {
     u32 failed_processes;
     u32 stack_allocations;
     u32 stack_alignment_ok;
+    u32 stack_switches;
+    u32 stack_execution_ok;
     u32 last_created_pid;
     u32 last_run_pid;
     u32 worker_a_count;
@@ -48,6 +50,8 @@ struct x86_64_process_smoke_state {
     u64 first_stack_top;
     u64 second_stack_base;
     u64 second_stack_top;
+    u64 worker_a_stack_sample;
+    u64 worker_b_stack_sample;
 };
 
 void x86_64_process_initialize(struct x86_64_process_smoke_state *state);
