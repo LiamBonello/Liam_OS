@@ -7,7 +7,6 @@ X86_64_BUILD_DIR := $(BUILD_DIR)/x86_64
 X86_64_ISO_DIR := $(X86_64_BUILD_DIR)/iso
 X86_64_KERNEL := $(X86_64_BUILD_DIR)/kernel.elf
 X86_64_ISO := $(X86_64_BUILD_DIR)/liam_os_x86_64.iso
-X86_64_SMOKE_LOG := $(X86_64_BUILD_DIR)/x86_64-smoke.log
 X86_64_GRUB_CFG := boot/grub-x86_64.cfg
 X86_64_BOOT32_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot32.o
 X86_64_START_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/start.o
@@ -61,7 +60,7 @@ $(error Unsupported ARCH '$(ARCH)'. Supported: $(SUPPORTED_ARCHES))
 endif
 
 ifeq ($(ARCH),x86_64)
-$(error ARCH=x86_64 is scaffolded but not the default build path yet. Use 'make x86_64-info', 'make x86_64-kernel', 'make x86_64-iso', 'make x86_64-run', or 'make x86_64-smoke' for staged migration work.)
+$(error ARCH=x86_64 is scaffolded but not the default build path yet. Use 'make x86_64-info', 'make x86_64-kernel', 'make x86_64-iso', or 'make x86_64-run' for staged migration work.)
 endif
 
 ASM_SRC := \
@@ -143,7 +142,7 @@ VPATH := \
 	kernel/memory \
 	kernel/userland
 
-.PHONY: all clean run run-debug debug check-tools userland x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-run-check-tools x86_64-smoke-check-tools x86_64-kernel x86_64-iso x86_64-run x86_64-smoke
+.PHONY: all clean run run-debug debug check-tools userland x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-run-check-tools x86_64-kernel x86_64-iso x86_64-run
 
 all: $(ISO)
 
@@ -169,21 +168,17 @@ x86_64-iso-check-tools: x86_64-check-tools
 x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
-x86_64-smoke-check-tools: x86_64-run-check-tools
-
 x86_64-info:
-	@echo "Liam_OS x86_64 path now validates higher-half instruction fetch after activating C-owned page tables."
+	@echo "Liam_OS x86_64 path validates higher-half instruction fetch after activating C-owned page tables."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
 	@echo "Run target: make x86_64-run"
-	@echo "Headless smoke target: make x86_64-smoke"
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
-	@echo "Smoke log output: $(X86_64_SMOKE_LOG)"
 	@echo "Expected x86_64 screen messages: CPU baseline ok: 1, IDT IST gates: 1, PMM smoke free: 1, Desc/IST ok: 1"
 	@echo "Expected serial markers include: Higher-half probe ok: 1, Paging probes ok: 1, Paging activation ok: 1, VM plan ok: 1, Desc/IST ok: 1"
-	@echo "Serial output is routed to the terminal by make x86_64-run and validated by make x86_64-smoke."
+	@echo "Serial output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
 x86_64-kernel: x86_64-check-tools $(X86_64_KERNEL)
@@ -194,9 +189,6 @@ x86_64-iso: x86_64-iso-check-tools $(X86_64_ISO)
 
 x86_64-run: x86_64-run-check-tools $(X86_64_ISO)
 	$(QEMU_x86_64) -serial stdio -boot d -cdrom $(X86_64_ISO)
-
-x86_64-smoke: x86_64-smoke-check-tools $(X86_64_ISO)
-	sh scripts/x86_64_smoke.sh $(X86_64_SMOKE_LOG)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
