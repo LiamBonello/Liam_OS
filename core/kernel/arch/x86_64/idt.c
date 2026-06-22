@@ -12,6 +12,14 @@
 #define X86_64_IRQ_VECTOR_COUNT 16U
 #define X86_64_IRQ_PIT_VECTOR 32U
 #define X86_64_IRQ_KEYBOARD_VECTOR 33U
+#define X86_64_PIC1_COMMAND 0x20U
+#define X86_64_PIC1_DATA 0x21U
+#define X86_64_PIC2_COMMAND 0xA0U
+#define X86_64_PIC2_DATA 0xA1U
+#define X86_64_ICW1_INIT 0x10U
+#define X86_64_ICW1_ICW4 0x01U
+#define X86_64_ICW4_8086 0x01U
+#define X86_64_PIC_MASK_ALL 0xFFU
 #define X86_64_PAGE_FAULT_PRESENT 0x01ULL
 #define X86_64_PAGE_FAULT_WRITE 0x02ULL
 #define X86_64_PAGE_FAULT_USER 0x04ULL
@@ -37,6 +45,10 @@ extern void (*x86_64_isr_table[])(void);
 
 static struct idt_entry idt[X86_64_IDT_ENTRIES];
 static struct idt_descriptor idt_descriptor;
+static u32 legacy_pic_remapped;
+static u32 legacy_pic_all_masked;
+static u8 legacy_pic_master_mask;
+static u8 legacy_pic_slave_mask;
 
 static const char *exception_name(u64 vector)
 {
@@ -130,6 +142,23 @@ static void read_idtr(struct idt_descriptor *descriptor)
     __asm__ volatile ("sidt %0" : "=m" (*descriptor));
 }
 
+static u8 inb(u16 port)
+{
+    u8 value;
+    __asm__ volatile ("inb %1, %0" : "=a" (value) : "Nd" (port));
+    return value;
+}
+
+static void outb(u16 port, u8 value)
+{
+    __asm__ volatile ("outb %0, %1" : : "a" (value), "Nd" (port));
+}
+
+static void io_wait(void)
+{
+    outb(0x80U, 0U);
+}
+
 static u64 read_cr2(void)
 {
     u64 value;
@@ -155,18 +184,57 @@ static u32 gate_ist(u32 vector)
     return (u32)(idt[vector].ist & X86_64_IDT_IST_MASK);
 }
 
+static void remap_and_mask_legacy_pic(void)
+{
+    outb(X86_64_PIC1_COMMAND, X86_64_ICW1_INIT | X86_64_ICW1_ICW4);
+    io_wait();
+    outb(X86_64_PIC2_COMMAND, X86_64_ICW1_INIT | X86_64_ICW1_ICW4);
+    io_wait();
+
+    outb(X86_64_PIC1_DATA, X86_64_IRQ_VECTOR_BASE);
+    io_wait();
+    outb(X86_64_PIC2_DATA, X86_64_IRQ_VECTOR_BASE + 8U);
+    io_wait();
+
+    outb(X86_64_PIC1_DATA, 0x04U);
+    io_wait();
+    outb(X86_64_PIC2_DATA, 0x02U);
+    io_wait();
+
+    outb(X86_64_PIC1_DATA, X86_64_ICW4_8086);
+    io_wait();
+    outb(X86_64_PIC2_DATA, X86_64_ICW4_8086);
+    io_wait();
+
+    outb(X86_64_PIC1_DATA, X86_64_PIC_MASK_ALL);
+    outb(X86_64_PIC2_DATA, X86_64_PIC_MASK_ALL);
+
+    legacy_pic_master_mask = inb(X86_64_PIC1_DATA);
+    legacy_pic_slave_mask = inb(X86_64_PIC2_DATA);
+    legacy_pic_remapped = 1U;
+    legacy_pic_all_masked = ((legacy_pic_master_mask == X86_64_PIC_MASK_ALL) &&
+                             (legacy_pic_slave_mask == X86_64_PIC_MASK_ALL)) ? 1U : 0U;
+}
+
 static void report_irq_policy(void)
 {
     u32 interrupts_enabled = ((read_rflags() & X86_64_RFLAGS_INTERRUPT_ENABLE) != 0ULL) ? 1U : 0U;
-    u32 irq_policy_ok = (interrupts_enabled == 0U) ? 1U : 0U;
+    u32 interrupts_guarded = (interrupts_enabled == 0U) ? 1U : 0U;
+    u32 irq_policy_ok = ((interrupts_guarded != 0U) &&
+                         (legacy_pic_remapped != 0U) &&
+                         (legacy_pic_all_masked != 0U)) ? 1U : 0U;
 
     x86_64_serial_write_line("x86_64 IRQ policy online");
     x86_64_serial_write_u32("IRQ interrupts enabled: ", interrupts_enabled);
-    x86_64_serial_write_u32("IRQ interrupts guarded: ", irq_policy_ok);
+    x86_64_serial_write_u32("IRQ interrupts guarded: ", interrupts_guarded);
     x86_64_serial_write_u32("IRQ legacy vector base: ", X86_64_IRQ_VECTOR_BASE);
     x86_64_serial_write_u32("IRQ legacy vector count: ", X86_64_IRQ_VECTOR_COUNT);
     x86_64_serial_write_u32("IRQ PIT planned vector: ", X86_64_IRQ_PIT_VECTOR);
     x86_64_serial_write_u32("IRQ keyboard planned vector: ", X86_64_IRQ_KEYBOARD_VECTOR);
+    x86_64_serial_write_u32("IRQ legacy PIC remapped: ", legacy_pic_remapped);
+    x86_64_serial_write_hex32("IRQ master mask: 0x", legacy_pic_master_mask);
+    x86_64_serial_write_hex32("IRQ slave mask: 0x", legacy_pic_slave_mask);
+    x86_64_serial_write_u32("IRQ all masked: ", legacy_pic_all_masked);
     x86_64_serial_write_u32("IRQ APIC deferred: ", 1U);
     x86_64_serial_write_u32("IRQ policy ok: ", irq_policy_ok);
 }
@@ -207,6 +275,7 @@ void x86_64_idt_init(void)
     idt_descriptor.limit = (u16)(sizeof(idt) - 1U);
     idt_descriptor.base = (u64)&idt[0];
     load_idt(&idt_descriptor);
+    remap_and_mask_legacy_pic();
 
     x86_64_serial_write_u32("IDT PF CR2 reporting: ", 1U);
     x86_64_serial_write_u32("IDT PF error decode: ", 1U);
