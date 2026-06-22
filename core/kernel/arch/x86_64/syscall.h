@@ -1,0 +1,106 @@
+#ifndef LIAM_OS_X86_64_SYSCALL_H
+#define LIAM_OS_X86_64_SYSCALL_H
+
+#include "console.h"
+#include "types.h"
+
+#define X86_64_SYSCALL_MAX_ARGS 6U
+#define X86_64_MSR_IA32_EFER 0xC0000080ULL
+#define X86_64_MSR_IA32_STAR 0xC0000081ULL
+#define X86_64_MSR_IA32_LSTAR 0xC0000082ULL
+#define X86_64_MSR_IA32_FMASK 0xC0000084ULL
+
+struct x86_64_syscall_abi_state {
+    u32 initialized;
+    u32 fast_syscall_supported;
+    u32 syscall_sysret_planned;
+    u32 msr_programming_deferred;
+    u32 entry_stub_installed;
+    u32 user_entry_deferred;
+    u32 arg_register_count;
+    u32 syscall_number_rax;
+    u32 return_rax;
+    u32 arg0_rdi;
+    u32 arg1_rsi;
+    u32 arg2_rdx;
+    u32 arg3_r10;
+    u32 arg4_r8;
+    u32 arg5_r9;
+    u32 clobbers_rcx_r11;
+    u32 user_pointer_validation_required;
+    u32 syscall_abi_ok;
+    u32 syscall_entry_ready;
+    u64 ia32_efer_msr;
+    u64 ia32_star_msr;
+    u64 ia32_lstar_msr;
+    u64 ia32_fmask_msr;
+};
+
+static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *state, u32 fast_syscall_supported)
+{
+    state->initialized = 1U;
+    state->fast_syscall_supported = fast_syscall_supported;
+    state->syscall_sysret_planned = 1U;
+    state->msr_programming_deferred = 1U;
+    state->entry_stub_installed = 0U;
+    state->user_entry_deferred = 1U;
+    state->arg_register_count = X86_64_SYSCALL_MAX_ARGS;
+    state->syscall_number_rax = 1U;
+    state->return_rax = 1U;
+    state->arg0_rdi = 1U;
+    state->arg1_rsi = 1U;
+    state->arg2_rdx = 1U;
+    state->arg3_r10 = 1U;
+    state->arg4_r8 = 1U;
+    state->arg5_r9 = 1U;
+    state->clobbers_rcx_r11 = 1U;
+    state->user_pointer_validation_required = 1U;
+    state->syscall_entry_ready = 0U;
+    state->ia32_efer_msr = X86_64_MSR_IA32_EFER;
+    state->ia32_star_msr = X86_64_MSR_IA32_STAR;
+    state->ia32_lstar_msr = X86_64_MSR_IA32_LSTAR;
+    state->ia32_fmask_msr = X86_64_MSR_IA32_FMASK;
+
+    state->syscall_abi_ok = ((state->initialized != 0U) &&
+                             (state->fast_syscall_supported != 0U) &&
+                             (state->syscall_sysret_planned != 0U) &&
+                             (state->msr_programming_deferred != 0U) &&
+                             (state->arg_register_count == X86_64_SYSCALL_MAX_ARGS) &&
+                             (state->syscall_number_rax != 0U) &&
+                             (state->return_rax != 0U) &&
+                             (state->arg0_rdi != 0U) &&
+                             (state->arg1_rsi != 0U) &&
+                             (state->arg2_rdx != 0U) &&
+                             (state->arg3_r10 != 0U) &&
+                             (state->arg4_r8 != 0U) &&
+                             (state->arg5_r9 != 0U) &&
+                             (state->clobbers_rcx_r11 != 0U) &&
+                             (state->user_pointer_validation_required != 0U)) ? 1U : 0U;
+}
+
+static inline void x86_64_syscall_abi_report(const struct x86_64_syscall_abi_state *state)
+{
+    x86_64_serial_write_line("x86_64 syscall ABI plan online");
+    x86_64_serial_write_u32("Syscall fast supported: ", state->fast_syscall_supported);
+    x86_64_serial_write_u32("Syscall/SYSRET planned: ", state->syscall_sysret_planned);
+    x86_64_serial_write_u32("Syscall args: ", state->arg_register_count);
+    x86_64_serial_write_u32("Syscall number RAX: ", state->syscall_number_rax);
+    x86_64_serial_write_u32("Syscall return RAX: ", state->return_rax);
+    x86_64_serial_write_u32("Syscall arg0 RDI: ", state->arg0_rdi);
+    x86_64_serial_write_u32("Syscall arg1 RSI: ", state->arg1_rsi);
+    x86_64_serial_write_u32("Syscall arg2 RDX: ", state->arg2_rdx);
+    x86_64_serial_write_u32("Syscall arg3 R10: ", state->arg3_r10);
+    x86_64_serial_write_u32("Syscall arg4 R8: ", state->arg4_r8);
+    x86_64_serial_write_u32("Syscall arg5 R9: ", state->arg5_r9);
+    x86_64_serial_write_u32("Syscall clobbers RCX/R11: ", state->clobbers_rcx_r11);
+    x86_64_serial_write_u32("Syscall pointer validation required: ", state->user_pointer_validation_required);
+    x86_64_serial_write_u32("Syscall MSR programming deferred: ", state->msr_programming_deferred);
+    x86_64_serial_write_hex64("Syscall IA32_EFER MSR: ", state->ia32_efer_msr);
+    x86_64_serial_write_hex64("Syscall IA32_STAR MSR: ", state->ia32_star_msr);
+    x86_64_serial_write_hex64("Syscall IA32_LSTAR MSR: ", state->ia32_lstar_msr);
+    x86_64_serial_write_hex64("Syscall IA32_FMASK MSR: ", state->ia32_fmask_msr);
+    x86_64_serial_write_u32("Syscall entry ready: ", state->syscall_entry_ready);
+    x86_64_serial_write_u32("Syscall ABI ok: ", state->syscall_abi_ok);
+}
+
+#endif
