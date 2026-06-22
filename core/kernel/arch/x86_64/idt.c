@@ -49,6 +49,7 @@ static u8 legacy_pic_master_mask;
 static u8 legacy_pic_slave_mask;
 static u32 irq_delivery_count;
 static u64 last_irq_vector;
+static u32 irq_self_test_active;
 
 static const char *exception_name(u64 vector)
 {
@@ -268,6 +269,19 @@ static void report_irq_policy(void)
     x86_64_serial_write_u32("IRQ policy ok: ", irq_policy_ok);
 }
 
+static void run_irq_self_test(void)
+{
+    u32 before = irq_delivery_count;
+
+    x86_64_serial_write_u32("IRQ self-test requested: ", 1U);
+    x86_64_serial_write_u32("IRQ self-test vector: ", X86_64_IRQ_PIT_VECTOR);
+    irq_self_test_active = 1U;
+    __asm__ volatile ("int $32" ::: "memory");
+    irq_self_test_active = 0U;
+    x86_64_serial_write_u32("IRQ self-test delivered: ", irq_delivery_count - before);
+    x86_64_serial_write_u32("IRQ self-test returned: ", 1U);
+}
+
 static void report_page_fault_error(u64 error_code)
 {
     x86_64_serial_write_hex64("CR2 fault address: 0x", read_cr2());
@@ -316,6 +330,10 @@ void x86_64_idt_init(void)
     x86_64_serial_write_u32("IDT panic cli before hlt: ", 1U);
     x86_64_serial_write_u32("IDT diagnostics ok: ", 1U);
     report_irq_policy();
+
+    if (x86_64_irq_self_test_requested != 0U) {
+        run_irq_self_test();
+    }
 
     if (x86_64_exception_self_test_requested != 0U) {
         x86_64_serial_write_u32("Exception self-test requested: ", 1U);
@@ -418,5 +436,7 @@ void x86_64_irq_handler(u64 vector)
     x86_64_serial_write_u32("IRQ delivery count: ", irq_delivery_count);
     x86_64_serial_write_hex64("IRQ last vector: 0x", last_irq_vector);
 
-    send_pic_eoi(vector);
+    if (irq_self_test_active == 0U) {
+        send_pic_eoi(vector);
+    }
 }
