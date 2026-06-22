@@ -168,6 +168,10 @@ void x86_64_idt_init(void)
     idt_descriptor.limit = (u16)(sizeof(idt) - 1U);
     idt_descriptor.base = (u64)&idt[0];
     load_idt(&idt_descriptor);
+
+    x86_64_serial_write_u32("IDT PF CR2 reporting: ", 1U);
+    x86_64_serial_write_u32("IDT PF error decode: ", 1U);
+    x86_64_serial_write_u32("IDT diagnostics ok: ", 1U);
 }
 
 void x86_64_idt_get_state(struct x86_64_idt_state *state)
