@@ -6,6 +6,18 @@
 #include "types.h"
 
 #define X86_64_SYSCALL_MAX_ARGS 6U
+#define X86_64_SYSCALL_SERVICE_EXIT 1U
+#define X86_64_SYSCALL_SERVICE_WRITE 2U
+#define X86_64_SYSCALL_SERVICE_OPEN 3U
+#define X86_64_SYSCALL_SERVICE_READ 4U
+#define X86_64_SYSCALL_SERVICE_CLOSE 5U
+#define X86_64_SYSCALL_SERVICE_STAT 6U
+#define X86_64_SYSCALL_SERVICE_GET_ARG 7U
+#define X86_64_SYSCALL_SERVICE_EXEC 8U
+#define X86_64_SYSCALL_SERVICE_GETPID 9U
+#define X86_64_SYSCALL_SERVICE_YIELD 10U
+#define X86_64_SYSCALL_SERVICE_COUNT 10U
+#define X86_64_SYSCALL_SERVICE_COUNT_OK 1U
 #define X86_64_MSR_IA32_EFER 0xC0000080ULL
 #define X86_64_MSR_IA32_STAR 0xC0000081ULL
 #define X86_64_MSR_IA32_LSTAR 0xC0000082ULL
@@ -35,6 +47,17 @@ struct x86_64_syscall_abi_state {
     u32 arg5_r9;
     u32 clobbers_rcx_r11;
     u32 user_pointer_validation_required;
+    u32 service_count;
+    u32 service_exit_planned;
+    u32 service_write_planned;
+    u32 service_open_planned;
+    u32 service_read_planned;
+    u32 service_close_planned;
+    u32 service_stat_planned;
+    u32 service_get_arg_planned;
+    u32 service_exec_planned;
+    u32 service_getpid_planned;
+    u32 service_yield_planned;
     u32 syscall_abi_ok;
     u32 syscall_entry_ready;
     u64 entry_lstar_target;
@@ -67,6 +90,17 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->arg5_r9 = 1U;
     state->clobbers_rcx_r11 = 1U;
     state->user_pointer_validation_required = 1U;
+    state->service_count = X86_64_SYSCALL_SERVICE_COUNT;
+    state->service_exit_planned = (X86_64_SYSCALL_SERVICE_EXIT == 1U) ? 1U : 0U;
+    state->service_write_planned = (X86_64_SYSCALL_SERVICE_WRITE == 2U) ? 1U : 0U;
+    state->service_open_planned = (X86_64_SYSCALL_SERVICE_OPEN == 3U) ? 1U : 0U;
+    state->service_read_planned = (X86_64_SYSCALL_SERVICE_READ == 4U) ? 1U : 0U;
+    state->service_close_planned = (X86_64_SYSCALL_SERVICE_CLOSE == 5U) ? 1U : 0U;
+    state->service_stat_planned = (X86_64_SYSCALL_SERVICE_STAT == 6U) ? 1U : 0U;
+    state->service_get_arg_planned = (X86_64_SYSCALL_SERVICE_GET_ARG == 7U) ? 1U : 0U;
+    state->service_exec_planned = (X86_64_SYSCALL_SERVICE_EXEC == 8U) ? 1U : 0U;
+    state->service_getpid_planned = (X86_64_SYSCALL_SERVICE_GETPID == 9U) ? 1U : 0U;
+    state->service_yield_planned = (X86_64_SYSCALL_SERVICE_YIELD == 10U) ? 1U : 0U;
     state->planned_star_value = X86_64_SYSCALL_STAR_VALUE;
     state->planned_fmask_value = X86_64_SYSCALL_FMASK_VALUE;
     state->ia32_efer_msr = X86_64_MSR_IA32_EFER;
@@ -92,7 +126,18 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
                              (state->arg4_r8 != 0U) &&
                              (state->arg5_r9 != 0U) &&
                              (state->clobbers_rcx_r11 != 0U) &&
-                             (state->user_pointer_validation_required != 0U)) ? 1U : 0U;
+                             (state->user_pointer_validation_required != 0U) &&
+                             (state->service_count == X86_64_SYSCALL_SERVICE_COUNT) &&
+                             (state->service_exit_planned != 0U) &&
+                             (state->service_write_planned != 0U) &&
+                             (state->service_open_planned != 0U) &&
+                             (state->service_read_planned != 0U) &&
+                             (state->service_close_planned != 0U) &&
+                             (state->service_stat_planned != 0U) &&
+                             (state->service_get_arg_planned != 0U) &&
+                             (state->service_exec_planned != 0U) &&
+                             (state->service_getpid_planned != 0U) &&
+                             (state->service_yield_planned != 0U)) ? 1U : 0U;
     state->syscall_entry_ready = ((state->syscall_abi_ok != 0U) &&
                                   (state->entry_stub_installed != 0U)) ? 1U : 0U;
 }
@@ -113,6 +158,17 @@ static inline void x86_64_syscall_abi_report(const struct x86_64_syscall_abi_sta
     x86_64_serial_write_u32("Syscall arg5 R9: ", state->arg5_r9);
     x86_64_serial_write_u32("Syscall clobbers RCX/R11: ", state->clobbers_rcx_r11);
     x86_64_serial_write_u32("Syscall pointer validation required: ", state->user_pointer_validation_required);
+    x86_64_serial_write_u32("Syscall service count: ", state->service_count);
+    x86_64_serial_write_u32("Syscall exit planned: ", state->service_exit_planned);
+    x86_64_serial_write_u32("Syscall write planned: ", state->service_write_planned);
+    x86_64_serial_write_u32("Syscall open planned: ", state->service_open_planned);
+    x86_64_serial_write_u32("Syscall read planned: ", state->service_read_planned);
+    x86_64_serial_write_u32("Syscall close planned: ", state->service_close_planned);
+    x86_64_serial_write_u32("Syscall stat planned: ", state->service_stat_planned);
+    x86_64_serial_write_u32("Syscall get_arg planned: ", state->service_get_arg_planned);
+    x86_64_serial_write_u32("Syscall exec planned: ", state->service_exec_planned);
+    x86_64_serial_write_u32("Syscall getpid planned: ", state->service_getpid_planned);
+    x86_64_serial_write_u32("Syscall yield planned: ", state->service_yield_planned);
     x86_64_serial_write_u32("Syscall MSR programming deferred: ", state->msr_programming_deferred);
     x86_64_serial_write_u32("Syscall user entry deferred: ", state->user_entry_deferred);
     x86_64_serial_write_u32("Syscall STAR selectors ready: ", state->user_selectors_ready);
