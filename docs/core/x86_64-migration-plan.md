@@ -46,7 +46,7 @@ Status: started.
 Remaining work:
 
 - Add explicit failure diagnostics for unsupported CPUs or malformed boot state before enabling long mode.
-- Move execution to the planned higher-half kernel window after active candidate paging stays stable.
+- Move execution to the planned higher-half kernel window after active alias probes stay stable.
 
 ## Stage 4: early 64-bit kernel entry
 
@@ -107,7 +107,7 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
-Status: started with layout, PMM planning, an isolated allocator smoke test, bootstrap paging-state diagnostics, a smoke-validated higher-half/direct-map plan, smoke-validated C-owned page tables, and CR3 activation of those tables.
+Status: started with layout, PMM planning, an isolated allocator smoke test, bootstrap paging-state diagnostics, a smoke-validated higher-half/direct-map plan, smoke-validated C-owned page tables, CR3 activation of those tables, and active alias probes.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
@@ -124,12 +124,14 @@ Status: started with layout, PMM planning, an isolated allocator smoke test, boo
 - The headless smoke test validates the planned PML4 slots, canonical virtual address windows, planned-region count, and `VM plan ok: 1` before accepting the boot.
 - Added `core/kernel/arch/x86_64/paging_builder.c` and `paging_builder.h` to construct C-owned page tables for the planned identity, direct-map, and higher-half kernel windows.
 - The headless smoke test validates table alignment, PML4 population, identity/direct huge-page coverage, the 4 KiB kernel mapping, and `Paging builder ok: 1` before accepting the boot.
-- The x86_64 C entry now switches CR3 to the C-built page tables after the builder validates them.
+- The x86_64 C entry switches CR3 to the C-built page tables after the builder validates them.
 - The headless smoke test validates `Paging activation builder ready: 1`, `Paging activation active matches builder: 1`, and `Paging activation ok: 1`.
+- The x86_64 C entry probes the kernel image through the identity map, direct physical map, and higher-half kernel alias after the CR3 switch.
+- The headless smoke test validates `Paging probe identity ok: 1`, `Paging probe direct map ok: 1`, `Paging probe kernel alias ok: 1`, and `Paging probes ok: 1`.
 
 Remaining work:
 
-- Move kernel execution to the higher-half mapping after active candidate paging is proven stable.
+- Move kernel execution to the higher-half mapping after active alias probes are proven stable.
 - Introduce pointer-width-safe address types where needed.
 - Connect the x86_64 PMM to page-table allocation only after the active paging baseline stays stable.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
