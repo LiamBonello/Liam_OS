@@ -5,9 +5,12 @@ KERNEL := $(BUILD_DIR)/kernel.bin
 ISO := $(BUILD_DIR)/liam_os.iso
 X86_64_BUILD_DIR := $(BUILD_DIR)/x86_64
 X86_64_ISO_DIR := $(X86_64_BUILD_DIR)/iso
+X86_64_EXCEPTION_TEST_ISO_DIR := $(X86_64_BUILD_DIR)/iso-exception-test
 X86_64_KERNEL := $(X86_64_BUILD_DIR)/kernel.elf
 X86_64_ISO := $(X86_64_BUILD_DIR)/liam_os_x86_64.iso
+X86_64_EXCEPTION_TEST_ISO := $(X86_64_BUILD_DIR)/liam_os_x86_64_exception_test.iso
 X86_64_GRUB_CFG := boot/grub-x86_64.cfg
+X86_64_EXCEPTION_TEST_GRUB_CFG := boot/grub-x86_64-exception-test.cfg
 X86_64_BOOT32_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot32.o
 X86_64_START_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/start.o
 X86_64_IDT_STUBS_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/idt_stubs.o
@@ -144,7 +147,7 @@ VPATH := \
 	kernel/memory \
 	kernel/userland
 
-.PHONY: all clean run run-debug debug check-tools userland x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-run-check-tools x86_64-kernel x86_64-iso x86_64-run
+.PHONY: all clean run run-debug debug check-tools userland x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-run-check-tools x86_64-kernel x86_64-iso x86_64-run x86_64-exception-test-iso x86_64-exception-test-run
 
 all: $(ISO)
 
@@ -176,11 +179,15 @@ x86_64-info:
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
 	@echo "Run target: make x86_64-run"
+	@echo "Exception self-test ISO target: make x86_64-exception-test-iso"
+	@echo "Exception self-test run target: make x86_64-exception-test-run"
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
+	@echo "Exception self-test ISO output: $(X86_64_EXCEPTION_TEST_ISO)"
 	@echo "Expected x86_64 screen messages: CPU baseline ok: 1, IDT IST gates: 1, PMM smoke free: 1, Desc/IST ok: 1"
 	@echo "Expected serial markers include: Runtime entry ok: 1, IDT diagnostics ok: 1, IDT PF CR2 reporting: 1, Higher-half handoff ok: 1, Paging probes ok: 1, Paging activation ok: 1, VM plan ok: 1, Desc/IST ok: 1"
-	@echo "Serial output is routed to the terminal by make x86_64-run."
+	@echo "Expected exception self-test markers include: Exception self-test requested: 1, x86_64 exception self-test: ud2, Name: invalid opcode, Vector: 0x0000000000000006, x86_64 panic halt"
+	@echo "Serial output is routed to the terminal by make x86_64-run and make x86_64-exception-test-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
 x86_64-kernel: x86_64-check-tools $(X86_64_KERNEL)
@@ -191,6 +198,12 @@ x86_64-iso: x86_64-iso-check-tools $(X86_64_ISO)
 
 x86_64-run: x86_64-run-check-tools $(X86_64_ISO)
 	$(QEMU_x86_64) -serial stdio -boot d -cdrom $(X86_64_ISO)
+
+x86_64-exception-test-iso: x86_64-iso-check-tools $(X86_64_EXCEPTION_TEST_ISO)
+	@echo "Built experimental x86_64 exception self-test ISO: $(X86_64_EXCEPTION_TEST_ISO)"
+
+x86_64-exception-test-run: x86_64-run-check-tools $(X86_64_EXCEPTION_TEST_ISO)
+	$(QEMU_x86_64) -serial stdio -boot d -cdrom $(X86_64_EXCEPTION_TEST_ISO)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -302,6 +315,13 @@ $(X86_64_ISO): $(X86_64_KERNEL) $(X86_64_GRUB_CFG)
 	cp $(X86_64_KERNEL) $(X86_64_ISO_DIR)/boot/kernel.elf
 	cp $(X86_64_GRUB_CFG) $(X86_64_ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o $(X86_64_ISO) $(X86_64_ISO_DIR)
+
+$(X86_64_EXCEPTION_TEST_ISO): $(X86_64_KERNEL) $(X86_64_EXCEPTION_TEST_GRUB_CFG)
+	rm -rf $(X86_64_EXCEPTION_TEST_ISO_DIR)
+	mkdir -p $(X86_64_EXCEPTION_TEST_ISO_DIR)/boot/grub
+	cp $(X86_64_KERNEL) $(X86_64_EXCEPTION_TEST_ISO_DIR)/boot/kernel.elf
+	cp $(X86_64_EXCEPTION_TEST_GRUB_CFG) $(X86_64_EXCEPTION_TEST_ISO_DIR)/boot/grub/grub.cfg
+	grub-mkrescue -o $(X86_64_EXCEPTION_TEST_ISO) $(X86_64_EXCEPTION_TEST_ISO_DIR)
 
 $(BUILD_DIR)/%.o: %.asm | $(BUILD_DIR)
 	mkdir -p $(dir $@)
