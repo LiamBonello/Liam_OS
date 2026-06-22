@@ -188,4 +188,9 @@ void x86_64_boot_info_parse(u32 magic, u32 boot_info_addr, struct x86_64_boot_su
 
         offset += align8(tag->size);
     }
+
+    if (summary->multiboot2_valid == 0U) {
+        summary->exception_test_requested = 0U;
+        x86_64_exception_self_test_requested = 0U;
+    }
 }
