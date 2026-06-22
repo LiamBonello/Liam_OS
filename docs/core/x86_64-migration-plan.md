@@ -46,7 +46,7 @@ Status: started.
 Remaining work:
 
 - Add explicit failure diagnostics for unsupported CPUs or malformed boot state before enabling long mode.
-- Move the full C runtime to the planned higher-half kernel window after the guarded higher-half handoff probe is stable.
+- Remove the low identity transition dependency after the higher-half runtime entry remains stable.
 
 ## Stage 4: early 64-bit kernel entry
 
@@ -56,6 +56,7 @@ Status: started.
 - Added `core/kernel/arch/x86_64/console.c` and `console.h` for early VGA text and COM1 serial output.
 - Added `core/kernel/arch/x86_64/types.h` for local fixed-width types.
 - Added `core/kernel/arch/x86_64/cpuid.c` and `cpuid.h` for early CPU baseline capability diagnostics.
+- Added `core/kernel/arch/x86_64/runtime.c` and `runtime.h` for the first guarded higher-half runtime entry boundary.
 - `make x86_64-run` routes serial output to the terminal with `-serial stdio`.
 
 Remaining work:
@@ -104,7 +105,7 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
-Status: started with layout, PMM planning, an isolated allocator smoke check, bootstrap paging-state diagnostics, a higher-half/direct-map plan, C-owned page tables, CR3 activation of those tables, active alias probes, safe higher-half assembly/C execution probes, and a guarded higher-half handoff probe.
+Status: started with layout, PMM planning, an isolated allocator smoke check, bootstrap paging-state diagnostics, a higher-half/direct-map plan, C-owned page tables, CR3 activation of those tables, active alias probes, safe higher-half assembly/C execution probes, a guarded higher-half handoff probe, and a guarded higher-half runtime entry.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
@@ -131,10 +132,12 @@ Status: started with layout, PMM planning, an isolated allocator smoke check, bo
 - The x86_64 diagnostics report `Higher-half C probe low ok: 1`, `Higher-half C probe high ok: 1`, and `Higher-half C probe ok: 1`.
 - Added a guarded higher-half handoff probe that calls a C function through the higher-half kernel alias, passes an argument, uses the active stack/calling convention, writes a scratch result, and returns a validation marker.
 - The x86_64 diagnostics report `Higher-half handoff ready: 1`, `Higher-half handoff result ok: 1`, `Higher-half handoff scratch ok: 1`, and `Higher-half handoff ok: 1`.
+- Added a guarded higher-half runtime entry that executes through the higher-half kernel alias and validates argument passing, active CR3, return value, entry marker, stack scratch value, and transition-stack identity reachability.
+- The x86_64 diagnostics report `Runtime high entry ready: 1`, `Runtime CR3 ok: 1`, `Runtime return ok: 1`, `Runtime entered ok: 1`, `Runtime scratch ok: 1`, `Runtime stack identity ok: 1`, and `Runtime entry ok: 1`.
 
 Remaining work:
 
-- Relocate the real C runtime path to the higher-half mapping after the guarded handoff probe remains stable.
+- Remove the low identity-map dependency from the permanent runtime path after this guarded runtime entry remains stable.
 - Introduce pointer-width-safe address types where needed.
 - Connect the x86_64 PMM to page-table allocation only after the active paging baseline stays stable.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
