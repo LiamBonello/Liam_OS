@@ -224,6 +224,22 @@ static void report_paging_activation(const struct x86_64_paging_activation_state
     x86_64_serial_write_u32("Paging activation ok: ", state->activation_ok);
 }
 
+static void report_paging_probes(const struct x86_64_paging_probe_state *state)
+{
+    x86_64_serial_write_line("x86_64 paging alias probes online");
+    x86_64_serial_write_hex64("Paging probe identity addr: 0x", state->identity_addr);
+    x86_64_serial_write_hex64("Paging probe direct map addr: 0x", state->direct_map_addr);
+    x86_64_serial_write_hex64("Paging probe kernel alias addr: 0x", state->kernel_alias_addr);
+    x86_64_serial_write_hex32("Paging probe identity value: 0x", state->identity_value);
+    x86_64_serial_write_hex32("Paging probe direct map value: 0x", state->direct_map_value);
+    x86_64_serial_write_hex32("Paging probe kernel alias value: 0x", state->kernel_alias_value);
+    x86_64_serial_write_u32("Paging probe activation ready: ", state->activation_ready);
+    x86_64_serial_write_u32("Paging probe identity ok: ", state->identity_probe_ok);
+    x86_64_serial_write_u32("Paging probe direct map ok: ", state->direct_map_probe_ok);
+    x86_64_serial_write_u32("Paging probe kernel alias ok: ", state->kernel_alias_probe_ok);
+    x86_64_serial_write_u32("Paging probes ok: ", state->probes_ok);
+}
+
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
     x86_64_serial_write_line("x86_64 maintained GDT online");
@@ -290,6 +306,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_paging_plan paging_plan;
     struct x86_64_paging_builder_state paging_builder;
     struct x86_64_paging_activation_state paging_activation;
+    struct x86_64_paging_probe_state paging_probe;
     struct x86_64_tss_state tss_state;
 
     x86_64_console_init();
@@ -307,12 +324,14 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_idt_init();
     x86_64_idt_get_state(&idt_state);
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
+    x86_64_paging_probe_active_mappings(&paging_probe, &paging_activation,
+                                        &context.memory_layout, &paging_plan);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: paging active + descriptor", 1, 0);
+    x86_64_console_write_at("Stage: paging probes + descriptor", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: paging active + descriptor");
+    x86_64_serial_write_line("Stage: paging probes + descriptor");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
@@ -324,6 +343,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_paging_plan(&paging_plan);
     report_paging_builder(&paging_builder);
     report_paging_activation(&paging_activation);
+    report_paging_probes(&paging_probe);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
     report_descriptor_summary(&idt_state, &gdt_state, &tss_state);
