@@ -14,36 +14,26 @@ Liam_OS must move toward a real x86_64 kernel path without breaking the current 
 Status: complete for the initial scaffold.
 
 - Keep `core/kernel/arch/i386/` untouched as the bootable path.
-- Add `core/kernel/arch/x86_64/` as a real architecture directory, initially documentation-only.
+- Add `core/kernel/arch/x86_64/` as a real architecture directory.
 - Add Makefile architecture metadata for `i386` and `x86_64`.
 - Keep normal `make`, `make check-tools`, and `make run` i386-only.
-- Add an informational target for the x86_64 plan.
-- Refuse accidental `ARCH=x86_64` builds until a real bootstrap exists.
+- Add staged x86_64 targets instead of silently changing the default build.
 
 ## Stage 2: x86_64 boot objects
 
 Status: complete for the first experimental objects.
 
 - Added `core/linker.x86_64.ld` for a 64-bit kernel image layout.
-- Added `core/kernel/arch/x86_64/start.asm` as the first x86_64 entry object.
-- Added `make x86_64-kernel` to build `core/build/x86_64/kernel.elf` without changing the i386 ISO path.
-- Added `core/kernel/arch/x86_64/boot32.asm` as a Multiboot2 32-bit handoff that creates temporary identity-mapped long-mode paging.
-- Added `core/boot/grub-x86_64.cfg` for the experimental x86_64 ISO path.
-- Added `core/boot/grub-x86_64-exception-test.cfg` for the opt-in exception self-test ISO path.
+- Added x86_64 bootstrap and entry objects under `core/kernel/arch/x86_64/`.
+- Added Multiboot2 GRUB configs for normal and opt-in exception-test x86_64 ISO paths.
 
 ## Stage 3: long mode transition
 
 Status: started.
 
-- Added `make x86_64-iso` to create `core/build/x86_64/liam_os_x86_64.iso`.
-- Added `make x86_64-run` to boot the experimental ISO in `qemu-system-x86_64`.
-- Added `make x86_64-exception-test-iso` and `make x86_64-exception-test-run` for the intentional invalid-opcode exception validation path.
-- The handoff enters long mode, sets 64-bit segments, installs a temporary stack, and calls the x86_64 entry shim.
-- The handoff preserves GRUB's Multiboot2 magic and boot information pointer for C.
-- This path is still experimental and uses temporary identity-mapped paging.
-- The bootstrap assembly now uses BSS-safe alignment and explicit 64-bit boot-state reads to keep assembly diagnostics clean.
-- The bootstrap PML4, PDPT, and PD tables now have named symbols that C diagnostics can inspect.
-- The bootstrap GDT entries now have named symbols that C diagnostics can inspect.
+- `make x86_64-iso` creates `core/build/x86_64/liam_os_x86_64.iso`.
+- `make x86_64-run` boots the experimental ISO in `qemu-system-x86_64`.
+- The bootstrap enters long mode, sets 64-bit segments, installs a temporary stack, preserves GRUB Multiboot2 state, and calls the x86_64 C entry.
 
 Remaining work:
 
@@ -54,106 +44,77 @@ Remaining work:
 
 Status: started.
 
-- Added `core/kernel/arch/x86_64/kernel.c` with a minimal freestanding C entry point.
-- Added `core/kernel/arch/x86_64/console.c` and `console.h` for early VGA text and COM1 serial output.
-- Added `core/kernel/arch/x86_64/types.h` for local fixed-width types.
-- Added `core/kernel/arch/x86_64/cpuid.c` and `cpuid.h` for early CPU baseline capability diagnostics.
-- Added `core/kernel/arch/x86_64/runtime.c` and `runtime.h` for the first guarded higher-half runtime entry boundary.
-- `make x86_64-run` and `make x86_64-exception-test-run` route serial output to the terminal with `-serial stdio`.
+- Added early VGA/COM1 console output, local fixed-width types, CPU capability diagnostics, and a guarded higher-half runtime entry boundary.
+- x86_64 run targets route serial output to the terminal for validation.
 
 Remaining work:
 
 - Expand serial-driven boot validation as new subsystems come online.
-- Move any mandatory pre-long-mode CPU gate into the bootstrap once the C-side baseline stays stable.
-- Avoid porting scheduler, userspace, or syscalls until basic boot and diagnostics are stable.
+- Move mandatory CPU gates into bootstrap once the C-side baseline stays stable.
 
 ## Stage 5: Multiboot2 and memory discovery
 
 Status: started.
 
-- Added `core/kernel/arch/x86_64/boot_info.c` and `boot_info.h`.
 - Parse Multiboot2 total size, bounded command line, bootloader name, basic memory info, and memory map tags.
-- Recognize the opt-in `liam.x86_64.exception_test=ud2` boot flag for the intentional invalid-opcode exception self-test.
-- Report bootloader name, boot-info size, memory-map entry count, and total usable memory bytes over VGA and serial.
-- Added `core/kernel/arch/x86_64/boot_context.c` and `boot_context.h` to preserve parsed boot information inside an architecture-owned boot context.
-- Retain a bounded copy of Multiboot2 memory-map regions for later architecture initialization.
+- Retain a bounded memory-map copy inside an architecture-owned boot context.
+- Recognize controlled test flags for exception and IRQ self-tests.
 
 Remaining work:
 
-- Keep the boot context alive as the handoff into PMM, paging, and later kernel runtime initialization grows.
-- Expand memory-map validation before relying on the allocator for core kernel subsystems.
+- Keep the boot context alive as PMM, paging, runtime, and userspace initialization grow.
+- Expand memory-map validation before relying on the allocator for long-lived subsystems.
 
 ## Stage 6: descriptor and interrupt strategy
 
-Status: started for maintained GDT, loaded TSS, critical-exception IST routing, CPU capability diagnostics, CPU exceptions, page-fault diagnostics, panic-halt readiness, guarded IRQ policy reporting, legacy PIC remap/mask initialization, and the first opt-in exception self-test.
+Status: started.
 
-- Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
-- Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
-- Installed interrupt-gate descriptors for CPU exceptions after the maintained GDT/TSS path initializes.
-- Added VGA and serial exception diagnostics with vector, error code, and exception name.
-- Added page-fault CR2 capture plus error-code decoding for present/write/user/reserved-bit/instruction-fetch flags.
-- Added boot-time serial readiness markers for `IDT PF CR2 reporting: 1`, `IDT PF error decode: 1`, and `IDT diagnostics ok: 1`.
-- Added boot-time serial readiness markers for `IDT panic halt ready: 1` and `IDT panic cli before hlt: 1`.
-- Routed exception termination through one shared panic halt helper that reports the halt mode before entering the `cli; hlt` loop.
-- Added guarded IRQ policy diagnostics that prove the interrupt flag is still clear and record the planned legacy IRQ vector window before hardware IRQs are enabled.
-- Remap the legacy PIC to the planned IRQ vector window and keep both PIC masks fully closed.
-- Added boot-time serial readiness markers for `IRQ legacy PIC remapped: 1`, `IRQ master mask: 0x000000FF`, `IRQ slave mask: 0x000000FF`, `IRQ all masked: 1`, and `IRQ policy ok: 1`.
-- Recorded planned legacy IRQ vectors for PIT and keyboard interrupts while deferring APIC/PIT initialization.
-- Added an opt-in invalid-opcode self-test path that deliberately executes `ud2` only when the x86_64 exception-test GRUB config passes `liam.x86_64.exception_test=ud2`.
-- Added `core/kernel/arch/x86_64/gdt.c` and `gdt.h` to install a maintained x86_64 GDT from C.
-- Added `core/kernel/arch/x86_64/tss.c` and `tss.h` to build a packed 64-bit TSS image and planned IST stacks for dangerous exceptions.
-- Added a 64-bit TSS descriptor to the maintained GDT and load it with `ltr`.
-- Routed the double-fault exception gate through IST1.
-- Routed the NMI exception gate through IST2.
-- Routed the page-fault exception gate through IST3.
-- Report required CPU baseline capabilities from C, including CPUID, FPU, MSR, APIC, SSE, SSE2, SYSCALL/SYSRET, NX, and long mode.
-- The x86_64 C entry reports IDTR state, critical-exception IST routing, GDT selector validation, current task-register selector, and TSS load validation.
+- Maintained x86_64 GDT and loaded TSS descriptor are active.
+- NMI, double fault, and page fault use dedicated IST slots.
+- CPU exception handlers report vector/error-code diagnostics and panic through a shared `cli; hlt` halt path.
+- Legacy PIC is remapped, IRQ gates are installed, and opt-in IRQ/exception self-tests validate gate delivery and fault reporting.
+- Normal x86_64 boot now runs bounded PIT and keyboard IRQ diagnostics.
 
 Remaining work:
 
-- Add actual IRQ stubs and handlers deliberately, keeping delivery masked until the default IRQ behavior is safe.
 - Decide what remains legacy PIC/PIT and what moves toward APIC later.
-- Keep interrupts disabled until the IRQ and timer strategy is implemented, not just reported.
+- Grow IRQ dispatch from diagnostics into normal kernel interrupt services.
 
 ## Stage 7: 64-bit memory model
 
-Status: started with layout, PMM planning, an isolated allocator smoke check, bootstrap paging-state diagnostics, a higher-half/direct-map plan, C-owned page tables, CR3 activation of those tables, active alias probes, safe higher-half assembly/C execution probes, a guarded higher-half handoff probe, and a guarded higher-half runtime entry.
+Status: started.
 
-- Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
-- Exposed linker-provided x86_64 kernel image start and end symbols.
-- Report current kernel image bounds, kernel image size, bootstrap identity-map span, boot stack size, and page-size constants through the boot context.
-- Added `core/kernel/arch/x86_64/pmm_plan.c` and `pmm_plan.h`.
-- Compute a planning PMM view from retained Multiboot2 memory regions by reserving everything below the aligned kernel image end.
-- Report PMM usable region count, first planned free page, managed page count, managed bytes, and reserved-below boundary.
-- Added `core/kernel/arch/x86_64/pmm.c` and `pmm.h` as an isolated bounded page-stack allocator for early x86_64 physical pages.
-- The allocator rejects duplicate frees, unaligned pages, invalid pages, and obvious out-of-range frees.
-- The x86_64 C entry performs a one-page allocate/free smoke check and reports the result over VGA and serial.
-- Added `core/kernel/arch/x86_64/paging.c` and `paging.h` to capture the bootstrap CR3 and identity-mapped huge-page table state.
-- Added `core/kernel/arch/x86_64/paging_plan.c` and `paging_plan.h` to define the planned higher-half kernel window, direct physical map window, and transition identity-map window.
-- Added `core/kernel/arch/x86_64/paging_builder.c` and `paging_builder.h` to construct C-owned page tables for the planned identity, direct-map, and higher-half kernel windows.
-- The x86_64 C entry switches CR3 to the C-built page tables after the builder validates them.
-- The x86_64 C entry probes the kernel image through the identity map, direct physical map, and higher-half kernel alias after the CR3 switch.
-- Added a tiny assembly-only higher-half execution probe that returns a fixed value without touching globals or stack-owned data beyond the call/return path.
-- Added a C higher-half execution probe that reads a kernel marker through normal compiler-generated code/data access.
-- Added a guarded higher-half handoff probe that calls a C function through the higher-half kernel alias, passes an argument, uses the active stack/calling convention, writes a scratch result, and returns a validation marker.
-- Added a guarded higher-half runtime entry that executes through the higher-half kernel alias and validates argument passing, active CR3, return value, entry marker, stack scratch value, and transition-stack identity reachability.
+- Added boot-context memory layout reporting, PMM planning, and an isolated bounded PMM allocator.
+- Added a higher-half/direct-map virtual memory plan.
+- Built PMM-backed C-owned page tables and switched CR3 to them.
+- Validated identity, direct-map, and higher-half aliases plus guarded higher-half execution/runtime-entry probes.
+- Added a PMM-backed early heap over the direct-map window with rollback on partial allocation failure.
 
 Remaining work:
 
-- Remove the low identity-map dependency from the permanent runtime path after this guarded runtime entry remains stable.
+- Remove the low identity-map dependency from the permanent runtime path after the guarded runtime entry remains stable.
 - Introduce pointer-width-safe address types where needed.
-- Connect the x86_64 PMM to page-table allocation only after the active paging baseline stays stable.
-- Keep PMM/VMM interfaces honest about physical and virtual address width.
+- Replace the early heap with a fuller x86_64 kernel heap/VMM layer when process address spaces arrive.
 
 ## Stage 8: process and userspace model
 
-- Keep 32-bit userspace out of the first x86_64 kernel boot milestone.
-- Decide whether early x86_64 userspace starts as 64-bit flat binaries, ELF64, or compatibility-mode experiments.
-- Design a syscall ABI separately from the current i386 `int 0x80` path.
-- Add process address spaces before treating userspace as isolated.
+Status: started.
+
+- Added an x86_64 architecture-local process table and scheduler smoke model.
+- Current process states are READY, RUNNING, EXITED, FAILED, and UNUSED.
+- Early process records allocate kernel stacks from the PMM-backed early heap.
+- The normal x86_64 boot creates two kernel smoke processes, runs all ready processes, and validates creation/run/exit counters.
+
+Remaining work:
+
+- Add real x86_64 context switching instead of direct function calls.
+- Add per-process address spaces and VMM ownership.
+- Design the x86_64 syscall ABI separately from the i386 `int 0x80` path.
+- Add ELF64 loading and an isolated x86_64 userspace shell only after kernel scheduling and address spaces are stable.
 
 ## Non-goals for early migration
 
 - Do not rename i386 files to x86_64.
+- Do not remove i386 until x86_64 can do what the i386 path currently does and a final comparison pass confirms parity.
 - Do not port GUI, desktop, installer, or product UX work into the kernel migration branch.
-- Do not treat the x86_64 path as complete until it has a real C kernel entry, interrupts, paging model, memory layout, and userspace strategy.
+- Do not treat the x86_64 path as complete until it has a real C kernel entry, interrupts, paging model, memory layout, scheduler, syscall ABI, and userspace strategy.
