@@ -107,7 +107,7 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
-Status: started with layout, PMM planning, an isolated allocator smoke test, bootstrap paging-state diagnostics, and a smoke-validated higher-half/direct-map plan.
+Status: started with layout, PMM planning, an isolated allocator smoke test, bootstrap paging-state diagnostics, a smoke-validated higher-half/direct-map plan, and smoke-validated candidate page tables.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
@@ -122,10 +122,12 @@ Status: started with layout, PMM planning, an isolated allocator smoke test, boo
 - The x86_64 C entry reports the current bootstrap paging baseline before a permanent paging model is introduced.
 - Added `core/kernel/arch/x86_64/paging_plan.c` and `paging_plan.h` to define the planned higher-half kernel window, direct physical map window, and transition identity-map window.
 - The headless smoke test validates the planned PML4 slots, canonical virtual address windows, planned-region count, and `VM plan ok: 1` before accepting the boot.
+- Added `core/kernel/arch/x86_64/paging_builder.c` and `paging_builder.h` to construct candidate C-owned page tables for the planned identity, direct-map, and higher-half kernel windows.
+- The headless smoke test validates candidate table alignment, PML4 population, identity/direct huge-page coverage, the 4 KiB kernel mapping, and `Paging builder ok: 1` before accepting the boot.
 
 Remaining work:
 
-- Replace the temporary identity map with an architecture-owned PML4 bootstrap builder.
+- Switch CR3 to the C-built candidate page tables only after the builder stays stable under smoke testing.
 - Introduce pointer-width-safe address types where needed.
 - Connect the x86_64 PMM to page-table allocation only after the bootstrap paging baseline stays stable.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
