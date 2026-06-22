@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.38-dev
+
+### Added
+
+- Added x86_64 IRQ stubs for legacy IRQ vectors 32 through 47.
+- Installed guarded IDT interrupt gates for the full legacy IRQ vector window while keeping hardware IRQ delivery masked.
+- Added serial IRQ diagnostics for `IRQ gates installed: 16` and `IRQ gates ok: 1`.
+- Added a default x86_64 IRQ handler that records unexpected IRQ delivery and sends legacy PIC EOI when needed.
+
+### Changed
+
+- Tightened x86_64 IRQ policy validation so `IRQ policy ok: 1` now requires installed IRQ gates, disabled interrupts, remapped PIC state, and fully masked PIC lines.
+- Updated Liam_OS version to `0.8.38-dev`.
+
+### Notes
+
+- This milestone prepares default IRQ handling without unmasking PIC lines or enabling interrupts yet.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.37-dev
 
 ### Added
