@@ -1,5 +1,23 @@
 # Liam_OS Changelog
 
+## Core 0.8.46-dev
+
+### Added
+
+- Added an x86_64 syscall ABI planning contract for the future `syscall/sysret` path.
+- Added serial diagnostics for the planned syscall number, argument, return, clobber, MSR, and user-pointer validation rules.
+
+### Changed
+
+- Wired the syscall ABI report to the x86_64 CPU capability path so the boot log confirms fast syscall support before later ring-3 syscall work.
+- Updated Liam_OS version to `0.8.46-dev`.
+
+### Notes
+
+- This does not enable `syscall/sysret`, program syscall MSRs, or enter x86_64 user mode yet. It locks down the ABI contract first so the real syscall entry can be added in a controlled step.
+- The normal x86_64 boot should report `x86_64 syscall ABI plan online`, `Syscall fast supported: 1`, `Syscall pointer validation required: 1`, `Syscall entry ready: 0`, and `Syscall ABI ok: 1`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.44-dev
 
 ### Added
