@@ -2,6 +2,7 @@
 #include "console.h"
 #include "cpuid.h"
 #include "gdt.h"
+#include "heap.h"
 #include "higher_half_probe.h"
 #include "idt.h"
 #include "paging.h"
@@ -312,6 +313,31 @@ static void report_runtime_entry(const struct x86_64_runtime_entry_state *state)
     x86_64_serial_write_u32("Runtime entry ok: ", state->runtime_ok);
 }
 
+static void report_heap_state(const struct x86_64_heap_state *state)
+{
+    x86_64_console_write_u32(24, 0, "Heap smoke ok: ", state->smoke_ok);
+
+    x86_64_serial_write_line("x86_64 early heap online");
+    x86_64_serial_write_u32("Heap initialized: ", state->initialized);
+    x86_64_serial_write_u32("Heap PMM backed: ", state->pmm_backed);
+    x86_64_serial_write_u32("Heap direct map ok: ", state->direct_map_ok);
+    x86_64_serial_write_u32("Heap pages: ", state->heap_pages);
+    x86_64_serial_write_hex64("Heap bytes: 0x", state->heap_bytes);
+    x86_64_serial_write_hex64("Heap used bytes: 0x", state->used_bytes);
+    x86_64_serial_write_u32("Heap allocations: ", state->allocations);
+    x86_64_serial_write_u32("Heap PMM free before: ", state->pmm_free_pages_before);
+    x86_64_serial_write_u32("Heap PMM free after: ", state->pmm_free_pages_after);
+    x86_64_serial_write_hex64("Heap first physical page: 0x", state->first_physical_page);
+    x86_64_serial_write_hex64("Heap last physical page: 0x", state->last_physical_page);
+    x86_64_serial_write_hex64("Heap first virtual page: 0x", state->first_virtual_page);
+    x86_64_serial_write_hex64("Heap last virtual page: 0x", state->last_virtual_page);
+    x86_64_serial_write_hex64("Heap first allocation: 0x", state->first_allocation);
+    x86_64_serial_write_hex64("Heap second allocation: 0x", state->second_allocation);
+    x86_64_serial_write_u32("Heap alignment ok: ", state->alignment_ok);
+    x86_64_serial_write_u32("Heap pattern ok: ", state->pattern_ok);
+    x86_64_serial_write_u32("Heap smoke ok: ", state->smoke_ok);
+}
+
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
     x86_64_serial_write_line("x86_64 maintained GDT online");
@@ -364,7 +390,7 @@ static void report_descriptor_summary(const struct x86_64_idt_state *idt_state,
                          (tss_state->loaded != 0U) &&
                          (limit_ok != 0U)) ? 1U : 0U;
 
-    x86_64_console_write_u32(24, 0, "Desc/IST ok: ", descriptor_ok);
+    x86_64_console_write_u32(25, 0, "Desc/IST ok: ", descriptor_ok);
     x86_64_serial_write_u32("Desc/IST ok: ", descriptor_ok);
 }
 
@@ -373,6 +399,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_boot_context context;
     struct x86_64_cpuid_state cpuid_state;
     struct x86_64_gdt_state gdt_state;
+    struct x86_64_heap_state heap_state;
     struct x86_64_higher_half_probe_state higher_half_probe;
     struct x86_64_idt_state idt_state;
     struct x86_64_paging_state paging_state;
@@ -393,6 +420,8 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
     x86_64_paging_builder_init(&paging_builder, &context.memory_layout, &paging_plan);
     x86_64_paging_builder_activate(&paging_activation, &paging_builder);
+    x86_64_heap_init(&heap_state, &paging_plan);
+    x86_64_heap_run_smoke(&heap_state);
     x86_64_tss_init(&tss_state);
     x86_64_gdt_load_tss(&tss_state, &gdt_state);
     tss_state.loaded = gdt_state.tss_loaded;
@@ -406,10 +435,10 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
                                      &context.memory_layout, &paging_plan);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: PMM-backed page tables", 1, 0);
+    x86_64_console_write_at("Stage: x86_64 early heap", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: PMM-backed page tables");
+    x86_64_serial_write_line("Stage: x86_64 early heap");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
@@ -424,6 +453,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_paging_probes(&paging_probe);
     report_higher_half_probe(&higher_half_probe);
     report_runtime_entry(&runtime_entry);
+    report_heap_state(&heap_state);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
     report_descriptor_summary(&idt_state, &gdt_state, &tss_state);
