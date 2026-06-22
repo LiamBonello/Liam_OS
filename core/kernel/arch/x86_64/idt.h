@@ -26,6 +26,9 @@ struct x86_64_idt_state {
     u32 page_fault_ist;
     u32 page_fault_present;
     u32 page_fault_ist_ok;
+    u32 page_fault_cr2_reporting;
+    u32 page_fault_error_decode;
+    u32 diagnostics_ok;
     u32 ist_gates_ok;
 };
 
