@@ -77,7 +77,7 @@ require_line() {
 }
 
 require_line "Liam_OS x86_64 kernel diagnostics"
-require_line "Stage: paging probes + descriptor"
+require_line "Stage: higher-half probe + descriptor"
 require_line "Multiboot2: ok"
 require_line "CPU CPUID available: 1"
 require_line "CPU FPU: 1"
@@ -124,6 +124,11 @@ require_line "Paging probe identity ok: 1"
 require_line "Paging probe direct map ok: 1"
 require_line "Paging probe kernel alias ok: 1"
 require_line "Paging probes ok: 1"
+require_line "Higher-half probe activation ready: 1"
+require_line "Higher-half probe alias ready: 1"
+require_line "Higher-half probe low ok: 1"
+require_line "Higher-half probe high ok: 1"
+require_line "Higher-half probe ok: 1"
 require_line "GDT/TSS loaded ok: 1"
 require_line "Desc/IST ok: 1"
 
