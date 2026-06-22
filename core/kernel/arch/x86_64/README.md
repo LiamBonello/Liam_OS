@@ -61,68 +61,32 @@ Desc/IST ok: 1
 
 If an early CPU exception fires after IDT installation, the handler prints the exception name over VGA and the full vector/error-code diagnostics over serial.
 
-`make x86_64-run` also routes COM1 serial output to the terminal, including CPU capability diagnostics, bootstrap paging diagnostics for the original CR3, planned virtual memory diagnostics for the higher-half kernel and direct physical map, C-owned page-table diagnostics, active CR3 diagnostics after switching to the C-owned tables, identity/direct-map/higher-half data alias probe diagnostics, higher-half instruction-fetch probe diagnostics, IDTR base/limit, NMI/double-fault/page-fault IST routing, GDTR base/limit, active selectors, current task-register selector, descriptor values, TSS base/limit, and planned IST stack addresses.
+`make x86_64-run` routes COM1 serial output to the terminal, including CPU capability diagnostics, bootstrap paging diagnostics for the original CR3, planned virtual memory diagnostics for the higher-half kernel and direct physical map, C-owned page-table diagnostics, active CR3 diagnostics after switching to the C-owned tables, identity/direct-map/higher-half data alias probe diagnostics, higher-half instruction-fetch probe diagnostics, IDTR base/limit, NMI/double-fault/page-fault IST routing, GDTR base/limit, active selectors, current task-register selector, descriptor values, TSS base/limit, and planned IST stack addresses.
 
-The x86_64 path also has a headless smoke target for CI and automated agent testing:
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, CPU capability baseline reporting, an early CPU exception IDT, dedicated critical-exception IST routing, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke check, C-visible bootstrap paging-state diagnostics, a C-visible higher-half/direct-map virtual memory plan, a C-owned page-table set for that plan, activation of those page tables through CR3, validation that planned early aliases read the same kernel image bytes, a safe higher-half instruction-fetch probe through the kernel alias, and a C-visible bootstrap TSS/IST plan. It does not relocate the full C runtime to the higher-half kernel window yet, and it does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
+
+## Manual validation
+
+Use this path for the current x86_64 milestone:
 
 ```sh
 cd core
-make x86_64-smoke
+make clean
+make x86_64-info
+make x86_64-kernel
+make x86_64-iso
+make x86_64-run
 ```
 
-That target runs QEMU without a window, captures serial output to `core/build/x86_64/x86_64-smoke.log`, and validates these serial markers:
+Check the serial output for:
 
 ```txt
-Liam_OS x86_64 kernel diagnostics
-Stage: higher-half probe + descriptor
-Multiboot2: ok
-CPU CPUID available: 1
-CPU FPU: 1
-CPU MSR: 1
-CPU APIC: 1
-CPU SSE: 1
-CPU SSE2: 1
-CPU SYSCALL/SYSRET: 1
-CPU NX: 1
-CPU long mode: 1
-CPU baseline ok: 1
-IDT NMI IST: 2
-IDT NMI IST ok: 1
-IDT double fault IST: 1
-IDT double fault IST ok: 1
-IDT page fault IST: 3
-IDT page fault IST ok: 1
-IDT IST gates ok: 1
-PMM smoke free: 1
-Paging huge pages: 512
-VM identity PML4 index: 0
-VM kernel PML4 index: 511
-VM direct map PML4 index: 256
-VM planned regions: 3
-VM identity window ok: 1
-VM kernel canonical: 1
-VM direct map canonical: 1
-VM PML4 slots distinct: 1
-VM plan ok: 1
-Paging builder ok: 1
-Paging activation ok: 1
-Paging probe activation ready: 1
-Paging probe identity ok: 1
-Paging probe direct map ok: 1
-Paging probe kernel alias ok: 1
-Paging probes ok: 1
-Higher-half probe activation ready: 1
-Higher-half probe alias ready: 1
-Higher-half probe low ok: 1
-Higher-half probe high ok: 1
 Higher-half probe ok: 1
-GDT/TSS loaded ok: 1
+Paging probes ok: 1
+Paging activation ok: 1
+VM plan ok: 1
 Desc/IST ok: 1
 ```
-
-GitHub Actions runs the same smoke target and uploads the serial log when the workflow completes.
-
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, CPU capability baseline reporting, an early CPU exception IDT, dedicated critical-exception IST routing, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke test, C-visible bootstrap paging-state diagnostics, a C-visible higher-half/direct-map virtual memory plan, a C-owned page-table set for that plan, activation of those page tables through CR3, validation that planned early aliases read the same kernel image bytes, a safe higher-half instruction-fetch probe through the kernel alias, a C-visible bootstrap TSS/IST plan, and automated headless boot validation. It does not relocate the full C runtime to the higher-half kernel window yet, and it does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
 
 ## Milestones
 
