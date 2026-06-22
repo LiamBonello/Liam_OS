@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.27-dev
+
+### Added
+
+- Added a tiny x86_64 higher-half execution probe that safely calls an assembly-only function through both its low identity-mapped address and its higher-half kernel alias.
+- Added serial diagnostics for the probe entry addresses, byte span, expected value, low-result, high-result, readiness gates, and `Higher-half probe ok: 1`.
+- Added smoke-test assertions for the higher-half execution probe markers.
+
+### Changed
+
+- Updated the x86_64 boot stage to `Stage: higher-half probe + descriptor`.
+- Updated x86_64 documentation to distinguish this isolated instruction-fetch probe from full higher-half C runtime relocation.
+- Updated Liam_OS version to `0.8.27-dev`.
+
+### Notes
+
+- This milestone proves instruction fetch through the planned higher-half kernel alias after C-owned page tables are active.
+- This still does not relocate the full C runtime to the higher-half kernel window.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.26-dev
 
 ### Added
