@@ -1,5 +1,21 @@
 # Liam_OS Changelog
 
+## Core 0.8.33-dev
+
+### Fixed
+
+- Fixed the i386 kernel build ordering so `kernel/userland/userland_images.asm` now depends on the generated `build/userland/*.bin` files before NASM evaluates its `incbin` directives.
+
+### Changed
+
+- Added an explicit `USERLAND_IMAGES_OBJ` Makefile target for the embedded userland image object.
+- Updated Liam_OS version to `0.8.33-dev`.
+
+### Notes
+
+- This restores `make clean && make` from a clean tree after the recent x86_64 migration batch.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.32-dev
 
 ### Added
