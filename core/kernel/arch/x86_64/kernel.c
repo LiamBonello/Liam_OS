@@ -1,5 +1,6 @@
 #include "boot_context.h"
 #include "console.h"
+#include "cpuid.h"
 #include "gdt.h"
 #include "idt.h"
 #include "paging.h"
@@ -55,9 +56,32 @@ static void report_boot_summary(const struct x86_64_boot_summary *summary)
     }
 }
 
+static void report_cpu_state(const struct x86_64_cpuid_state *state)
+{
+    x86_64_console_write_u32(10, 0, "CPU baseline ok: ", state->baseline_ok);
+
+    x86_64_serial_write_line("x86_64 CPU baseline diagnostics");
+    x86_64_serial_write_u32("CPU CPUID available: ", state->cpuid_available);
+    x86_64_serial_write("CPU vendor: ");
+    x86_64_serial_write_line(state->vendor);
+    x86_64_serial_write_hex32("CPU max basic leaf: 0x", state->max_basic_leaf);
+    x86_64_serial_write_hex32("CPU max extended leaf: 0x", state->max_extended_leaf);
+    x86_64_serial_write_u32("CPU FPU: ", state->has_fpu);
+    x86_64_serial_write_u32("CPU MSR: ", state->has_msr);
+    x86_64_serial_write_u32("CPU APIC: ", state->has_apic);
+    x86_64_serial_write_u32("CPU SSE: ", state->has_sse);
+    x86_64_serial_write_u32("CPU SSE2: ", state->has_sse2);
+    x86_64_serial_write_u32("CPU SYSCALL/SYSRET: ", state->has_fast_syscall);
+    x86_64_serial_write_u32("CPU NX: ", state->has_nx);
+    x86_64_serial_write_u32("CPU 1G pages: ", state->has_1g_pages);
+    x86_64_serial_write_u32("CPU long mode: ", state->has_long_mode);
+    x86_64_serial_write_u32("CPU hypervisor: ", state->hypervisor_present);
+    x86_64_serial_write_u32("CPU baseline ok: ", state->baseline_ok);
+}
+
 static void report_idt_state(const struct x86_64_idt_state *state)
 {
-    x86_64_console_write_u32(10, 0, "IDT IST gates: ", state->ist_gates_ok);
+    x86_64_console_write_u32(11, 0, "IDT IST gates: ", state->ist_gates_ok);
 
     x86_64_serial_write_line("x86_64 IDT: exceptions installed");
     x86_64_serial_write_hex64("IDT base: 0x", state->idtr_base);
@@ -80,10 +104,10 @@ static void report_idt_state(const struct x86_64_idt_state *state)
 
 static void report_memory_layout(const struct x86_64_memory_layout *layout)
 {
-    x86_64_console_write_hex64(11, 0, "Kernel start: 0x", layout->kernel_start);
-    x86_64_console_write_hex64(12, 0, "Kernel end: 0x", layout->kernel_end);
-    x86_64_console_write_hex64(13, 0, "Kernel bytes: 0x", layout->kernel_size_bytes);
-    x86_64_console_write_hex64(14, 0, "Identity map bytes: 0x", layout->bootstrap_identity_map_bytes);
+    x86_64_console_write_hex64(12, 0, "Kernel start: 0x", layout->kernel_start);
+    x86_64_console_write_hex64(13, 0, "Kernel end: 0x", layout->kernel_end);
+    x86_64_console_write_hex64(14, 0, "Kernel bytes: 0x", layout->kernel_size_bytes);
+    x86_64_console_write_hex64(15, 0, "Identity map bytes: 0x", layout->bootstrap_identity_map_bytes);
 
     x86_64_serial_write_hex64("Kernel start: 0x", layout->kernel_start);
     x86_64_serial_write_hex64("Kernel end: 0x", layout->kernel_end);
@@ -93,11 +117,11 @@ static void report_memory_layout(const struct x86_64_memory_layout *layout)
 
 static void report_pmm_plan(const struct x86_64_pmm_plan *plan)
 {
-    x86_64_console_write_u32(15, 0, "PMM usable regions: ", plan->usable_region_count);
-    x86_64_console_write_hex64(16, 0, "PMM first page: 0x", plan->first_free_page);
-    x86_64_console_write_hex64(17, 0, "PMM pages: 0x", plan->managed_pages);
-    x86_64_console_write_hex64(18, 0, "PMM bytes: 0x", plan->managed_bytes);
-    x86_64_console_write_hex64(19, 0, "Reserved below: 0x", plan->reserved_below);
+    x86_64_console_write_u32(16, 0, "PMM usable regions: ", plan->usable_region_count);
+    x86_64_console_write_hex64(17, 0, "PMM first page: 0x", plan->first_free_page);
+    x86_64_console_write_hex64(18, 0, "PMM pages: 0x", plan->managed_pages);
+    x86_64_console_write_hex64(19, 0, "PMM bytes: 0x", plan->managed_bytes);
+    x86_64_console_write_hex64(20, 0, "Reserved below: 0x", plan->reserved_below);
 
     x86_64_serial_write_u32("PMM usable regions: ", plan->usable_region_count);
     x86_64_serial_write_hex64("PMM first page: 0x", plan->first_free_page);
@@ -112,9 +136,9 @@ static void report_pmm_allocator(void)
     u64 page = x86_64_pmm_alloc_page();
     u32 free_ok = x86_64_pmm_free_page(page);
 
-    x86_64_console_write_u32(20, 0, "PMM tracked pages: ", state->tracked_pages);
-    x86_64_console_write_hex64(21, 0, "PMM smoke page: 0x", page);
-    x86_64_console_write_u32(22, 0, "PMM smoke free: ", free_ok);
+    x86_64_console_write_u32(21, 0, "PMM tracked pages: ", state->tracked_pages);
+    x86_64_console_write_hex64(22, 0, "PMM smoke page: 0x", page);
+    x86_64_console_write_u32(23, 0, "PMM smoke free: ", free_ok);
 
     x86_64_serial_write_line("x86_64 PMM allocator online");
     x86_64_serial_write_u32("PMM tracked pages: ", state->tracked_pages);
@@ -129,8 +153,6 @@ static void report_pmm_allocator(void)
 
 static void report_paging_state(const struct x86_64_paging_state *state)
 {
-    x86_64_console_write_u32(23, 0, "Paging huge pages: ", state->huge_pages_present);
-
     x86_64_serial_write_line("x86_64 bootstrap paging online");
     x86_64_serial_write_hex64("Paging CR3: 0x", state->cr3);
     x86_64_serial_write_hex64("Paging PML4: 0x", state->pml4_table);
@@ -203,6 +225,7 @@ static void report_descriptor_summary(const struct x86_64_idt_state *idt_state,
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
+    struct x86_64_cpuid_state cpuid_state;
     struct x86_64_gdt_state gdt_state;
     struct x86_64_idt_state idt_state;
     struct x86_64_paging_state paging_state;
@@ -212,6 +235,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_serial_init();
 
     x86_64_boot_context_init(boot_magic, boot_info, &context);
+    x86_64_cpuid_state_init(&cpuid_state);
     x86_64_paging_state_init(&paging_state);
     x86_64_tss_init(&tss_state);
     x86_64_gdt_load_tss(&tss_state, &gdt_state);
@@ -227,6 +251,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_serial_write_line("Stage: IST gates + descriptor + PMM");
 
     report_boot_summary(&context.boot_info);
+    report_cpu_state(&cpuid_state);
     report_idt_state(&idt_state);
     report_memory_layout(&context.memory_layout);
     report_pmm_plan(&context.pmm_plan);
