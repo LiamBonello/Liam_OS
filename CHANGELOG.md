@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.35-dev
+
+### Added
+
+- Added bounded Multiboot2 command-line parsing for the x86_64 boot path.
+- Added an opt-in x86_64 invalid-opcode exception self-test selected with `liam.x86_64.exception_test=ud2`.
+- Added `core/boot/grub-x86_64-exception-test.cfg` for a separate exception-test ISO boot entry.
+- Added `make x86_64-exception-test-iso` and `make x86_64-exception-test-run`.
+
+### Changed
+
+- Exposed the exception self-test request through a narrow architecture-local boot flag consumed by the IDT setup path.
+- Updated Liam_OS version to `0.8.35-dev`.
+
+### Notes
+
+- Normal i386 and x86_64 boot paths do not deliberately fault.
+- The exception-test path should report `Exception self-test requested: 1`, `Name: invalid opcode`, `Vector: 0x0000000000000006`, and `x86_64 panic halt` over serial.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.34-dev
 
 ### Added
