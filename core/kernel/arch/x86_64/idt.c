@@ -7,6 +7,11 @@
 #define X86_64_KERNEL_CODE_SELECTOR 0x08U
 #define X86_64_INTERRUPT_GATE 0x8EU
 #define X86_64_IDT_IST_MASK 0x07U
+#define X86_64_RFLAGS_INTERRUPT_ENABLE (1ULL << 9U)
+#define X86_64_IRQ_VECTOR_BASE 32U
+#define X86_64_IRQ_VECTOR_COUNT 16U
+#define X86_64_IRQ_PIT_VECTOR 32U
+#define X86_64_IRQ_KEYBOARD_VECTOR 33U
 #define X86_64_PAGE_FAULT_PRESENT 0x01ULL
 #define X86_64_PAGE_FAULT_WRITE 0x02ULL
 #define X86_64_PAGE_FAULT_USER 0x04ULL
@@ -132,6 +137,13 @@ static u64 read_cr2(void)
     return value;
 }
 
+static u64 read_rflags(void)
+{
+    u64 value;
+    __asm__ volatile ("pushfq; popq %0" : "=r" (value));
+    return value;
+}
+
 static u32 gate_present(u32 vector)
 {
     return (idt[vector].selector == X86_64_KERNEL_CODE_SELECTOR &&
@@ -141,6 +153,22 @@ static u32 gate_present(u32 vector)
 static u32 gate_ist(u32 vector)
 {
     return (u32)(idt[vector].ist & X86_64_IDT_IST_MASK);
+}
+
+static void report_irq_policy(void)
+{
+    u32 interrupts_enabled = ((read_rflags() & X86_64_RFLAGS_INTERRUPT_ENABLE) != 0ULL) ? 1U : 0U;
+    u32 irq_policy_ok = (interrupts_enabled == 0U) ? 1U : 0U;
+
+    x86_64_serial_write_line("x86_64 IRQ policy online");
+    x86_64_serial_write_u32("IRQ interrupts enabled: ", interrupts_enabled);
+    x86_64_serial_write_u32("IRQ interrupts guarded: ", irq_policy_ok);
+    x86_64_serial_write_u32("IRQ legacy vector base: ", X86_64_IRQ_VECTOR_BASE);
+    x86_64_serial_write_u32("IRQ legacy vector count: ", X86_64_IRQ_VECTOR_COUNT);
+    x86_64_serial_write_u32("IRQ PIT planned vector: ", X86_64_IRQ_PIT_VECTOR);
+    x86_64_serial_write_u32("IRQ keyboard planned vector: ", X86_64_IRQ_KEYBOARD_VECTOR);
+    x86_64_serial_write_u32("IRQ APIC deferred: ", 1U);
+    x86_64_serial_write_u32("IRQ policy ok: ", irq_policy_ok);
 }
 
 static void report_page_fault_error(u64 error_code)
@@ -185,6 +213,7 @@ void x86_64_idt_init(void)
     x86_64_serial_write_u32("IDT panic halt ready: ", 1U);
     x86_64_serial_write_u32("IDT panic cli before hlt: ", 1U);
     x86_64_serial_write_u32("IDT diagnostics ok: ", 1U);
+    report_irq_policy();
 
     if (x86_64_exception_self_test_requested != 0U) {
         x86_64_serial_write_u32("Exception self-test requested: ", 1U);
