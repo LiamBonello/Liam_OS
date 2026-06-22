@@ -267,6 +267,18 @@ static void report_higher_half_probe(const struct x86_64_higher_half_probe_state
     x86_64_serial_write_u32("Higher-half C probe low ok: ", state->c_low_probe_ok);
     x86_64_serial_write_u32("Higher-half C probe high ok: ", state->c_high_probe_ok);
     x86_64_serial_write_u32("Higher-half C probe ok: ", state->c_probe_ok);
+    x86_64_serial_write_line("x86_64 higher-half handoff probe online");
+    x86_64_serial_write_hex64("Higher-half handoff low entry: 0x", state->handoff_low_entry);
+    x86_64_serial_write_hex64("Higher-half handoff high entry: 0x", state->handoff_high_entry);
+    x86_64_serial_write_hex64("Higher-half handoff scratch low: 0x", state->handoff_scratch_low);
+    x86_64_serial_write_hex64("Higher-half handoff arg: 0x", state->handoff_arg);
+    x86_64_serial_write_hex32("Higher-half handoff expected: 0x", state->handoff_expected_value);
+    x86_64_serial_write_hex32("Higher-half handoff result: 0x", state->handoff_result);
+    x86_64_serial_write_hex32("Higher-half handoff scratch result: 0x", state->handoff_scratch_result);
+    x86_64_serial_write_u32("Higher-half handoff ready: ", state->handoff_ready);
+    x86_64_serial_write_u32("Higher-half handoff result ok: ", state->handoff_result_ok);
+    x86_64_serial_write_u32("Higher-half handoff scratch ok: ", state->handoff_scratch_ok);
+    x86_64_serial_write_u32("Higher-half handoff ok: ", state->handoff_ok);
 }
 
 static void report_gdt_state(const struct x86_64_gdt_state *state)
@@ -360,10 +372,10 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
                                  &context.memory_layout, &paging_plan);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: higher-half C probe + descriptor", 1, 0);
+    x86_64_console_write_at("Stage: higher-half handoff probe", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: higher-half C probe + descriptor");
+    x86_64_serial_write_line("Stage: higher-half handoff probe");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
