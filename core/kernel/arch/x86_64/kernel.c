@@ -203,6 +203,11 @@ static void report_paging_builder(const struct x86_64_paging_builder_state *stat
     x86_64_serial_write_hex64("Paging builder kernel PDPT: 0x", state->kernel_pdpt_table);
     x86_64_serial_write_hex64("Paging builder kernel PD: 0x", state->kernel_pd_table);
     x86_64_serial_write_hex64("Paging builder kernel PT: 0x", state->kernel_pt_table);
+    x86_64_serial_write_u32("Paging builder PMM backed: ", state->pmm_backed);
+    x86_64_serial_write_u32("Paging builder table pages: ", state->allocated_table_pages);
+    x86_64_serial_write_u32("Paging builder PMM free before: ", state->pmm_free_pages_before);
+    x86_64_serial_write_u32("Paging builder PMM free after: ", state->pmm_free_pages_after);
+    x86_64_serial_write_u32("Paging builder allocation ok: ", state->allocation_ok);
     x86_64_serial_write_u32("Paging builder PML4 entries: ", state->pml4_present_entries);
     x86_64_serial_write_u32("Paging builder identity huge pages: ", state->identity_huge_pages);
     x86_64_serial_write_u32("Paging builder direct huge pages: ", state->direct_huge_pages);
@@ -384,6 +389,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_boot_context_init(boot_magic, boot_info, &context);
     x86_64_cpuid_state_init(&cpuid_state);
     x86_64_paging_state_init(&paging_state);
+    x86_64_pmm_init(&context.boot_info, &context.memory_layout);
     x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
     x86_64_paging_builder_init(&paging_builder, &context.memory_layout, &paging_plan);
     x86_64_paging_builder_activate(&paging_activation, &paging_builder);
@@ -392,7 +398,6 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     tss_state.loaded = gdt_state.tss_loaded;
     x86_64_idt_init();
     x86_64_idt_get_state(&idt_state);
-    x86_64_pmm_init(&context.boot_info, &context.memory_layout);
     x86_64_paging_probe_active_mappings(&paging_probe, &paging_activation,
                                         &context.memory_layout, &paging_plan);
     x86_64_higher_half_probe_run(&higher_half_probe, &paging_activation, &paging_probe,
@@ -401,10 +406,10 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
                                      &context.memory_layout, &paging_plan);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: higher-half runtime entry", 1, 0);
+    x86_64_console_write_at("Stage: PMM-backed page tables", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: higher-half runtime entry");
+    x86_64_serial_write_line("Stage: PMM-backed page tables");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
