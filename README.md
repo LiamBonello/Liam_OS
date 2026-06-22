@@ -11,7 +11,7 @@ This split keeps the original kernel work intact while giving the commercial des
 
 `core/` is the active buildable project. It is a freestanding i386 kernel with GRUB Multiboot booting, protected-mode setup, interrupts, paging, memory management, basic scheduling/process abstractions, VFS/initramfs foundations, flat userspace image loading, and an early syscall path.
 
-An x86_64 architecture path is scaffolded for staged migration planning. It can build an experimental ELF64 kernel artifact and an experimental Multiboot2 long-mode ISO with an early freestanding C entry, VGA diagnostics, COM1 serial output, parsed Multiboot2 boot information, CPU capability baseline diagnostics, early CPU exception IDT diagnostics, page-fault CR2/error-code diagnostics, exception panic-halt readiness diagnostics, dedicated NMI/double-fault/page-fault IST routing, a maintained GDT with a loaded TSS descriptor, bootstrap IST planning diagnostics, an architecture-owned boot context, memory-layout reporting, a higher-half/direct-map virtual memory plan, active C-owned x86_64 page tables for that plan, identity/direct-map/higher-half alias probes, higher-half assembly and C execution probes, a guarded higher-half handoff probe, a guarded higher-half runtime entry, early PMM planning diagnostics, an isolated early PMM page-allocator smoke check, and bootstrap paging-state diagnostics. The default stable Core build remains i386.
+An x86_64 architecture path is scaffolded for staged migration planning. It can build an experimental ELF64 kernel artifact and an experimental Multiboot2 long-mode ISO with an early freestanding C entry, VGA diagnostics, COM1 serial output, parsed Multiboot2 boot information, bounded command-line parsing, CPU capability baseline diagnostics, early CPU exception IDT diagnostics, an opt-in invalid-opcode exception self-test, page-fault CR2/error-code diagnostics, exception panic-halt readiness diagnostics, dedicated NMI/double-fault/page-fault IST routing, a maintained GDT with a loaded TSS descriptor, bootstrap IST planning diagnostics, an architecture-owned boot context, memory-layout reporting, a higher-half/direct-map virtual memory plan, active C-owned x86_64 page tables for that plan, identity/direct-map/higher-half alias probes, higher-half assembly and C execution probes, a guarded higher-half handoff probe, a guarded higher-half runtime entry, early PMM planning diagnostics, an isolated early PMM page-allocator smoke check, and bootstrap paging-state diagnostics. The default stable Core build remains i386.
 
 `desktop/` is intentionally a planning/skeleton area. It should not pretend to be an installable commercial OS yet.
 
@@ -74,6 +74,22 @@ core/build/x86_64/liam_os_x86_64.iso
 ```
 
 `make x86_64-run` routes COM1 serial output to the terminal.
+
+To build and run the opt-in x86_64 invalid-opcode exception self-test ISO:
+
+```sh
+cd core
+make x86_64-exception-test-iso
+make x86_64-exception-test-run
+```
+
+The generated exception self-test ISO is written to:
+
+```txt
+core/build/x86_64/liam_os_x86_64_exception_test.iso
+```
+
+Expected serial markers include `Exception self-test requested: 1`, `Name: invalid opcode`, `Vector: 0x0000000000000006`, and `x86_64 panic halt`.
 
 ## Repository layout
 
