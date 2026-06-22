@@ -176,7 +176,7 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path now has an architecture-local process scheduler smoke check backed by early heap kernel stacks."
+	@echo "Liam_OS x86_64 path now has an architecture-local process scheduler smoke check and a guarded syscall entry plan."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
@@ -187,7 +187,7 @@ x86_64-info:
 	@echo "ISO output: $(X86_64_ISO)"
 	@echo "Exception self-test ISO output: $(X86_64_EXCEPTION_TEST_ISO)"
 	@echo "Expected x86_64 screen messages: PIT timer ok: 1, Keyboard ready ok: 1, Heap smoke ok: 1, Process smoke ok: 1, Desc/IST ok: 1"
-	@echo "Expected serial markers include: Paging builder PMM backed: 1, Heap smoke ok: 1, Process created: 2, Process run count: 2, Process exited: 2, Process smoke ok: 1, Runtime entry ok: 1, Paging activation ok: 1, Paging probes ok: 1"
+	@echo "Expected serial markers include: Syscall entry stub installed: 1, Syscall STAR selectors deferred: 1, Syscall entry ready: 1, Paging builder PMM backed: 1, Heap smoke ok: 1, Process stack execution ok: 1, Runtime entry ok: 1, Paging activation ok: 1, Paging probes ok: 1"
 	@echo "Expected exception self-test markers include: Exception self-test requested: 1, x86_64 exception self-test: ud2, Name: invalid opcode, Vector: 0x0000000000000006, x86_64 panic halt"
 	@echo "Serial output is routed to the terminal by make x86_64-run and make x86_64-exception-test-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
