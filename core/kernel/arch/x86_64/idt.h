@@ -13,6 +13,7 @@
 #define X86_64_IRQ_VECTOR_COUNT 16U
 #define X86_64_IRQ_PIT_VECTOR 32U
 #define X86_64_IRQ_KEYBOARD_VECTOR 33U
+#define X86_64_PIT_DEFAULT_FREQUENCY_HZ 100U
 
 struct x86_64_idt_state {
     u64 idtr_base;
@@ -49,8 +50,24 @@ struct x86_64_idt_state {
     u32 ist_gates_ok;
 };
 
+struct x86_64_timer_state {
+    u32 initialized;
+    u32 interrupts_enabled_before;
+    u32 interrupts_enabled_after;
+    u32 irq0_unmasked;
+    u32 frequency_hz;
+    u32 divisor;
+    u32 ticks;
+    u32 waited_ticks;
+    u32 wait_ok;
+    u32 timer_ok;
+};
+
 void x86_64_idt_init(void);
 void x86_64_idt_get_state(struct x86_64_idt_state *state);
+void x86_64_timer_initialize(u32 frequency_hz);
+void x86_64_timer_wait_for_ticks(u32 ticks);
+void x86_64_timer_get_state(struct x86_64_timer_state *state);
 void x86_64_exception_handler(u64 vector, u64 error_code);
 void x86_64_irq_handler(u64 vector);
 
