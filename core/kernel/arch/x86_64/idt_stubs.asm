@@ -1,5 +1,7 @@
 global x86_64_isr_table
+global x86_64_irq_table
 extern x86_64_exception_handler
+extern x86_64_irq_handler
 
 section .text
 bits 64
@@ -19,6 +21,13 @@ x86_64_isr%1:
     jmp x86_64_isr_common
 %endmacro
 
+%macro IRQ_STUB 2
+global x86_64_irq%1
+x86_64_irq%1:
+    push %2
+    jmp x86_64_irq_common
+%endmacro
+
 x86_64_isr_common:
     mov rdi, [rsp]
     mov rsi, [rsp + 8]
@@ -29,6 +38,34 @@ x86_64_isr_common:
     cli
     hlt
     jmp .hang
+
+x86_64_irq_common:
+    push rax
+    push rbx
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    push r8
+    push r9
+    push r10
+    push r11
+
+    mov rdi, [rsp + 80]
+    call x86_64_irq_handler
+
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax
+    add rsp, 8
+    iretq
 
 ISR_NOERR 0
 ISR_NOERR 1
@@ -62,6 +99,23 @@ ISR_NOERR 28
 ISR_ERR 29
 ISR_ERR 30
 ISR_NOERR 31
+
+IRQ_STUB 0, 32
+IRQ_STUB 1, 33
+IRQ_STUB 2, 34
+IRQ_STUB 3, 35
+IRQ_STUB 4, 36
+IRQ_STUB 5, 37
+IRQ_STUB 6, 38
+IRQ_STUB 7, 39
+IRQ_STUB 8, 40
+IRQ_STUB 9, 41
+IRQ_STUB 10, 42
+IRQ_STUB 11, 43
+IRQ_STUB 12, 44
+IRQ_STUB 13, 45
+IRQ_STUB 14, 46
+IRQ_STUB 15, 47
 
 section .rodata
 align 8
@@ -98,3 +152,22 @@ x86_64_isr_table:
     dq x86_64_isr29
     dq x86_64_isr30
     dq x86_64_isr31
+
+align 8
+x86_64_irq_table:
+    dq x86_64_irq0
+    dq x86_64_irq1
+    dq x86_64_irq2
+    dq x86_64_irq3
+    dq x86_64_irq4
+    dq x86_64_irq5
+    dq x86_64_irq6
+    dq x86_64_irq7
+    dq x86_64_irq8
+    dq x86_64_irq9
+    dq x86_64_irq10
+    dq x86_64_irq11
+    dq x86_64_irq12
+    dq x86_64_irq13
+    dq x86_64_irq14
+    dq x86_64_irq15
