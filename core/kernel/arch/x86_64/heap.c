@@ -86,6 +86,17 @@ static u32 heap_pages_are_available(void)
     return 1U;
 }
 
+static void rollback_heap_pages(u32 allocated_pages)
+{
+    for (u32 i = 0; i < allocated_pages; ++i) {
+        if (heap_physical_pages[i] != X86_64_PMM_INVALID_PAGE) {
+            (void)x86_64_pmm_free_page(heap_physical_pages[i]);
+            heap_physical_pages[i] = X86_64_PMM_INVALID_PAGE;
+            heap_virtual_pages[i] = 0ULL;
+        }
+    }
+}
+
 void x86_64_heap_init(struct x86_64_heap_state *state,
                       const struct x86_64_paging_plan *plan)
 {
@@ -99,9 +110,11 @@ void x86_64_heap_init(struct x86_64_heap_state *state,
     heap_state.heap_pages = X86_64_EARLY_HEAP_PAGES;
     heap_state.heap_bytes = (u64)X86_64_EARLY_HEAP_PAGES * X86_64_PAGE_SIZE;
 
+    u32 allocated_pages = 0U;
     for (u32 i = 0; i < X86_64_EARLY_HEAP_PAGES; ++i) {
         u64 page = x86_64_pmm_alloc_page();
         if (page == X86_64_PMM_INVALID_PAGE) {
+            rollback_heap_pages(allocated_pages);
             heap_state.pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
             if (state != &heap_state) {
                 *state = heap_state;
@@ -112,6 +125,7 @@ void x86_64_heap_init(struct x86_64_heap_state *state,
         heap_physical_pages[i] = page;
         heap_virtual_pages[i] = plan->direct_map_base + page;
         clear_bytes((void *)heap_virtual_pages[i], X86_64_PAGE_SIZE);
+        allocated_pages += 1U;
     }
 
     heap_state.pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
