@@ -1,5 +1,6 @@
 global x86_64_isr_table
 global x86_64_irq_table
+global x86_64_syscall_entry_stub
 extern x86_64_exception_handler
 extern x86_64_irq_handler
 
@@ -27,6 +28,13 @@ x86_64_irq%1:
     push %2
     jmp x86_64_irq_common
 %endmacro
+
+x86_64_syscall_entry_stub:
+    cli
+
+.hang:
+    hlt
+    jmp .hang
 
 x86_64_isr_common:
     mov rdi, [rsp]
