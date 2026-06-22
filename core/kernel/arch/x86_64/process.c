@@ -6,11 +6,17 @@
 #define X86_64_PROCESS_INVALID_PID 0U
 #define X86_64_PROCESS_FIRST_PID 1U
 
+extern void x86_64_process_enter_stack(u64 stack_top,
+                                       x86_64_process_entry_t entry,
+                                       void *arg);
+
 static struct x86_64_process process_table[X86_64_PROCESS_MAX_PROCESSES];
 static struct x86_64_process_smoke_state process_state;
 static u32 next_pid = X86_64_PROCESS_FIRST_PID;
 static u32 worker_a_runs;
 static u32 worker_b_runs;
+static u64 worker_a_stack_sample;
+static u64 worker_b_stack_sample;
 
 static void clear_bytes(void *ptr, usize size)
 {
@@ -20,9 +26,21 @@ static void clear_bytes(void *ptr, usize size)
     }
 }
 
+static u64 read_rsp(void)
+{
+    u64 value;
+    __asm__ volatile ("mov %%rsp, %0" : "=r"(value));
+    return value;
+}
+
 static u32 is_aligned_u64(u64 value, u64 alignment)
 {
     return ((value & (alignment - 1ULL)) == 0ULL) ? 1U : 0U;
+}
+
+static u32 is_inside_stack(u64 value, u64 stack_base, u64 stack_top)
+{
+    return ((value >= stack_base) && (value < stack_top)) ? 1U : 0U;
 }
 
 static void copy_name(char *dest, const char *src)
@@ -78,6 +96,8 @@ static void refresh_counts(void)
     process_state.failed_processes = count_processes_with_state(X86_64_PROCESS_FAILED);
     process_state.worker_a_count = worker_a_runs;
     process_state.worker_b_count = worker_b_runs;
+    process_state.worker_a_stack_sample = worker_a_stack_sample;
+    process_state.worker_b_stack_sample = worker_b_stack_sample;
 }
 
 void x86_64_process_initialize(struct x86_64_process_smoke_state *state)
@@ -87,6 +107,8 @@ void x86_64_process_initialize(struct x86_64_process_smoke_state *state)
     next_pid = X86_64_PROCESS_FIRST_PID;
     worker_a_runs = 0U;
     worker_b_runs = 0U;
+    worker_a_stack_sample = 0ULL;
+    worker_b_stack_sample = 0ULL;
 
     process_state.initialized = 1U;
     process_state.table_capacity = X86_64_PROCESS_MAX_PROCESSES;
@@ -156,13 +178,14 @@ u32 x86_64_process_run_next_ready(void)
     process_state.last_run_pid = process->pid;
     process->state = X86_64_PROCESS_RUNNING;
 
-    if (process->entry == (x86_64_process_entry_t)0) {
+    if (process->entry == (x86_64_process_entry_t)0 || process->kernel_stack_top == 0ULL) {
         process->state = X86_64_PROCESS_FAILED;
         refresh_counts();
         return 0U;
     }
 
-    process->entry(process->arg);
+    x86_64_process_enter_stack(process->kernel_stack_top, process->entry, process->arg);
+    process_state.stack_switches += 1U;
     process->state = X86_64_PROCESS_EXITED;
     process->exit_code = 0U;
     process_state.run_count += 1U;
@@ -187,12 +210,14 @@ u32 x86_64_process_run_all_ready(u32 max_runs)
 static void process_worker_a(void *arg)
 {
     (void)arg;
+    worker_a_stack_sample = read_rsp();
     worker_a_runs += 1U;
 }
 
 static void process_worker_b(void *arg)
 {
     (void)arg;
+    worker_b_stack_sample = read_rsp();
     worker_b_runs += 1U;
 }
 
@@ -207,6 +232,13 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     (void)x86_64_process_run_all_ready(X86_64_PROCESS_MAX_PROCESSES);
     refresh_counts();
 
+    u32 worker_a_stack_ok = is_inside_stack(process_state.worker_a_stack_sample,
+                                            process_state.first_stack_base,
+                                            process_state.first_stack_top);
+    u32 worker_b_stack_ok = is_inside_stack(process_state.worker_b_stack_sample,
+                                            process_state.second_stack_base,
+                                            process_state.second_stack_top);
+
     process_state.stack_alignment_ok =
         ((process_state.first_stack_base != 0ULL) &&
          (process_state.second_stack_base != 0ULL) &&
@@ -214,6 +246,11 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (is_aligned_u64(process_state.first_stack_top, 16ULL) != 0U) &&
          (is_aligned_u64(process_state.second_stack_base, 16ULL) != 0U) &&
          (is_aligned_u64(process_state.second_stack_top, 16ULL) != 0U)) ? 1U : 0U;
+
+    process_state.stack_execution_ok =
+        ((process_state.stack_switches == 2U) &&
+         (worker_a_stack_ok != 0U) &&
+         (worker_b_stack_ok != 0U)) ? 1U : 0U;
 
     process_state.smoke_ok =
         ((process_state.initialized != 0U) &&
@@ -226,6 +263,7 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.failed_processes == 0U) &&
          (process_state.stack_allocations == 2U) &&
          (process_state.stack_alignment_ok != 0U) &&
+         (process_state.stack_execution_ok != 0U) &&
          (process_state.worker_a_count == 1U) &&
          (process_state.worker_b_count == 1U)) ? 1U : 0U;
 
@@ -242,12 +280,16 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process failed: ", process_state.failed_processes);
     x86_64_serial_write_u32("Process stack allocations: ", process_state.stack_allocations);
     x86_64_serial_write_u32("Process stack alignment ok: ", process_state.stack_alignment_ok);
+    x86_64_serial_write_u32("Process stack switches: ", process_state.stack_switches);
+    x86_64_serial_write_u32("Process stack execution ok: ", process_state.stack_execution_ok);
     x86_64_serial_write_u32("Process last created pid: ", process_state.last_created_pid);
     x86_64_serial_write_u32("Process last run pid: ", process_state.last_run_pid);
     x86_64_serial_write_hex64("Process first stack base: 0x", process_state.first_stack_base);
     x86_64_serial_write_hex64("Process first stack top: 0x", process_state.first_stack_top);
     x86_64_serial_write_hex64("Process second stack base: 0x", process_state.second_stack_base);
     x86_64_serial_write_hex64("Process second stack top: 0x", process_state.second_stack_top);
+    x86_64_serial_write_hex64("Process worker A stack sample: 0x", process_state.worker_a_stack_sample);
+    x86_64_serial_write_hex64("Process worker B stack sample: 0x", process_state.worker_b_stack_sample);
     x86_64_serial_write_u32("Process worker A count: ", process_state.worker_a_count);
     x86_64_serial_write_u32("Process worker B count: ", process_state.worker_b_count);
     x86_64_serial_write_u32("Process smoke ok: ", process_state.smoke_ok);
