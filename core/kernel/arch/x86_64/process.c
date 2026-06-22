@@ -6,9 +6,23 @@
 #define X86_64_PROCESS_INVALID_PID 0U
 #define X86_64_PROCESS_FIRST_PID 1U
 
-extern void x86_64_process_enter_stack(u64 stack_top,
-                                       x86_64_process_entry_t entry,
-                                       void *arg);
+__attribute__((naked)) static void x86_64_process_enter_stack(
+    u64 stack_top __attribute__((unused)),
+    x86_64_process_entry_t entry __attribute__((unused)),
+    void *arg __attribute__((unused)))
+{
+    __asm__ volatile (
+        "push %rbx\n"
+        "mov %rsp, %rbx\n"
+        "mov %rdi, %rsp\n"
+        "and $-16, %rsp\n"
+        "mov %rdx, %rdi\n"
+        "call *%rsi\n"
+        "mov %rbx, %rsp\n"
+        "pop %rbx\n"
+        "ret\n"
+    );
+}
 
 static struct x86_64_process process_table[X86_64_PROCESS_MAX_PROCESSES];
 static struct x86_64_process_smoke_state process_state;
