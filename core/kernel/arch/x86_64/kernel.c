@@ -212,6 +212,18 @@ static void report_paging_builder(const struct x86_64_paging_builder_state *stat
     x86_64_serial_write_u32("Paging builder ok: ", state->builder_ok);
 }
 
+static void report_paging_activation(const struct x86_64_paging_activation_state *state)
+{
+    x86_64_serial_write_line("x86_64 candidate paging active");
+    x86_64_serial_write_hex64("Paging activation previous CR3: 0x", state->previous_cr3);
+    x86_64_serial_write_hex64("Paging activation requested CR3: 0x", state->requested_cr3);
+    x86_64_serial_write_hex64("Paging activation active CR3: 0x", state->active_cr3);
+    x86_64_serial_write_u32("Paging activation builder ready: ", state->builder_ready);
+    x86_64_serial_write_u32("Paging activation CR3 changed: ", state->cr3_changed);
+    x86_64_serial_write_u32("Paging activation active matches builder: ", state->active_matches_builder);
+    x86_64_serial_write_u32("Paging activation ok: ", state->activation_ok);
+}
+
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
     x86_64_serial_write_line("x86_64 maintained GDT online");
@@ -277,6 +289,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_paging_state paging_state;
     struct x86_64_paging_plan paging_plan;
     struct x86_64_paging_builder_state paging_builder;
+    struct x86_64_paging_activation_state paging_activation;
     struct x86_64_tss_state tss_state;
 
     x86_64_console_init();
@@ -287,6 +300,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_paging_state_init(&paging_state);
     x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
     x86_64_paging_builder_init(&paging_builder, &context.memory_layout, &paging_plan);
+    x86_64_paging_builder_activate(&paging_activation, &paging_builder);
     x86_64_tss_init(&tss_state);
     x86_64_gdt_load_tss(&tss_state, &gdt_state);
     tss_state.loaded = gdt_state.tss_loaded;
@@ -295,10 +309,10 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: paging builder + descriptor", 1, 0);
+    x86_64_console_write_at("Stage: paging active + descriptor", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: paging builder + descriptor");
+    x86_64_serial_write_line("Stage: paging active + descriptor");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
@@ -309,6 +323,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_paging_state(&paging_state);
     report_paging_plan(&paging_plan);
     report_paging_builder(&paging_builder);
+    report_paging_activation(&paging_activation);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
     report_descriptor_summary(&idt_state, &gdt_state, &tss_state);
