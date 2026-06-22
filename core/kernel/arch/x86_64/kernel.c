@@ -255,6 +255,18 @@ static void report_higher_half_probe(const struct x86_64_higher_half_probe_state
     x86_64_serial_write_u32("Higher-half probe low ok: ", state->low_probe_ok);
     x86_64_serial_write_u32("Higher-half probe high ok: ", state->high_probe_ok);
     x86_64_serial_write_u32("Higher-half probe ok: ", state->probe_ok);
+    x86_64_serial_write_line("x86_64 higher-half C probe online");
+    x86_64_serial_write_hex64("Higher-half C probe low entry: 0x", state->c_low_entry);
+    x86_64_serial_write_hex64("Higher-half C probe high entry: 0x", state->c_high_entry);
+    x86_64_serial_write_hex64("Higher-half C probe marker low: 0x", state->c_marker_low);
+    x86_64_serial_write_hex64("Higher-half C probe marker high: 0x", state->c_marker_high);
+    x86_64_serial_write_hex32("Higher-half C probe expected: 0x", state->c_expected_value);
+    x86_64_serial_write_hex32("Higher-half C probe low result: 0x", state->c_low_result);
+    x86_64_serial_write_hex32("Higher-half C probe high result: 0x", state->c_high_result);
+    x86_64_serial_write_u32("Higher-half C probe alias ready: ", state->c_alias_ready);
+    x86_64_serial_write_u32("Higher-half C probe low ok: ", state->c_low_probe_ok);
+    x86_64_serial_write_u32("Higher-half C probe high ok: ", state->c_high_probe_ok);
+    x86_64_serial_write_u32("Higher-half C probe ok: ", state->c_probe_ok);
 }
 
 static void report_gdt_state(const struct x86_64_gdt_state *state)
@@ -348,10 +360,10 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
                                  &context.memory_layout, &paging_plan);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: higher-half probe + descriptor", 1, 0);
+    x86_64_console_write_at("Stage: higher-half C probe + descriptor", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: higher-half probe + descriptor");
+    x86_64_serial_write_line("Stage: higher-half C probe + descriptor");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
