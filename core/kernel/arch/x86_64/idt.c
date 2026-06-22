@@ -1,3 +1,4 @@
+#include "boot_info.h"
 #include "console.h"
 #include "idt.h"
 
@@ -184,6 +185,12 @@ void x86_64_idt_init(void)
     x86_64_serial_write_u32("IDT panic halt ready: ", 1U);
     x86_64_serial_write_u32("IDT panic cli before hlt: ", 1U);
     x86_64_serial_write_u32("IDT diagnostics ok: ", 1U);
+
+    if (x86_64_exception_self_test_requested != 0U) {
+        x86_64_serial_write_u32("Exception self-test requested: ", 1U);
+        x86_64_serial_write_line("x86_64 exception self-test: ud2");
+        __asm__ volatile ("ud2");
+    }
 }
 
 void x86_64_idt_get_state(struct x86_64_idt_state *state)
