@@ -1,7 +1,6 @@
 #include "boot_info.h"
 #include "console.h"
 #include "idt.h"
-#include "pit.h"
 
 #define X86_64_IDT_ENTRIES 256U
 #define X86_64_EXCEPTION_COUNT 32U
@@ -18,6 +17,10 @@
 #define X86_64_ICW4_8086 0x01U
 #define X86_64_PIC_MASK_ALL 0xFFU
 #define X86_64_PIC_EOI 0x20U
+#define X86_64_PIT_CHANNEL_0 0x40U
+#define X86_64_PIT_COMMAND 0x43U
+#define X86_64_PIT_BASE_FREQUENCY 1193182U
+#define X86_64_PIT_MODE_RATE_GENERATOR 0x36U
 #define X86_64_PAGE_FAULT_PRESENT 0x01ULL
 #define X86_64_PAGE_FAULT_WRITE 0x02ULL
 #define X86_64_PAGE_FAULT_USER 0x04ULL
@@ -51,6 +54,8 @@ static u8 legacy_pic_slave_mask;
 static u32 irq_delivery_count;
 static u64 last_irq_vector;
 static u32 irq_self_test_active;
+static volatile u32 timer_ticks;
+static struct x86_64_timer_state timer_state;
 
 static const char *exception_name(u64 vector)
 {
@@ -175,6 +180,11 @@ static u64 read_rflags(void)
     return value;
 }
 
+static void enable_interrupts(void)
+{
+    __asm__ volatile ("sti" ::: "memory");
+}
+
 static u32 gate_present(u32 vector)
 {
     return (idt[vector].selector == X86_64_KERNEL_CODE_SELECTOR &&
@@ -229,6 +239,14 @@ static void remap_and_mask_legacy_pic(void)
                              (legacy_pic_slave_mask == X86_64_PIC_MASK_ALL)) ? 1U : 0U;
 }
 
+static void unmask_irq0(void)
+{
+    u8 mask = inb(X86_64_PIC1_DATA);
+    mask = (u8)(mask & ~1U);
+    outb(X86_64_PIC1_DATA, mask);
+    timer_state.irq0_unmasked = ((inb(X86_64_PIC1_DATA) & 1U) == 0U) ? 1U : 0U;
+}
+
 static void send_pic_eoi(u64 vector)
 {
     if (vector >= (u64)(X86_64_IRQ_VECTOR_BASE + 8U) &&
@@ -240,6 +258,17 @@ static void send_pic_eoi(u64 vector)
         vector < (u64)(X86_64_IRQ_VECTOR_BASE + X86_64_IRQ_VECTOR_COUNT)) {
         outb(X86_64_PIC1_COMMAND, X86_64_PIC_EOI);
     }
+}
+
+static u32 timer_handle_irq(u64 vector)
+{
+    if (vector != X86_64_IRQ_PIT_VECTOR) {
+        return 0U;
+    }
+
+    timer_ticks += 1U;
+    timer_state.ticks = timer_ticks;
+    return 1U;
 }
 
 static void report_irq_policy(void)
@@ -407,6 +436,63 @@ void x86_64_idt_get_state(struct x86_64_idt_state *state)
                            (state->page_fault_ist_ok != 0U)) ? 1U : 0U;
 }
 
+void x86_64_timer_initialize(u32 frequency_hz)
+{
+    if (frequency_hz == 0U) {
+        frequency_hz = X86_64_PIT_DEFAULT_FREQUENCY_HZ;
+    }
+
+    u32 divisor = X86_64_PIT_BASE_FREQUENCY / frequency_hz;
+    if (divisor == 0U) {
+        divisor = 1U;
+    }
+
+    timer_ticks = 0U;
+    timer_state.initialized = 1U;
+    timer_state.frequency_hz = frequency_hz;
+    timer_state.divisor = divisor;
+    timer_state.ticks = 0U;
+    timer_state.waited_ticks = 0U;
+    timer_state.wait_ok = 0U;
+    timer_state.timer_ok = 0U;
+    timer_state.interrupts_enabled_before = ((read_rflags() & X86_64_RFLAGS_INTERRUPT_ENABLE) != 0ULL) ? 1U : 0U;
+
+    outb(X86_64_PIT_COMMAND, X86_64_PIT_MODE_RATE_GENERATOR);
+    outb(X86_64_PIT_CHANNEL_0, (u8)(divisor & 0xFFU));
+    outb(X86_64_PIT_CHANNEL_0, (u8)((divisor >> 8U) & 0xFFU));
+
+    unmask_irq0();
+    enable_interrupts();
+
+    timer_state.interrupts_enabled_after = ((read_rflags() & X86_64_RFLAGS_INTERRUPT_ENABLE) != 0ULL) ? 1U : 0U;
+}
+
+void x86_64_timer_wait_for_ticks(u32 ticks)
+{
+    u32 start = timer_ticks;
+    u32 target = start + ticks;
+    u32 spin_budget = 200000000U;
+
+    while (timer_ticks < target && spin_budget > 0U) {
+        --spin_budget;
+        __asm__ volatile ("hlt" ::: "memory");
+    }
+
+    timer_state.ticks = timer_ticks;
+    timer_state.waited_ticks = timer_ticks - start;
+    timer_state.wait_ok = (timer_state.waited_ticks >= ticks) ? 1U : 0U;
+    timer_state.timer_ok = ((timer_state.initialized != 0U) &&
+                            (timer_state.irq0_unmasked != 0U) &&
+                            (timer_state.interrupts_enabled_after != 0U) &&
+                            (timer_state.wait_ok != 0U)) ? 1U : 0U;
+}
+
+void x86_64_timer_get_state(struct x86_64_timer_state *state)
+{
+    timer_state.ticks = timer_ticks;
+    *state = timer_state;
+}
+
 void x86_64_exception_handler(u64 vector, u64 error_code)
 {
     const char *name = exception_name(vector);
@@ -429,7 +515,7 @@ void x86_64_exception_handler(u64 vector, u64 error_code)
 
 void x86_64_irq_handler(u64 vector)
 {
-    if (irq_self_test_active == 0U && x86_64_pit_handle_irq(vector) != 0U) {
+    if (irq_self_test_active == 0U && timer_handle_irq(vector) != 0U) {
         send_pic_eoi(vector);
         return;
     }
