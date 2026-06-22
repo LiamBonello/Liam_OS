@@ -1,6 +1,7 @@
 #include "boot_info.h"
 #include "console.h"
 #include "idt.h"
+#include "pit.h"
 
 #define X86_64_IDT_ENTRIES 256U
 #define X86_64_EXCEPTION_COUNT 32U
@@ -428,6 +429,11 @@ void x86_64_exception_handler(u64 vector, u64 error_code)
 
 void x86_64_irq_handler(u64 vector)
 {
+    if (irq_self_test_active == 0U && x86_64_pit_handle_irq(vector) != 0U) {
+        send_pic_eoi(vector);
+        return;
+    }
+
     irq_delivery_count += 1U;
     last_irq_vector = vector;
 
