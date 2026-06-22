@@ -4,6 +4,7 @@
 #include "gdt.h"
 #include "idt.h"
 #include "paging.h"
+#include "paging_plan.h"
 #include "pmm.h"
 #include "tss.h"
 
@@ -166,6 +167,28 @@ static void report_paging_state(const struct x86_64_paging_state *state)
     x86_64_serial_write_hex64("Paging identity bytes: 0x", state->identity_map_bytes);
 }
 
+static void report_paging_plan(const struct x86_64_paging_plan *plan)
+{
+    x86_64_serial_write_line("x86_64 virtual memory plan online");
+    x86_64_serial_write_hex64("VM identity window bytes: 0x", plan->identity_window_bytes);
+    x86_64_serial_write_hex64("VM kernel virtual base: 0x", plan->kernel_virtual_base);
+    x86_64_serial_write_hex64("VM kernel virtual start: 0x", plan->kernel_virtual_start);
+    x86_64_serial_write_hex64("VM kernel virtual end: 0x", plan->kernel_virtual_end);
+    x86_64_serial_write_hex64("VM kernel virtual offset: 0x", plan->kernel_virtual_offset);
+    x86_64_serial_write_hex64("VM direct map base: 0x", plan->direct_map_base);
+    x86_64_serial_write_hex64("VM direct map end: 0x", plan->direct_map_end);
+    x86_64_serial_write_hex64("VM direct map bytes: 0x", plan->direct_map_bytes);
+    x86_64_serial_write_u32("VM identity PML4 index: ", plan->identity_pml4_index);
+    x86_64_serial_write_u32("VM kernel PML4 index: ", plan->kernel_pml4_index);
+    x86_64_serial_write_u32("VM direct map PML4 index: ", plan->direct_map_pml4_index);
+    x86_64_serial_write_u32("VM planned regions: ", plan->planned_region_count);
+    x86_64_serial_write_u32("VM identity window ok: ", plan->identity_window_ok);
+    x86_64_serial_write_u32("VM kernel canonical: ", plan->kernel_window_canonical);
+    x86_64_serial_write_u32("VM direct map canonical: ", plan->direct_map_canonical);
+    x86_64_serial_write_u32("VM PML4 slots distinct: ", plan->pml4_slots_distinct);
+    x86_64_serial_write_u32("VM plan ok: ", plan->plan_ok);
+}
+
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
     x86_64_serial_write_line("x86_64 maintained GDT online");
@@ -229,6 +252,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_gdt_state gdt_state;
     struct x86_64_idt_state idt_state;
     struct x86_64_paging_state paging_state;
+    struct x86_64_paging_plan paging_plan;
     struct x86_64_tss_state tss_state;
 
     x86_64_console_init();
@@ -237,6 +261,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_boot_context_init(boot_magic, boot_info, &context);
     x86_64_cpuid_state_init(&cpuid_state);
     x86_64_paging_state_init(&paging_state);
+    x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
     x86_64_tss_init(&tss_state);
     x86_64_gdt_load_tss(&tss_state, &gdt_state);
     tss_state.loaded = gdt_state.tss_loaded;
@@ -245,10 +270,10 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: IST gates + descriptor + PMM", 1, 0);
+    x86_64_console_write_at("Stage: VM plan + descriptor + PMM", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: IST gates + descriptor + PMM");
+    x86_64_serial_write_line("Stage: VM plan + descriptor + PMM");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
@@ -257,6 +282,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_pmm_plan(&context.pmm_plan);
     report_pmm_allocator();
     report_paging_state(&paging_state);
+    report_paging_plan(&paging_plan);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
     report_descriptor_summary(&idt_state, &gdt_state, &tss_state);
