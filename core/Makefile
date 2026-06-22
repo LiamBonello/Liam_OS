@@ -110,6 +110,7 @@ C_SRC := \
 
 ASM_OBJ := $(patsubst %.asm,$(BUILD_DIR)/%.o,$(ASM_SRC))
 C_OBJ := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRC))
+USERLAND_IMAGES_OBJ := $(BUILD_DIR)/kernel/userland/userland_images.o
 
 USERLAND_FLAT_NAMES := \
 	init \
@@ -208,6 +209,8 @@ $(USERLAND_BUILD_DIR)/$(1).bin: userland/flat/$(1)/$(1).asm | $(USERLAND_BUILD_D
 endef
 
 $(foreach name,$(USERLAND_FLAT_NAMES),$(eval $(call BUILD_USERLAND_FLAT,$(name))))
+
+$(USERLAND_IMAGES_OBJ): $(USERLAND_FLAT_BIN)
 
 $(X86_64_BOOT32_OBJ): kernel/arch/x86_64/boot32.asm | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
@@ -308,7 +311,7 @@ $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL): $(ASM_OBJ) $(C_OBJ) linker.ld | userland
+$(KERNEL): $(ASM_OBJ) $(C_OBJ) linker.ld
 	$(LD) $(LDFLAGS) $(ASM_OBJ) $(C_OBJ) -o $@
 	$(GRUB_FILE) --is-x86-multiboot $@
 
