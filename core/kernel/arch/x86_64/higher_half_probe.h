@@ -8,6 +8,8 @@
 
 #define X86_64_HIGHER_HALF_PROBE_EXPECTED 0x48485031U
 #define X86_64_HIGHER_HALF_C_PROBE_EXPECTED 0x48484331U
+#define X86_64_HIGHER_HALF_HANDOFF_ARG 0x48484F465F415247ULL
+#define X86_64_HIGHER_HALF_HANDOFF_EXPECTED 0x48484F31U
 
 struct x86_64_higher_half_probe_state {
     u64 low_entry;
@@ -17,12 +19,19 @@ struct x86_64_higher_half_probe_state {
     u64 c_high_entry;
     u64 c_marker_low;
     u64 c_marker_high;
+    u64 handoff_low_entry;
+    u64 handoff_high_entry;
+    u64 handoff_scratch_low;
+    u64 handoff_arg;
     u32 expected_value;
     u32 low_result;
     u32 high_result;
     u32 c_expected_value;
     u32 c_low_result;
     u32 c_high_result;
+    u32 handoff_expected_value;
+    u32 handoff_result;
+    u32 handoff_scratch_result;
     u32 activation_ready;
     u32 alias_ready;
     u32 low_probe_ok;
@@ -32,6 +41,10 @@ struct x86_64_higher_half_probe_state {
     u32 c_low_probe_ok;
     u32 c_high_probe_ok;
     u32 c_probe_ok;
+    u32 handoff_ready;
+    u32 handoff_result_ok;
+    u32 handoff_scratch_ok;
+    u32 handoff_ok;
 };
 
 void x86_64_higher_half_probe_run(struct x86_64_higher_half_probe_state *state,
