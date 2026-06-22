@@ -2,6 +2,7 @@
 #define LIAM_OS_X86_64_SYSCALL_H
 
 #include "console.h"
+#include "gdt.h"
 #include "types.h"
 
 #define X86_64_SYSCALL_MAX_ARGS 6U
@@ -10,6 +11,8 @@
 #define X86_64_MSR_IA32_LSTAR 0xC0000082ULL
 #define X86_64_MSR_IA32_FMASK 0xC0000084ULL
 #define X86_64_SYSCALL_FMASK_VALUE 0x0000000000000200ULL
+#define X86_64_SYSCALL_STAR_VALUE \
+    ((((u64)X86_64_GDT_SYSCALL_USER_SELECTOR_BASE) << 48U) | (((u64)X86_64_GDT_CODE_SELECTOR) << 32U))
 
 extern void x86_64_syscall_entry_stub(void);
 
@@ -20,7 +23,7 @@ struct x86_64_syscall_abi_state {
     u32 msr_programming_deferred;
     u32 entry_stub_installed;
     u32 user_entry_deferred;
-    u32 user_selectors_deferred;
+    u32 user_selectors_ready;
     u32 arg_register_count;
     u32 syscall_number_rax;
     u32 return_rax;
@@ -52,7 +55,7 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->entry_lstar_target = (u64)x86_64_syscall_entry_stub;
     state->entry_stub_installed = (state->entry_lstar_target != 0ULL) ? 1U : 0U;
     state->user_entry_deferred = 1U;
-    state->user_selectors_deferred = 1U;
+    state->user_selectors_ready = 1U;
     state->arg_register_count = X86_64_SYSCALL_MAX_ARGS;
     state->syscall_number_rax = 1U;
     state->return_rax = 1U;
@@ -64,7 +67,7 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->arg5_r9 = 1U;
     state->clobbers_rcx_r11 = 1U;
     state->user_pointer_validation_required = 1U;
-    state->planned_star_value = 0ULL;
+    state->planned_star_value = X86_64_SYSCALL_STAR_VALUE;
     state->planned_fmask_value = X86_64_SYSCALL_FMASK_VALUE;
     state->ia32_efer_msr = X86_64_MSR_IA32_EFER;
     state->ia32_star_msr = X86_64_MSR_IA32_STAR;
@@ -77,7 +80,8 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
                              (state->msr_programming_deferred != 0U) &&
                              (state->entry_stub_installed != 0U) &&
                              (state->user_entry_deferred != 0U) &&
-                             (state->user_selectors_deferred != 0U) &&
+                             (state->user_selectors_ready != 0U) &&
+                             (state->planned_star_value != 0ULL) &&
                              (state->arg_register_count == X86_64_SYSCALL_MAX_ARGS) &&
                              (state->syscall_number_rax != 0U) &&
                              (state->return_rax != 0U) &&
@@ -111,7 +115,7 @@ static inline void x86_64_syscall_abi_report(const struct x86_64_syscall_abi_sta
     x86_64_serial_write_u32("Syscall pointer validation required: ", state->user_pointer_validation_required);
     x86_64_serial_write_u32("Syscall MSR programming deferred: ", state->msr_programming_deferred);
     x86_64_serial_write_u32("Syscall user entry deferred: ", state->user_entry_deferred);
-    x86_64_serial_write_u32("Syscall STAR selectors deferred: ", state->user_selectors_deferred);
+    x86_64_serial_write_u32("Syscall STAR selectors ready: ", state->user_selectors_ready);
     x86_64_serial_write_u32("Syscall entry stub installed: ", state->entry_stub_installed);
     x86_64_serial_write_hex64("Syscall LSTAR target: 0x", state->entry_lstar_target);
     x86_64_serial_write_hex64("Syscall planned STAR: 0x", state->planned_star_value);
