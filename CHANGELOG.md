@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.43-dev
+
+### Added
+
+- Added an x86_64 architecture-local early heap backed by PMM pages and accessed through the direct-map window.
+- Added heap allocation smoke diagnostics for PMM backing, direct-map accessibility, allocation count, alignment, pattern writes, and overall heap smoke status.
+- Added rollback for partially allocated x86_64 early-heap backing pages if PMM page allocation fails during heap initialization.
+
+### Changed
+
+- Wired the early heap into the x86_64 boot path after PMM-backed page tables are active.
+- Updated `make x86_64-info` and README validation markers for the early heap milestone.
+- Updated Liam_OS version to `0.8.43-dev`.
+
+### Notes
+
+- This is an early kernel heap/VMM stepping stone for x86_64. It is not yet the shared kernel heap, scheduler heap use, process address-space VMM, syscall ABI, ELF64 loader, or x86_64 shell.
+- The normal x86_64 boot should report `Heap PMM backed: 1`, `Heap direct map ok: 1`, `Heap alignment ok: 1`, `Heap pattern ok: 1`, and `Heap smoke ok: 1`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.42-dev
 
 ### Added
