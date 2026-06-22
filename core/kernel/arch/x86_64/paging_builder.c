@@ -35,6 +35,12 @@ static void write_cr3(u64 value)
     __asm__ volatile ("movq %0, %%cr3" :: "r" (value) : "memory");
 }
 
+static u32 read_probe_u32(u64 address)
+{
+    volatile const u32 *ptr = (volatile const u32 *)address;
+    return *ptr;
+}
+
 static u32 is_page_aligned(u64 value)
 {
     return ((value & X86_64_PAGE_MASK) == 0ULL) ? 1U : 0U;
@@ -192,4 +198,37 @@ void x86_64_paging_builder_activate(struct x86_64_paging_activation_state *state
     state->activation_ok =
         ((state->builder_ready != 0U) &&
          (state->active_matches_builder != 0U)) ? 1U : 0U;
+}
+
+void x86_64_paging_probe_active_mappings(struct x86_64_paging_probe_state *state,
+                                         const struct x86_64_paging_activation_state *activation,
+                                         const struct x86_64_memory_layout *layout,
+                                         const struct x86_64_paging_plan *plan)
+{
+    state->identity_addr = layout->kernel_start;
+    state->direct_map_addr = plan->direct_map_base + layout->kernel_start;
+    state->kernel_alias_addr = plan->kernel_virtual_start;
+    state->activation_ready = activation->activation_ok;
+
+    if (state->activation_ready == 0U) {
+        state->identity_value = 0U;
+        state->direct_map_value = 0U;
+        state->kernel_alias_value = 0U;
+        state->identity_probe_ok = 0U;
+        state->direct_map_probe_ok = 0U;
+        state->kernel_alias_probe_ok = 0U;
+        state->probes_ok = 0U;
+        return;
+    }
+
+    state->identity_value = read_probe_u32(state->identity_addr);
+    state->direct_map_value = read_probe_u32(state->direct_map_addr);
+    state->kernel_alias_value = read_probe_u32(state->kernel_alias_addr);
+    state->identity_probe_ok = (state->identity_value != 0U) ? 1U : 0U;
+    state->direct_map_probe_ok = (state->direct_map_value == state->identity_value) ? 1U : 0U;
+    state->kernel_alias_probe_ok = (state->kernel_alias_value == state->identity_value) ? 1U : 0U;
+    state->probes_ok =
+        ((state->identity_probe_ok != 0U) &&
+         (state->direct_map_probe_ok != 0U) &&
+         (state->kernel_alias_probe_ok != 0U)) ? 1U : 0U;
 }
