@@ -85,7 +85,7 @@ Remaining work:
 
 ## Stage 6: descriptor and interrupt strategy
 
-Status: started for maintained GDT, loaded TSS, critical-exception IST routing, CPU capability diagnostics, CPU exceptions, page-fault diagnostics, panic-halt readiness, guarded IRQ policy reporting, and the first opt-in exception self-test.
+Status: started for maintained GDT, loaded TSS, critical-exception IST routing, CPU capability diagnostics, CPU exceptions, page-fault diagnostics, panic-halt readiness, guarded IRQ policy reporting, legacy PIC remap/mask initialization, and the first opt-in exception self-test.
 
 - Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
 - Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
@@ -96,7 +96,9 @@ Status: started for maintained GDT, loaded TSS, critical-exception IST routing, 
 - Added boot-time serial readiness markers for `IDT panic halt ready: 1` and `IDT panic cli before hlt: 1`.
 - Routed exception termination through one shared panic halt helper that reports the halt mode before entering the `cli; hlt` loop.
 - Added guarded IRQ policy diagnostics that prove the interrupt flag is still clear and record the planned legacy IRQ vector window before hardware IRQs are enabled.
-- Recorded planned legacy IRQ vectors for PIT and keyboard interrupts while deferring APIC/PIC/PIT initialization.
+- Remap the legacy PIC to the planned IRQ vector window and keep both PIC masks fully closed.
+- Added boot-time serial readiness markers for `IRQ legacy PIC remapped: 1`, `IRQ master mask: 0x000000FF`, `IRQ slave mask: 0x000000FF`, `IRQ all masked: 1`, and `IRQ policy ok: 1`.
+- Recorded planned legacy IRQ vectors for PIT and keyboard interrupts while deferring APIC/PIT initialization.
 - Added an opt-in invalid-opcode self-test path that deliberately executes `ud2` only when the x86_64 exception-test GRUB config passes `liam.x86_64.exception_test=ud2`.
 - Added `core/kernel/arch/x86_64/gdt.c` and `gdt.h` to install a maintained x86_64 GDT from C.
 - Added `core/kernel/arch/x86_64/tss.c` and `tss.h` to build a packed 64-bit TSS image and planned IST stacks for dangerous exceptions.
@@ -109,7 +111,8 @@ Status: started for maintained GDT, loaded TSS, critical-exception IST routing, 
 
 Remaining work:
 
-- Add actual IRQ routing and handlers deliberately, deciding what remains legacy PIC/PIT and what moves toward APIC later.
+- Add actual IRQ stubs and handlers deliberately, keeping delivery masked until the default IRQ behavior is safe.
+- Decide what remains legacy PIC/PIT and what moves toward APIC later.
 - Keep interrupts disabled until the IRQ and timer strategy is implemented, not just reported.
 
 ## Stage 7: 64-bit memory model
