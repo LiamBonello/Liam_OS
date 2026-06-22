@@ -1,5 +1,22 @@
 # Liam_OS Changelog
 
+## Core 0.8.37-dev
+
+### Added
+
+- Added early x86_64 legacy PIC remap and mask initialization during IDT setup.
+- Added serial IRQ-policy markers for `IRQ legacy PIC remapped: 1`, `IRQ master mask: 0x000000FF`, `IRQ slave mask: 0x000000FF`, and `IRQ all masked: 1`.
+
+### Changed
+
+- Tightened `IRQ policy ok: 1` so it now requires interrupts to remain disabled, legacy PIC remapping to complete, and both PIC masks to remain fully closed.
+- Updated Liam_OS version to `0.8.37-dev`.
+
+### Notes
+
+- This milestone prepares the legacy IRQ delivery path without enabling hardware interrupts yet.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.36-dev
 
 ### Added
