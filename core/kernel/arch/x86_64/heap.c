@@ -1,6 +1,7 @@
 #include "heap.h"
 #include "memory_layout.h"
 #include "pmm.h"
+#include "process.h"
 
 #define X86_64_HEAP_ALIGNMENT_DEFAULT 16ULL
 #define X86_64_HEAP_INVALID_INDEX 0xFFFFFFFFU
@@ -207,6 +208,11 @@ void x86_64_heap_run_smoke(struct x86_64_heap_state *state)
 
     if (state != &heap_state) {
         *state = heap_state;
+    }
+
+    if (heap_state.smoke_ok != 0U) {
+        struct x86_64_process_smoke_state process_smoke;
+        x86_64_process_run_smoke(&process_smoke);
     }
 }
 
