@@ -18,6 +18,7 @@ X86_64_CONSOLE_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/console.o
 X86_64_BOOT_INFO_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot_info.o
 X86_64_BOOT_CONTEXT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot_context.o
 X86_64_CPUID_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/cpuid.o
+X86_64_RUNTIME_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/runtime.o
 X86_64_GDT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/gdt.o
 X86_64_TSS_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/tss.o
 X86_64_MEMORY_LAYOUT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/memory_layout.o
@@ -27,7 +28,7 @@ X86_64_PAGING_BUILDER_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/paging_build
 X86_64_PMM_PLAN_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/pmm_plan.o
 X86_64_PMM_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/pmm.o
 X86_64_IDT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/idt.o
-X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_IDT_STUBS_OBJ) $(X86_64_HIGHER_HALF_PROBE_ASM_OBJ) $(X86_64_HIGHER_HALF_PROBE_C_OBJ) $(X86_64_KERNEL_C_OBJ) $(X86_64_CONSOLE_OBJ) $(X86_64_BOOT_INFO_OBJ) $(X86_64_BOOT_CONTEXT_OBJ) $(X86_64_CPUID_OBJ) $(X86_64_GDT_OBJ) $(X86_64_TSS_OBJ) $(X86_64_MEMORY_LAYOUT_OBJ) $(X86_64_PAGING_OBJ) $(X86_64_PAGING_PLAN_OBJ) $(X86_64_PAGING_BUILDER_OBJ) $(X86_64_PMM_PLAN_OBJ) $(X86_64_PMM_OBJ) $(X86_64_IDT_OBJ)
+X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_IDT_STUBS_OBJ) $(X86_64_HIGHER_HALF_PROBE_ASM_OBJ) $(X86_64_HIGHER_HALF_PROBE_C_OBJ) $(X86_64_KERNEL_C_OBJ) $(X86_64_CONSOLE_OBJ) $(X86_64_BOOT_INFO_OBJ) $(X86_64_BOOT_CONTEXT_OBJ) $(X86_64_CPUID_OBJ) $(X86_64_RUNTIME_OBJ) $(X86_64_GDT_OBJ) $(X86_64_TSS_OBJ) $(X86_64_MEMORY_LAYOUT_OBJ) $(X86_64_PAGING_OBJ) $(X86_64_PAGING_PLAN_OBJ) $(X86_64_PAGING_BUILDER_OBJ) $(X86_64_PMM_PLAN_OBJ) $(X86_64_PMM_OBJ) $(X86_64_IDT_OBJ)
 
 ARCH ?= i386
 SUPPORTED_ARCHES := i386 x86_64
@@ -169,7 +170,7 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path validates a guarded higher-half handoff probe after activating C-owned page tables."
+	@echo "Liam_OS x86_64 path validates a guarded higher-half runtime entry after activating C-owned page tables."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
@@ -177,7 +178,7 @@ x86_64-info:
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
 	@echo "Expected x86_64 screen messages: CPU baseline ok: 1, IDT IST gates: 1, PMM smoke free: 1, Desc/IST ok: 1"
-	@echo "Expected serial markers include: Higher-half handoff ok: 1, Higher-half C probe ok: 1, Higher-half probe ok: 1, Paging probes ok: 1, Paging activation ok: 1, VM plan ok: 1, Desc/IST ok: 1"
+	@echo "Expected serial markers include: Runtime entry ok: 1, Higher-half handoff ok: 1, Paging probes ok: 1, Paging activation ok: 1, VM plan ok: 1, Desc/IST ok: 1"
 	@echo "Serial output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
@@ -245,6 +246,10 @@ $(X86_64_BOOT_CONTEXT_OBJ): kernel/arch/x86_64/boot_context.c | $(X86_64_BUILD_D
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
 $(X86_64_CPUID_OBJ): kernel/arch/x86_64/cpuid.c | $(X86_64_BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS_x86_64) -c $< -o $@
+
+$(X86_64_RUNTIME_OBJ): kernel/arch/x86_64/runtime.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
