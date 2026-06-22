@@ -46,7 +46,7 @@ Status: started.
 Remaining work:
 
 - Add explicit failure diagnostics for unsupported CPUs or malformed boot state before enabling long mode.
-- Move execution to the planned higher-half kernel window after active alias probes stay stable.
+- Move the full C runtime to the planned higher-half kernel window after the higher-half execution probe is stable.
 
 ## Stage 4: early 64-bit kernel entry
 
@@ -107,7 +107,7 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
-Status: started with layout, PMM planning, an isolated allocator smoke test, bootstrap paging-state diagnostics, a smoke-validated higher-half/direct-map plan, smoke-validated C-owned page tables, CR3 activation of those tables, and active alias probes.
+Status: started with layout, PMM planning, an isolated allocator smoke test, bootstrap paging-state diagnostics, a smoke-validated higher-half/direct-map plan, smoke-validated C-owned page tables, CR3 activation of those tables, active alias probes, and a safe higher-half instruction-fetch probe.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
@@ -128,10 +128,12 @@ Status: started with layout, PMM planning, an isolated allocator smoke test, boo
 - The headless smoke test validates `Paging activation builder ready: 1`, `Paging activation active matches builder: 1`, and `Paging activation ok: 1`.
 - The x86_64 C entry probes the kernel image through the identity map, direct physical map, and higher-half kernel alias after the CR3 switch.
 - The headless smoke test validates `Paging probe identity ok: 1`, `Paging probe direct map ok: 1`, `Paging probe kernel alias ok: 1`, and `Paging probes ok: 1`.
+- Added a tiny assembly-only higher-half execution probe that returns a fixed value without touching globals or stack-owned data beyond the call/return path.
+- The headless smoke test validates `Higher-half probe low ok: 1`, `Higher-half probe high ok: 1`, and `Higher-half probe ok: 1`.
 
 Remaining work:
 
-- Move kernel execution to the higher-half mapping after active alias probes are proven stable.
+- Relocate the real C runtime path to the higher-half mapping after this isolated execution probe remains stable.
 - Introduce pointer-width-safe address types where needed.
 - Connect the x86_64 PMM to page-table allocation only after the active paging baseline stays stable.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
