@@ -27,8 +27,20 @@ struct x86_64_paging_builder_state {
     u32 builder_ok;
 };
 
+struct x86_64_paging_activation_state {
+    u64 previous_cr3;
+    u64 requested_cr3;
+    u64 active_cr3;
+    u32 builder_ready;
+    u32 cr3_changed;
+    u32 active_matches_builder;
+    u32 activation_ok;
+};
+
 void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
                                 const struct x86_64_memory_layout *layout,
                                 const struct x86_64_paging_plan *plan);
+void x86_64_paging_builder_activate(struct x86_64_paging_activation_state *state,
+                                    const struct x86_64_paging_builder_state *builder);
 
 #endif
