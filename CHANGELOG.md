@@ -1,5 +1,20 @@
 # Liam_OS Changelog
 
+## Core 0.8.28-dev
+
+### Changed
+
+- Removed the `make x86_64-smoke` target, its shell script, and its GitHub Actions workflow because this agent environment still cannot run the repository boot tests directly.
+- Trimmed duplicated x86_64 smoke-test documentation from the top-level and architecture README files.
+- Updated the x86_64 migration plan to describe manual serial-marker validation instead of removed headless automation.
+- Updated Liam_OS version to `0.8.28-dev`.
+
+### Notes
+
+- The x86_64 boot path still keeps the higher-half execution probe and serial diagnostics.
+- Manual validation now uses `make x86_64-info`, `make x86_64-kernel`, `make x86_64-iso`, and `make x86_64-run`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.27-dev
 
 ### Added
