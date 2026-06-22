@@ -82,7 +82,7 @@ Remaining work:
 
 ## Stage 6: descriptor and interrupt strategy
 
-Status: started for maintained GDT, loaded TSS, critical-exception IST routing, CPU capability diagnostics, CPU exceptions, and page-fault diagnostics.
+Status: started for maintained GDT, loaded TSS, critical-exception IST routing, CPU capability diagnostics, CPU exceptions, page-fault diagnostics, and panic-halt readiness.
 
 - Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
 - Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
@@ -90,6 +90,8 @@ Status: started for maintained GDT, loaded TSS, critical-exception IST routing, 
 - Added VGA and serial exception diagnostics with vector, error code, and exception name.
 - Added page-fault CR2 capture plus error-code decoding for present/write/user/reserved-bit/instruction-fetch flags.
 - Added boot-time serial readiness markers for `IDT PF CR2 reporting: 1`, `IDT PF error decode: 1`, and `IDT diagnostics ok: 1`.
+- Added boot-time serial readiness markers for `IDT panic halt ready: 1` and `IDT panic cli before hlt: 1`.
+- Routed exception termination through one shared panic halt helper that reports the halt mode before entering the `cli; hlt` loop.
 - Added `core/kernel/arch/x86_64/gdt.c` and `gdt.h` to install a maintained x86_64 GDT from C.
 - Added `core/kernel/arch/x86_64/tss.c` and `tss.h` to build a packed 64-bit TSS image and planned IST stacks for dangerous exceptions.
 - Added a 64-bit TSS descriptor to the maintained GDT and load it with `ltr`.
