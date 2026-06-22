@@ -1,5 +1,26 @@
 # Liam_OS Changelog
 
+## Core 0.8.40-dev
+
+### Added
+
+- Added a bounded x86_64 PIT timer smoke path on normal x86_64 boots.
+- Programmed PIT channel 0 at the architecture default timer frequency and unmasked legacy IRQ0 after the IRQ gates and PIC remap are in place.
+- Added quiet PIT IRQ handling that increments an x86_64 timer tick counter and sends PIC EOI without flooding serial output.
+- Added serial markers for `x86_64 PIT timer online`, `PIT IRQ0 unmasked: 1`, `PIT interrupts after: 1`, `PIT waited ticks: 3`, and `PIT timer ok: 1`.
+
+### Changed
+
+- Kept the opt-in IRQ/exception self-test path separate from the normal PIT smoke path.
+- Used a bounded `pause` loop for timer smoke waiting so failed timer delivery reports `PIT timer ok: 0` instead of intentionally parking the CPU.
+- Updated Liam_OS version to `0.8.40-dev`.
+
+### Notes
+
+- This is the first normal x86_64 boot milestone that enables hardware interrupts for PIT delivery.
+- Keyboard, heap/VMM, PMM-backed page-table allocation, scheduler/process, syscalls, ELF64, and userland shell remain follow-up milestones.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.39-dev
 
 ### Added
