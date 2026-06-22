@@ -23,6 +23,18 @@ static void clear_table(u64 *table)
     }
 }
 
+static u64 read_cr3(void)
+{
+    u64 value;
+    __asm__ volatile ("movq %%cr3, %0" : "=r" (value));
+    return value;
+}
+
+static void write_cr3(u64 value)
+{
+    __asm__ volatile ("movq %0, %%cr3" :: "r" (value) : "memory");
+}
+
 static u32 is_page_aligned(u64 value)
 {
     return ((value & X86_64_PAGE_MASK) == 0ULL) ? 1U : 0U;
@@ -161,4 +173,23 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
          (state->kernel_entry_ok != 0U) &&
          (state->tables_aligned != 0U) &&
          (plan->plan_ok != 0U)) ? 1U : 0U;
+}
+
+void x86_64_paging_builder_activate(struct x86_64_paging_activation_state *state,
+                                    const struct x86_64_paging_builder_state *builder)
+{
+    state->previous_cr3 = read_cr3();
+    state->requested_cr3 = builder->pml4_table;
+    state->builder_ready = builder->builder_ok;
+
+    if (state->builder_ready != 0U) {
+        write_cr3(state->requested_cr3);
+    }
+
+    state->active_cr3 = read_cr3();
+    state->cr3_changed = (state->active_cr3 != state->previous_cr3) ? 1U : 0U;
+    state->active_matches_builder = (state->active_cr3 == state->requested_cr3) ? 1U : 0U;
+    state->activation_ok =
+        ((state->builder_ready != 0U) &&
+         (state->active_matches_builder != 0U)) ? 1U : 0U;
 }
