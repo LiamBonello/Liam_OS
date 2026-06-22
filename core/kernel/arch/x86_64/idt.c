@@ -21,6 +21,11 @@
 #define X86_64_PIT_COMMAND 0x43U
 #define X86_64_PIT_BASE_FREQUENCY 1193182U
 #define X86_64_PIT_MODE_RATE_GENERATOR 0x36U
+#define X86_64_KEYBOARD_DATA_PORT 0x60U
+#define X86_64_SCANCODE_LEFT_SHIFT_PRESS 0x2AU
+#define X86_64_SCANCODE_RIGHT_SHIFT_PRESS 0x36U
+#define X86_64_SCANCODE_LEFT_SHIFT_RELEASE 0xAAU
+#define X86_64_SCANCODE_RIGHT_SHIFT_RELEASE 0xB6U
 #define X86_64_PAGE_FAULT_PRESENT 0x01ULL
 #define X86_64_PAGE_FAULT_WRITE 0x02ULL
 #define X86_64_PAGE_FAULT_USER 0x04ULL
@@ -56,6 +61,29 @@ static u64 last_irq_vector;
 static u32 irq_self_test_active;
 static volatile u32 timer_ticks;
 static struct x86_64_timer_state timer_state;
+static struct x86_64_keyboard_state keyboard_state;
+
+static const u8 scancode_ascii_map[128] = {
+    0, 27, '1', '2', '3', '4', '5', '6',
+    '7', '8', '9', '0', '-', '=', '\b', '\t',
+    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i',
+    'o', 'p', '[', ']', '\n', 0, 'a', 's',
+    'd', 'f', 'g', 'h', 'j', 'k', 'l', ';',
+    '\'', '`', 0, '\\', 'z', 'x', 'c', 'v',
+    'b', 'n', 'm', ',', '.', '/', 0, '*',
+    0, ' ',
+};
+
+static const u8 scancode_shift_ascii_map[128] = {
+    0, 27, '!', '@', '#', '$', '%', '^',
+    '&', '*', '(', ')', '_', '+', '\b', '\t',
+    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I',
+    'O', 'P', '{', '}', '\n', 0, 'A', 'S',
+    'D', 'F', 'G', 'H', 'J', 'K', 'L', ':',
+    '"', '~', 0, '|', 'Z', 'X', 'C', 'V',
+    'B', 'N', 'M', '<', '>', '?', 0, '*',
+    0, ' ',
+};
 
 static const char *exception_name(u64 vector)
 {
@@ -247,6 +275,14 @@ static void unmask_irq0(void)
     timer_state.irq0_unmasked = ((inb(X86_64_PIC1_DATA) & 1U) == 0U) ? 1U : 0U;
 }
 
+static void unmask_irq1(void)
+{
+    u8 mask = inb(X86_64_PIC1_DATA);
+    mask = (u8)(mask & ~2U);
+    outb(X86_64_PIC1_DATA, mask);
+    keyboard_state.irq1_unmasked = ((inb(X86_64_PIC1_DATA) & 2U) == 0U) ? 1U : 0U;
+}
+
 static void send_pic_eoi(u64 vector)
 {
     if (vector >= (u64)(X86_64_IRQ_VECTOR_BASE + 8U) &&
@@ -268,6 +304,69 @@ static u32 timer_handle_irq(u64 vector)
 
     timer_ticks += 1U;
     timer_state.ticks = timer_ticks;
+    return 1U;
+}
+
+static u8 keyboard_translate_scancode(u8 scancode)
+{
+    if (scancode >= 128U) {
+        return 0U;
+    }
+
+    if (keyboard_state.shift_pressed != 0U) {
+        return scancode_shift_ascii_map[scancode];
+    }
+
+    return scancode_ascii_map[scancode];
+}
+
+static void report_keyboard_input(u8 scancode, u8 ascii)
+{
+    x86_64_serial_write_line("x86_64 keyboard IRQ received");
+    x86_64_serial_write_hex32("Keyboard scancode: 0x", scancode);
+    x86_64_serial_write_u32("Keyboard ascii: ", ascii);
+    x86_64_serial_write_u32("Keyboard scancodes seen: ", keyboard_state.scancodes_seen);
+    x86_64_serial_write_u32("Keyboard translated chars: ", keyboard_state.translated_chars_seen);
+}
+
+static u32 keyboard_handle_irq(u64 vector)
+{
+    if (vector != X86_64_IRQ_KEYBOARD_VECTOR) {
+        return 0U;
+    }
+
+    u8 scancode = inb(X86_64_KEYBOARD_DATA_PORT);
+    keyboard_state.scancodes_seen += 1U;
+    keyboard_state.last_scancode = scancode;
+
+    if (scancode == X86_64_SCANCODE_LEFT_SHIFT_PRESS ||
+        scancode == X86_64_SCANCODE_RIGHT_SHIFT_PRESS) {
+        keyboard_state.shift_pressed = 1U;
+        keyboard_state.make_codes_seen += 1U;
+        return 1U;
+    }
+
+    if (scancode == X86_64_SCANCODE_LEFT_SHIFT_RELEASE ||
+        scancode == X86_64_SCANCODE_RIGHT_SHIFT_RELEASE) {
+        keyboard_state.shift_pressed = 0U;
+        keyboard_state.break_codes_seen += 1U;
+        return 1U;
+    }
+
+    if ((scancode & 0x80U) != 0U) {
+        keyboard_state.break_codes_seen += 1U;
+        return 1U;
+    }
+
+    keyboard_state.make_codes_seen += 1U;
+
+    u8 ascii = keyboard_translate_scancode(scancode);
+    keyboard_state.last_ascii = ascii;
+    if (ascii != 0U) {
+        keyboard_state.translated_chars_seen += 1U;
+        report_keyboard_input(scancode, ascii);
+    }
+
     return 1U;
 }
 
@@ -328,6 +427,21 @@ static void report_timer_state(void)
     x86_64_serial_write_u32("PIT ticks: ", state.ticks);
     x86_64_serial_write_u32("PIT wait ok: ", state.wait_ok);
     x86_64_serial_write_u32("PIT timer ok: ", state.timer_ok);
+}
+
+static void report_keyboard_state(void)
+{
+    struct x86_64_keyboard_state state;
+
+    x86_64_keyboard_get_state(&state);
+    x86_64_serial_write_line("x86_64 keyboard IRQ online");
+    x86_64_serial_write_u32("Keyboard initialized: ", state.initialized);
+    x86_64_serial_write_u32("Keyboard IRQ1 unmasked: ", state.irq1_unmasked);
+    x86_64_serial_write_u32("Keyboard scancodes seen: ", state.scancodes_seen);
+    x86_64_serial_write_u32("Keyboard translated chars: ", state.translated_chars_seen);
+    x86_64_serial_write_u32("Keyboard last scancode: ", state.last_scancode);
+    x86_64_serial_write_u32("Keyboard last ascii: ", state.last_ascii);
+    x86_64_serial_write_u32("Keyboard ready ok: ", state.keyboard_ok);
 }
 
 static void report_page_fault_error(u64 error_code)
@@ -392,6 +506,8 @@ void x86_64_idt_init(void)
     x86_64_timer_initialize(X86_64_PIT_DEFAULT_FREQUENCY_HZ);
     x86_64_timer_wait_for_ticks(3U);
     report_timer_state();
+    x86_64_keyboard_initialize();
+    report_keyboard_state();
 }
 
 void x86_64_idt_get_state(struct x86_64_idt_state *state)
@@ -515,6 +631,29 @@ void x86_64_timer_get_state(struct x86_64_timer_state *state)
     *state = timer_state;
 }
 
+void x86_64_keyboard_initialize(void)
+{
+    keyboard_state.initialized = 1U;
+    keyboard_state.scancodes_seen = 0U;
+    keyboard_state.make_codes_seen = 0U;
+    keyboard_state.break_codes_seen = 0U;
+    keyboard_state.translated_chars_seen = 0U;
+    keyboard_state.shift_pressed = 0U;
+    keyboard_state.last_scancode = 0U;
+    keyboard_state.last_ascii = 0U;
+    keyboard_state.keyboard_ok = 0U;
+
+    unmask_irq1();
+    keyboard_state.keyboard_ok = ((keyboard_state.initialized != 0U) &&
+                                  (keyboard_state.irq1_unmasked != 0U) &&
+                                  (timer_state.interrupts_enabled_after != 0U)) ? 1U : 0U;
+}
+
+void x86_64_keyboard_get_state(struct x86_64_keyboard_state *state)
+{
+    *state = keyboard_state;
+}
+
 void x86_64_exception_handler(u64 vector, u64 error_code)
 {
     const char *name = exception_name(vector);
@@ -538,6 +677,11 @@ void x86_64_exception_handler(u64 vector, u64 error_code)
 void x86_64_irq_handler(u64 vector)
 {
     if (irq_self_test_active == 0U && timer_handle_irq(vector) != 0U) {
+        send_pic_eoi(vector);
+        return;
+    }
+
+    if (irq_self_test_active == 0U && keyboard_handle_irq(vector) != 0U) {
         send_pic_eoi(vector);
         return;
     }
