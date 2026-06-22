@@ -170,7 +170,7 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 x86_64-smoke-check-tools: x86_64-run-check-tools
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path now builds candidate C-owned page tables for the higher-half/direct-map virtual memory layout before descriptor, paging, and PMM smoke validation."
+	@echo "Liam_OS x86_64 path now runs on C-owned page tables and validates identity, direct-map, and higher-half kernel aliases."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
@@ -180,7 +180,7 @@ x86_64-info:
 	@echo "ISO output: $(X86_64_ISO)"
 	@echo "Smoke log output: $(X86_64_SMOKE_LOG)"
 	@echo "Expected x86_64 screen messages: CPU baseline ok: 1, IDT IST gates: 1, PMM smoke free: 1, Desc/IST ok: 1"
-	@echo "Expected serial markers include: Paging builder ok: 1, VM plan ok: 1, CPU baseline ok: 1, Desc/IST ok: 1"
+	@echo "Expected serial markers include: Paging activation ok: 1, Paging probes ok: 1, VM plan ok: 1, Desc/IST ok: 1"
 	@echo "Serial output is routed to the terminal by make x86_64-run and validated by make x86_64-smoke."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
