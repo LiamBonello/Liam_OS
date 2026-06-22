@@ -77,7 +77,7 @@ require_line() {
 }
 
 require_line "Liam_OS x86_64 kernel diagnostics"
-require_line "Stage: paging builder + descriptor"
+require_line "Stage: paging active + descriptor"
 require_line "Multiboot2: ok"
 require_line "CPU CPUID available: 1"
 require_line "CPU FPU: 1"
@@ -115,6 +115,10 @@ require_line "Paging builder direct map ok: 1"
 require_line "Paging builder kernel ok: 1"
 require_line "Paging builder tables aligned: 1"
 require_line "Paging builder ok: 1"
+require_line "Paging activation builder ready: 1"
+require_line "Paging activation CR3 changed: 1"
+require_line "Paging activation active matches builder: 1"
+require_line "Paging activation ok: 1"
 require_line "GDT/TSS loaded ok: 1"
 require_line "Desc/IST ok: 1"
 
