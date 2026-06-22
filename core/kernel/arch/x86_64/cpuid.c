@@ -1,4 +1,5 @@
 #include "cpuid.h"
+#include "syscall.h"
 
 #define CPUID_BASIC_INFO 0x00000000U
 #define CPUID_BASIC_FEATURES 0x00000001U
@@ -76,6 +77,14 @@ static void copy_vendor(struct x86_64_cpuid_state *state, const struct cpuid_reg
     state->vendor[12] = '\0';
 }
 
+static void report_syscall_abi_plan(const struct x86_64_cpuid_state *state)
+{
+    struct x86_64_syscall_abi_state syscall_abi;
+
+    x86_64_syscall_abi_init(&syscall_abi, state->has_fast_syscall);
+    x86_64_syscall_abi_report(&syscall_abi);
+}
+
 void x86_64_cpuid_state_init(struct x86_64_cpuid_state *state)
 {
     struct cpuid_regs regs;
@@ -119,4 +128,6 @@ void x86_64_cpuid_state_init(struct x86_64_cpuid_state *state)
                           (state->has_fast_syscall != 0U) &&
                           (state->has_nx != 0U) &&
                           (state->has_long_mode != 0U)) ? 1U : 0U;
+
+    report_syscall_abi_plan(state);
 }
