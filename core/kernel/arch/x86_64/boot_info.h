@@ -9,6 +9,7 @@
 #define X86_64_MEMORY_REGION_AVAILABLE 1U
 
 extern u32 x86_64_exception_self_test_requested;
+extern u32 x86_64_irq_self_test_requested;
 
 struct x86_64_memory_region {
     u64 base;
@@ -24,6 +25,7 @@ struct x86_64_boot_summary {
     u32 command_line_found;
     char command_line[X86_64_BOOT_COMMAND_LINE_MAX];
     u32 exception_test_requested;
+    u32 irq_test_requested;
     u32 bootloader_name_found;
     char bootloader_name[X86_64_BOOTLOADER_NAME_MAX];
     u32 basic_meminfo_found;
