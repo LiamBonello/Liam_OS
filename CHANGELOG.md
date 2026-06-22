@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.42-dev
+
+### Added
+
+- Moved the x86_64 C-owned page-table builder onto the early PMM allocator instead of static bootstrap arrays.
+- Added serial diagnostics for `Paging builder PMM backed`, `Paging builder table pages`, `Paging builder PMM free before`, `Paging builder PMM free after`, and `Paging builder allocation ok`.
+- Added rollback for partially allocated x86_64 paging-builder tables if a PMM page allocation fails during table construction.
+
+### Changed
+
+- Reordered x86_64 early boot so the PMM allocator is initialized before the C-owned page-table builder needs physical pages.
+- Tightened `Paging builder ok: 1` so it requires PMM-backed table allocation and successful allocation accounting.
+- Updated Liam_OS version to `0.8.42-dev`.
+
+### Notes
+
+- This is a kernel-memory milestone toward a real x86_64 VMM/heap path; it does not port scheduler/process, syscalls, ELF64 loading, or x86_64 userspace yet.
+- The normal x86_64 boot should now show `Paging builder table pages: 8` and a PMM free-page count drop of 8 across the builder allocation.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.41-dev
 
 ### Added
