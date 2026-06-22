@@ -1,5 +1,26 @@
 # Liam_OS Changelog
 
+## Core 0.8.41-dev
+
+### Added
+
+- Added an early x86_64 keyboard IRQ diagnostic path on normal x86_64 boots.
+- Unmasked legacy IRQ1 after the PIT timer path is live and interrupts are enabled.
+- Added PS/2 Set 1 scancode tracking for make codes, break codes, shift state, last scancode, and last translated ASCII value.
+- Added serial markers for `x86_64 keyboard IRQ online`, `Keyboard IRQ1 unmasked: 1`, and `Keyboard ready ok: 1`.
+- Added per-keypress serial diagnostics for translated keypresses: `x86_64 keyboard IRQ received`, `Keyboard scancode: 0x...`, and `Keyboard ascii: ...`.
+
+### Changed
+
+- Kept x86_64 keyboard input architecture-local until the x86_64 shell and userland path exist.
+- Updated Liam_OS version to `0.8.41-dev`.
+
+### Notes
+
+- This proves keyboard IRQ delivery and basic scancode translation, not full x86_64 shell input yet.
+- Heap/VMM, PMM-backed page-table allocation, scheduler/process, syscalls, ELF64, and userland shell remain follow-up milestones.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.40-dev
 
 ### Added
