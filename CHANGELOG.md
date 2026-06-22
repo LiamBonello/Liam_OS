@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.24-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/paging_builder.h` and `paging_builder.c` to build candidate C-owned x86_64 page tables for the planned memory map.
+- Added serial diagnostics for candidate PML4, identity-map, direct-map, and higher-half kernel page-table state.
+- Added smoke-test assertions for candidate page-table alignment, PML4 population, identity/direct huge-page coverage, higher-half kernel mapping, and `Paging builder ok: 1`.
+
+### Changed
+
+- Updated the x86_64 boot stage to `Stage: paging builder + descriptor`.
+- Wired the x86_64 paging builder into `make x86_64-kernel`, `make x86_64-iso`, and `make x86_64-smoke`.
+- Updated Liam_OS version to `0.8.24-dev`.
+
+### Notes
+
+- This milestone still does not switch CR3. It validates the candidate page tables before the x86_64 path starts running on them.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.23-dev
 
 ### Added
