@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.23-dev
+
+### Added
+
+- Added `core/kernel/arch/x86_64/paging_plan.h` and `paging_plan.c` for a smoke-validated x86_64 virtual memory plan.
+- Added serial diagnostics for the planned higher-half kernel window, direct physical map window, transition identity-map window, and their PML4 slots.
+- Added smoke-test assertions for canonical virtual windows, distinct PML4 slots, planned-region count, and `VM plan ok: 1`.
+
+### Changed
+
+- Updated the x86_64 boot stage to `Stage: VM plan + descriptor + PMM`.
+- Wired the x86_64 virtual memory plan into `make x86_64-kernel`, `make x86_64-iso`, and `make x86_64-smoke`.
+- Removed the unused `timeout` tool check from the x86_64 smoke target prerequisites.
+- Updated Liam_OS version to `0.8.23-dev`.
+
+### Notes
+
+- This milestone does not switch CR3 or replace the bootstrap identity map yet. It defines and validates the permanent map shape before the future page-table builder starts using it.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.22-dev
 
 ### Added
@@ -24,7 +44,7 @@
 ### Added
 
 - Added `core/scripts/x86_64_smoke.sh` to boot the experimental x86_64 ISO headlessly in QEMU and validate required COM1 serial markers.
-- Added `make x86_64-smoke` as the automated x86_64 boot smoke target.
+- Added `make x86_64-smoke` as the automated x86_64 boot target.
 - Added `.github/workflows/core-x86_64-smoke.yml` to run the x86_64 headless boot smoke test in GitHub Actions and upload the serial log.
 
 ### Changed
