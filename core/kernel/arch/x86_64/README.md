@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, loads a maintained GDT with a 64-bit TSS descriptor, installs an early exception IDT after the TSS is ready, routes NMI through IST2, double fault through IST1, and page fault through IST3, builds an architecture boot context, parses boot information, computes an early PMM plan, initializes an isolated bounded PMM page allocator, captures bootstrap paging state, prepares bootstrap IST stacks, and writes VGA/serial diagnostics:
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, reports a required CPU capability baseline, loads a maintained GDT with a 64-bit TSS descriptor, installs an early exception IDT after the TSS is ready, routes NMI through IST2, double fault through IST1, and page fault through IST3, builds an architecture boot context, parses boot information, computes an early PMM plan, initializes an isolated bounded PMM page allocator, captures bootstrap paging state, prepares bootstrap IST stacks, and writes VGA/serial diagnostics:
 
 ```sh
 cd core
@@ -42,6 +42,7 @@ Boot info pointer: 0x........
 Boot info bytes: ...
 Memory map entries: ...
 Usable bytes: 0x................
+CPU baseline ok: 1
 IDT IST gates: 1
 Kernel start: 0x................
 Kernel end: 0x................
@@ -55,13 +56,12 @@ Reserved below: 0x................
 PMM tracked pages: ...
 PMM smoke page: 0x................
 PMM smoke free: 1
-Paging huge pages: 512
 Desc/IST ok: 1
 ```
 
 If an early CPU exception fires after IDT installation, the handler prints the exception name over VGA and the full vector/error-code diagnostics over serial.
 
-`make x86_64-run` also routes COM1 serial output to the terminal, including full paging table diagnostics for CR3, PML4, PDPT, PD, huge-page count, identity-map span, IDTR base/limit, NMI/double-fault/page-fault IST routing, GDTR base/limit, active selectors, current task-register selector, descriptor values, TSS base/limit, and planned IST stack addresses.
+`make x86_64-run` also routes COM1 serial output to the terminal, including CPU capability diagnostics, full paging table diagnostics for CR3, PML4, PDPT, PD, huge-page count, identity-map span, IDTR base/limit, NMI/double-fault/page-fault IST routing, GDTR base/limit, active selectors, current task-register selector, descriptor values, TSS base/limit, and planned IST stack addresses.
 
 The x86_64 path also has a headless smoke target for CI and automated agent testing:
 
@@ -76,6 +76,16 @@ That target runs QEMU without a window, captures serial output to `core/build/x8
 Liam_OS x86_64 kernel diagnostics
 Stage: IST gates + descriptor + PMM
 Multiboot2: ok
+CPU CPUID available: 1
+CPU FPU: 1
+CPU MSR: 1
+CPU APIC: 1
+CPU SSE: 1
+CPU SSE2: 1
+CPU SYSCALL/SYSRET: 1
+CPU NX: 1
+CPU long mode: 1
+CPU baseline ok: 1
 IDT NMI IST: 2
 IDT NMI IST ok: 1
 IDT double fault IST: 1
@@ -91,7 +101,7 @@ Desc/IST ok: 1
 
 GitHub Actions runs the same smoke target and uploads the serial log when the workflow completes.
 
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, an early CPU exception IDT, dedicated critical-exception IST routing, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke test, C-visible bootstrap paging-state diagnostics, a C-visible bootstrap TSS/IST plan, and automated headless boot validation. It does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
+This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, CPU capability baseline reporting, an early CPU exception IDT, dedicated critical-exception IST routing, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke test, C-visible bootstrap paging-state diagnostics, a C-visible bootstrap TSS/IST plan, and automated headless boot validation. It does not initialize IRQ routing, APIC/PIC/PIT, the shared paging subsystem, heap, processes, syscalls, or userspace.
 
 ## Milestones
 
