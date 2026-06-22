@@ -2,9 +2,12 @@
 
 #define MULTIBOOT2_BOOTLOADER_MAGIC 0x36D76289U
 #define MULTIBOOT2_TAG_TYPE_END 0U
+#define MULTIBOOT2_TAG_TYPE_CMDLINE 1U
 #define MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME 2U
 #define MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO 4U
 #define MULTIBOOT2_TAG_TYPE_MMAP 6U
+
+#define X86_64_EXCEPTION_TEST_FLAG "liam.x86_64.exception_test=ud2"
 
 struct multiboot2_info_header {
     u32 total_size;
@@ -50,13 +53,33 @@ static void zero_summary(struct x86_64_boot_summary *summary)
     }
 }
 
-static void copy_bootloader_name(char *destination, const char *source, u32 source_size)
+static void copy_bounded_string(char *destination, u32 destination_size, const char *source, u32 source_size)
 {
     u32 i = 0;
-    for (; i + 1U < X86_64_BOOTLOADER_NAME_MAX && i < source_size && source[i] != '\0'; ++i) {
+    for (; i + 1U < destination_size && i < source_size && source[i] != '\0'; ++i) {
         destination[i] = source[i];
     }
     destination[i] = '\0';
+}
+
+static u32 bounded_string_contains(const char *haystack, u32 haystack_size, const char *needle)
+{
+    for (u32 i = 0; i < haystack_size && haystack[i] != '\0'; ++i) {
+        u32 matched = 1U;
+
+        for (u32 j = 0; needle[j] != '\0'; ++j) {
+            if (i + j >= haystack_size || haystack[i + j] == '\0' || haystack[i + j] != needle[j]) {
+                matched = 0U;
+                break;
+            }
+        }
+
+        if (matched != 0U) {
+            return 1U;
+        }
+    }
+
+    return 0U;
 }
 
 static void retain_memory_region(const struct multiboot2_mmap_entry *mmap_entry, struct x86_64_boot_summary *summary)
@@ -135,10 +158,19 @@ void x86_64_boot_info_parse(u32 magic, u32 boot_info_addr, struct x86_64_boot_su
             break;
         }
 
-        if (tag->type == MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME) {
+        if (tag->type == MULTIBOOT2_TAG_TYPE_CMDLINE) {
+            const char *command_line = (const char *)(tag + 1);
+            const u32 command_line_size = tag->size - sizeof(*tag);
+            summary->command_line_found = 1U;
+            copy_bounded_string(summary->command_line, X86_64_BOOT_COMMAND_LINE_MAX,
+                                command_line, command_line_size);
+            summary->exception_test_requested = bounded_string_contains(
+                summary->command_line, X86_64_BOOT_COMMAND_LINE_MAX, X86_64_EXCEPTION_TEST_FLAG);
+        } else if (tag->type == MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME) {
             const char *name = (const char *)(tag + 1);
             summary->bootloader_name_found = 1U;
-            copy_bootloader_name(summary->bootloader_name, name, tag->size - sizeof(*tag));
+            copy_bounded_string(summary->bootloader_name, X86_64_BOOTLOADER_NAME_MAX,
+                                name, tag->size - sizeof(*tag));
         } else if (tag->type == MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO) {
             const struct multiboot2_basic_meminfo_tag *meminfo = (const struct multiboot2_basic_meminfo_tag *)tag;
             if (meminfo->size >= sizeof(*meminfo)) {
