@@ -1,5 +1,23 @@
 # Liam_OS Changelog
 
+## Core 0.8.34-dev
+
+### Added
+
+- Added explicit x86_64 exception panic-halt readiness diagnostics.
+- Added serial markers for `IDT panic halt ready: 1` and `IDT panic cli before hlt: 1`.
+- Added a shared exception halt helper that prints the panic halt mode before entering the `cli; hlt` loop.
+
+### Changed
+
+- Routed x86_64 CPU exception termination through the shared halt helper instead of open-coding the halt loop in the handler.
+- Updated Liam_OS version to `0.8.34-dev`.
+
+### Notes
+
+- This milestone prepares the panic halt path for later intentional exception tests without deliberately faulting the current boot path.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.33-dev
 
 ### Fixed
