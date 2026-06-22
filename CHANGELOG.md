@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.29-dev
+
+### Added
+
+- Added a C-level x86_64 higher-half execution probe that calls compiler-generated C code through both the low identity-mapped address and the higher-half kernel alias.
+- Added serial diagnostics for C probe code/data addresses, expected value, low-result, high-result, readiness, and `Higher-half C probe ok: 1`.
+
+### Changed
+
+- Updated the x86_64 boot stage to `Stage: higher-half C probe + descriptor`.
+- Updated x86_64 documentation to describe both the assembly probe and the C probe.
+- Updated Liam_OS version to `0.8.29-dev`.
+
+### Notes
+
+- This milestone proves the active higher-half kernel alias can execute a normal freestanding C function and read its marker data through compiler-generated access.
+- This still does not relocate the full C runtime to the higher-half kernel window.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.28-dev
 
 ### Changed
