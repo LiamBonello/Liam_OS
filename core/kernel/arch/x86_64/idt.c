@@ -157,6 +157,16 @@ static void report_page_fault_error(u64 error_code)
                             ((error_code & X86_64_PAGE_FAULT_INSTRUCTION) != 0ULL) ? 1U : 0U);
 }
 
+static void halt_after_exception(void)
+{
+    x86_64_serial_write_line("x86_64 panic halt");
+    x86_64_serial_write_line("Panic halt mode: cli; hlt");
+
+    for (;;) {
+        __asm__ volatile ("cli; hlt");
+    }
+}
+
 void x86_64_idt_init(void)
 {
     zero_idt();
@@ -171,6 +181,8 @@ void x86_64_idt_init(void)
 
     x86_64_serial_write_u32("IDT PF CR2 reporting: ", 1U);
     x86_64_serial_write_u32("IDT PF error decode: ", 1U);
+    x86_64_serial_write_u32("IDT panic halt ready: ", 1U);
+    x86_64_serial_write_u32("IDT panic cli before hlt: ", 1U);
     x86_64_serial_write_u32("IDT diagnostics ok: ", 1U);
 }
 
@@ -208,8 +220,12 @@ void x86_64_idt_get_state(struct x86_64_idt_state *state)
     state->page_fault_ist_ok = (page_fault_ist == X86_64_IDT_PAGE_FAULT_IST) ? 1U : 0U;
     state->page_fault_cr2_reporting = 1U;
     state->page_fault_error_decode = 1U;
+    state->panic_halt_ready = 1U;
+    state->panic_cli_before_hlt = 1U;
     state->diagnostics_ok = ((state->page_fault_cr2_reporting != 0U) &&
-                             (state->page_fault_error_decode != 0U)) ? 1U : 0U;
+                             (state->page_fault_error_decode != 0U) &&
+                             (state->panic_halt_ready != 0U) &&
+                             (state->panic_cli_before_hlt != 0U)) ? 1U : 0U;
 
     state->ist_gates_ok = ((state->nmi_present != 0U) &&
                            (state->nmi_ist_ok != 0U) &&
@@ -236,7 +252,5 @@ void x86_64_exception_handler(u64 vector, u64 error_code)
         report_page_fault_error(error_code);
     }
 
-    for (;;) {
-        __asm__ volatile ("cli; hlt");
-    }
+    halt_after_exception();
 }
