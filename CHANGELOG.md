@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.22-dev
+
+### Added
+
+- Added x86_64 CPUID baseline diagnostics to the C boot report.
+- Added headless smoke-test validation for required CPU capability markers.
+
+### Changed
+
+- Shifted early VGA diagnostic rows so CPU baseline, IDT IST, PMM smoke, and descriptor summary markers all fit.
+- Updated x86_64 documentation to include CPU baseline diagnostics.
+- Updated Liam_OS version to `0.8.22-dev`.
+
+### Notes
+
+- The x86_64 CPU baseline currently requires CPUID, FPU, MSR, APIC, SSE, SSE2, SYSCALL/SYSRET, NX, and long mode. 1 GiB pages are reported but not required yet.
+- The headless x86_64 smoke target now validates CPU baseline, descriptor/IST, PMM, paging, and GDT/TSS serial markers before passing.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.21-dev
 
 ### Added
@@ -303,7 +322,7 @@
 ### Notes
 
 - This is an experimental long-mode assembly handoff only. It does not yet initialize the shared C kernel runtime, interrupts, heap, processes, syscalls, or userspace.
-- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+- The default stable boot path remains `ARCH=i386` through GRUB Multiboot.
 
 ## Core 0.8.6-dev
 
@@ -536,7 +555,7 @@
 
 ### Notes
 
-- This validates that new flat userland programs can now be added through `USERLAND_FLAT_NAMES` plus normal initramfs/image registration.
+- This validates that new flat userland programs can now be added by creating `core/userland/flat/<name>/<name>.asm` and adding `<name>` to `USERLAND_FLAT_NAMES`.
 - `/bin/clear` currently emits ANSI clear-screen escape bytes.
 
 ## Core 0.6.1-dev
