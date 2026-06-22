@@ -29,6 +29,7 @@ Status: complete for the first experimental objects.
 - Added `make x86_64-kernel` to build `core/build/x86_64/kernel.elf` without changing the i386 ISO path.
 - Added `core/kernel/arch/x86_64/boot32.asm` as a Multiboot2 32-bit handoff that creates temporary identity-mapped long-mode paging.
 - Added `core/boot/grub-x86_64.cfg` for the experimental x86_64 ISO path.
+- Added `core/boot/grub-x86_64-exception-test.cfg` for the opt-in exception self-test ISO path.
 
 ## Stage 3: long mode transition
 
@@ -36,6 +37,7 @@ Status: started.
 
 - Added `make x86_64-iso` to create `core/build/x86_64/liam_os_x86_64.iso`.
 - Added `make x86_64-run` to boot the experimental ISO in `qemu-system-x86_64`.
+- Added `make x86_64-exception-test-iso` and `make x86_64-exception-test-run` for the intentional invalid-opcode exception validation path.
 - The handoff enters long mode, sets 64-bit segments, installs a temporary stack, and calls the x86_64 entry shim.
 - The handoff preserves GRUB's Multiboot2 magic and boot information pointer for C.
 - This path is still experimental and uses temporary identity-mapped paging.
@@ -57,7 +59,7 @@ Status: started.
 - Added `core/kernel/arch/x86_64/types.h` for local fixed-width types.
 - Added `core/kernel/arch/x86_64/cpuid.c` and `cpuid.h` for early CPU baseline capability diagnostics.
 - Added `core/kernel/arch/x86_64/runtime.c` and `runtime.h` for the first guarded higher-half runtime entry boundary.
-- `make x86_64-run` routes serial output to the terminal with `-serial stdio`.
+- `make x86_64-run` and `make x86_64-exception-test-run` route serial output to the terminal with `-serial stdio`.
 
 Remaining work:
 
@@ -70,7 +72,8 @@ Remaining work:
 Status: started.
 
 - Added `core/kernel/arch/x86_64/boot_info.c` and `boot_info.h`.
-- Parse Multiboot2 total size, bootloader name, basic memory info, and memory map tags.
+- Parse Multiboot2 total size, bounded command line, bootloader name, basic memory info, and memory map tags.
+- Recognize the opt-in `liam.x86_64.exception_test=ud2` boot flag for the intentional invalid-opcode exception self-test.
 - Report bootloader name, boot-info size, memory-map entry count, and total usable memory bytes over VGA and serial.
 - Added `core/kernel/arch/x86_64/boot_context.c` and `boot_context.h` to preserve parsed boot information inside an architecture-owned boot context.
 - Retain a bounded copy of Multiboot2 memory-map regions for later architecture initialization.
@@ -82,7 +85,7 @@ Remaining work:
 
 ## Stage 6: descriptor and interrupt strategy
 
-Status: started for maintained GDT, loaded TSS, critical-exception IST routing, CPU capability diagnostics, CPU exceptions, page-fault diagnostics, and panic-halt readiness.
+Status: started for maintained GDT, loaded TSS, critical-exception IST routing, CPU capability diagnostics, CPU exceptions, page-fault diagnostics, panic-halt readiness, and the first opt-in exception self-test.
 
 - Added `core/kernel/arch/x86_64/idt.c` and `idt.h` for early IDT setup.
 - Added `core/kernel/arch/x86_64/idt_stubs.asm` for exception vectors 0 through 31.
@@ -92,6 +95,7 @@ Status: started for maintained GDT, loaded TSS, critical-exception IST routing, 
 - Added boot-time serial readiness markers for `IDT PF CR2 reporting: 1`, `IDT PF error decode: 1`, and `IDT diagnostics ok: 1`.
 - Added boot-time serial readiness markers for `IDT panic halt ready: 1` and `IDT panic cli before hlt: 1`.
 - Routed exception termination through one shared panic halt helper that reports the halt mode before entering the `cli; hlt` loop.
+- Added an opt-in invalid-opcode self-test path that deliberately executes `ud2` only when the x86_64 exception-test GRUB config passes `liam.x86_64.exception_test=ud2`.
 - Added `core/kernel/arch/x86_64/gdt.c` and `gdt.h` to install a maintained x86_64 GDT from C.
 - Added `core/kernel/arch/x86_64/tss.c` and `tss.h` to build a packed 64-bit TSS image and planned IST stacks for dangerous exceptions.
 - Added a 64-bit TSS descriptor to the maintained GDT and load it with `ltr`.
@@ -103,7 +107,6 @@ Status: started for maintained GDT, loaded TSS, critical-exception IST routing, 
 
 Remaining work:
 
-- Add safe exception-path tests only after the panic/reporting path is ready for intentional faults.
 - Add IRQ routing deliberately, deciding what remains legacy PIC/PIT and what moves toward APIC later.
 - Keep interrupts disabled until the IRQ and timer strategy is explicit.
 
@@ -121,23 +124,14 @@ Status: started with layout, PMM planning, an isolated allocator smoke check, bo
 - The allocator rejects duplicate frees, unaligned pages, invalid pages, and obvious out-of-range frees.
 - The x86_64 C entry performs a one-page allocate/free smoke check and reports the result over VGA and serial.
 - Added `core/kernel/arch/x86_64/paging.c` and `paging.h` to capture the bootstrap CR3 and identity-mapped huge-page table state.
-- The x86_64 C entry reports the current bootstrap paging baseline before a permanent paging model is introduced.
 - Added `core/kernel/arch/x86_64/paging_plan.c` and `paging_plan.h` to define the planned higher-half kernel window, direct physical map window, and transition identity-map window.
-- The x86_64 diagnostics report planned PML4 slots, canonical virtual address windows, planned-region count, and `VM plan ok: 1`.
 - Added `core/kernel/arch/x86_64/paging_builder.c` and `paging_builder.h` to construct C-owned page tables for the planned identity, direct-map, and higher-half kernel windows.
-- The x86_64 diagnostics report table alignment, PML4 population, identity/direct huge-page coverage, the 4 KiB kernel mapping, and `Paging builder ok: 1`.
 - The x86_64 C entry switches CR3 to the C-built page tables after the builder validates them.
-- The x86_64 diagnostics report `Paging activation builder ready: 1`, `Paging activation active matches builder: 1`, and `Paging activation ok: 1`.
 - The x86_64 C entry probes the kernel image through the identity map, direct physical map, and higher-half kernel alias after the CR3 switch.
-- The x86_64 diagnostics report `Paging probe identity ok: 1`, `Paging probe direct map ok: 1`, `Paging probe kernel alias ok: 1`, and `Paging probes ok: 1`.
 - Added a tiny assembly-only higher-half execution probe that returns a fixed value without touching globals or stack-owned data beyond the call/return path.
-- The x86_64 diagnostics report `Higher-half probe low ok: 1`, `Higher-half probe high ok: 1`, and `Higher-half probe ok: 1`.
 - Added a C higher-half execution probe that reads a kernel marker through normal compiler-generated code/data access.
-- The x86_64 diagnostics report `Higher-half C probe low ok: 1`, `Higher-half C probe high ok: 1`, and `Higher-half C probe ok: 1`.
 - Added a guarded higher-half handoff probe that calls a C function through the higher-half kernel alias, passes an argument, uses the active stack/calling convention, writes a scratch result, and returns a validation marker.
-- The x86_64 diagnostics report `Higher-half handoff ready: 1`, `Higher-half handoff result ok: 1`, `Higher-half handoff scratch ok: 1`, and `Higher-half handoff ok: 1`.
 - Added a guarded higher-half runtime entry that executes through the higher-half kernel alias and validates argument passing, active CR3, return value, entry marker, stack scratch value, and transition-stack identity reachability.
-- The x86_64 diagnostics report `Runtime high entry ready: 1`, `Runtime CR3 ok: 1`, `Runtime return ok: 1`, `Runtime entered ok: 1`, `Runtime scratch ok: 1`, `Runtime stack identity ok: 1`, and `Runtime entry ok: 1`.
 
 Remaining work:
 
