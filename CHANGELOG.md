@@ -1,5 +1,23 @@
 # Liam_OS Changelog
 
+## Core 0.8.32-dev
+
+### Added
+
+- Added x86_64 page-fault diagnostic readiness reporting for CR2 fault-address capture and page-fault error-code decoding.
+- Added serial markers for `IDT PF CR2 reporting: 1`, `IDT PF error decode: 1`, and `IDT diagnostics ok: 1`.
+- Added page-fault exception-path serial decoding for present/write/user/reserved-bit/instruction-fetch error-code flags.
+
+### Changed
+
+- Updated x86_64 documentation and validation notes to include the guarded higher-half runtime entry plus page-fault diagnostic readiness markers.
+- Updated Liam_OS version to `0.8.32-dev`.
+
+### Notes
+
+- This milestone does not intentionally trigger a page fault yet; it prepares the reporting path before adding deliberate exception tests.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.31-dev
 
 ### Added
