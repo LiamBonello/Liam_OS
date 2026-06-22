@@ -1,4 +1,5 @@
 #include "paging_builder.h"
+#include "pmm.h"
 
 #define X86_64_PAGE_PRESENT 0x001ULL
 #define X86_64_PAGE_WRITABLE 0x002ULL
@@ -7,19 +8,18 @@
 #define X86_64_HUGE_PAGE_FLAGS (X86_64_TABLE_FLAGS | X86_64_PAGE_HUGE)
 #define X86_64_PAGE_MASK (X86_64_PAGE_SIZE - 1ULL)
 
-static u64 builder_pml4[X86_64_PAGING_BUILDER_ENTRIES] __attribute__((aligned(4096)));
-static u64 builder_identity_pdpt[X86_64_PAGING_BUILDER_ENTRIES] __attribute__((aligned(4096)));
-static u64 builder_identity_pd[X86_64_PAGING_BUILDER_ENTRIES] __attribute__((aligned(4096)));
-static u64 builder_direct_pdpt[X86_64_PAGING_BUILDER_ENTRIES] __attribute__((aligned(4096)));
-static u64 builder_direct_pd[X86_64_PAGING_BUILDER_ENTRIES] __attribute__((aligned(4096)));
-static u64 builder_kernel_pdpt[X86_64_PAGING_BUILDER_ENTRIES] __attribute__((aligned(4096)));
-static u64 builder_kernel_pd[X86_64_PAGING_BUILDER_ENTRIES] __attribute__((aligned(4096)));
-static u64 builder_kernel_pt[X86_64_PAGING_BUILDER_ENTRIES] __attribute__((aligned(4096)));
-
 static void clear_table(u64 *table)
 {
     for (u32 i = 0; i < X86_64_PAGING_BUILDER_ENTRIES; ++i) {
         table[i] = 0ULL;
+    }
+}
+
+static void clear_builder_state(struct x86_64_paging_builder_state *state)
+{
+    u8 *bytes = (u8 *)state;
+    for (usize i = 0; i < sizeof(*state); ++i) {
+        bytes[i] = 0U;
     }
 }
 
@@ -79,30 +79,84 @@ static u32 count_present_entries(const u64 *table)
     return count;
 }
 
-static u32 tables_are_aligned(void)
+static u32 tables_are_aligned(const struct x86_64_paging_builder_state *state)
 {
-    return ((is_page_aligned((u64)builder_pml4) != 0U) &&
-            (is_page_aligned((u64)builder_identity_pdpt) != 0U) &&
-            (is_page_aligned((u64)builder_identity_pd) != 0U) &&
-            (is_page_aligned((u64)builder_direct_pdpt) != 0U) &&
-            (is_page_aligned((u64)builder_direct_pd) != 0U) &&
-            (is_page_aligned((u64)builder_kernel_pdpt) != 0U) &&
-            (is_page_aligned((u64)builder_kernel_pd) != 0U) &&
-            (is_page_aligned((u64)builder_kernel_pt) != 0U)) ? 1U : 0U;
+    return ((is_page_aligned(state->pml4_table) != 0U) &&
+            (is_page_aligned(state->identity_pdpt_table) != 0U) &&
+            (is_page_aligned(state->identity_pd_table) != 0U) &&
+            (is_page_aligned(state->direct_pdpt_table) != 0U) &&
+            (is_page_aligned(state->direct_pd_table) != 0U) &&
+            (is_page_aligned(state->kernel_pdpt_table) != 0U) &&
+            (is_page_aligned(state->kernel_pd_table) != 0U) &&
+            (is_page_aligned(state->kernel_pt_table) != 0U)) ? 1U : 0U;
+}
+
+static u32 allocate_table(u64 **table, u64 *allocated_pages, u32 *allocated_count)
+{
+    u64 page = x86_64_pmm_alloc_page();
+    if (page == X86_64_PMM_INVALID_PAGE) {
+        return 0U;
+    }
+
+    allocated_pages[*allocated_count] = page;
+    *allocated_count += 1U;
+    *table = (u64 *)page;
+    clear_table(*table);
+    return 1U;
+}
+
+static void rollback_allocated_tables(const u64 *allocated_pages, u32 allocated_count)
+{
+    for (u32 i = 0; i < allocated_count; ++i) {
+        (void)x86_64_pmm_free_page(allocated_pages[i]);
+    }
 }
 
 void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
                                 const struct x86_64_memory_layout *layout,
                                 const struct x86_64_paging_plan *plan)
 {
-    clear_table(builder_pml4);
-    clear_table(builder_identity_pdpt);
-    clear_table(builder_identity_pd);
-    clear_table(builder_direct_pdpt);
-    clear_table(builder_direct_pd);
-    clear_table(builder_kernel_pdpt);
-    clear_table(builder_kernel_pd);
-    clear_table(builder_kernel_pt);
+    clear_builder_state(state);
+
+    const struct x86_64_pmm_state *pmm_state = x86_64_pmm_get_state();
+    state->pmm_free_pages_before = pmm_state->free_pages;
+
+    u64 allocated_pages[X86_64_PAGING_BUILDER_TABLE_PAGES];
+    u32 allocated_count = 0U;
+    u64 *builder_pml4 = (u64 *)0;
+    u64 *builder_identity_pdpt = (u64 *)0;
+    u64 *builder_identity_pd = (u64 *)0;
+    u64 *builder_direct_pdpt = (u64 *)0;
+    u64 *builder_direct_pd = (u64 *)0;
+    u64 *builder_kernel_pdpt = (u64 *)0;
+    u64 *builder_kernel_pd = (u64 *)0;
+    u64 *builder_kernel_pt = (u64 *)0;
+
+    if (allocate_table(&builder_pml4, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_identity_pdpt, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_identity_pd, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_direct_pdpt, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_direct_pd, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_kernel_pdpt, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_kernel_pd, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_kernel_pt, allocated_pages, &allocated_count) == 0U) {
+        rollback_allocated_tables(allocated_pages, allocated_count);
+        state->pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
+        return;
+    }
+
+    state->pml4_table = (u64)builder_pml4;
+    state->identity_pdpt_table = (u64)builder_identity_pdpt;
+    state->identity_pd_table = (u64)builder_identity_pd;
+    state->direct_pdpt_table = (u64)builder_direct_pdpt;
+    state->direct_pd_table = (u64)builder_direct_pd;
+    state->kernel_pdpt_table = (u64)builder_kernel_pdpt;
+    state->kernel_pd_table = (u64)builder_kernel_pd;
+    state->kernel_pt_table = (u64)builder_kernel_pt;
+    state->pmm_backed = 1U;
+    state->allocated_table_pages = allocated_count;
+    state->pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
+    state->allocation_ok = (allocated_count == X86_64_PAGING_BUILDER_TABLE_PAGES) ? 1U : 0U;
 
     u32 identity_pages = huge_page_count_for(plan->identity_window_bytes);
     if (identity_pages > X86_64_PAGING_BUILDER_ENTRIES) {
@@ -144,14 +198,6 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     builder_pml4[plan->direct_map_pml4_index] = ((u64)builder_direct_pdpt) | X86_64_TABLE_FLAGS;
     builder_pml4[plan->kernel_pml4_index] = ((u64)builder_kernel_pdpt) | X86_64_TABLE_FLAGS;
 
-    state->pml4_table = (u64)builder_pml4;
-    state->identity_pdpt_table = (u64)builder_identity_pdpt;
-    state->identity_pd_table = (u64)builder_identity_pd;
-    state->direct_pdpt_table = (u64)builder_direct_pdpt;
-    state->direct_pd_table = (u64)builder_direct_pd;
-    state->kernel_pdpt_table = (u64)builder_kernel_pdpt;
-    state->kernel_pd_table = (u64)builder_kernel_pd;
-    state->kernel_pt_table = (u64)builder_kernel_pt;
     state->pml4_present_entries = count_present_entries(builder_pml4);
     state->identity_huge_pages = identity_pages;
     state->direct_huge_pages = direct_pages;
@@ -171,9 +217,11 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
          (builder_kernel_pt[0] & X86_64_PAGE_PRESENT) != 0ULL &&
          (is_page_aligned(layout->kernel_start) != 0U) &&
          (kernel_pages_fit != 0U)) ? 1U : 0U;
-    state->tables_aligned = tables_are_aligned();
+    state->tables_aligned = tables_are_aligned(state);
     state->builder_ok =
-        ((state->pml4_present_entries == X86_64_PLANNED_REGION_COUNT) &&
+        ((state->pmm_backed != 0U) &&
+         (state->allocation_ok != 0U) &&
+         (state->pml4_present_entries == X86_64_PLANNED_REGION_COUNT) &&
          (state->identity_entry_ok != 0U) &&
          (state->direct_map_entry_ok != 0U) &&
          (state->kernel_entry_ok != 0U) &&
