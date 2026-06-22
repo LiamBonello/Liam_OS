@@ -37,10 +37,28 @@ struct x86_64_paging_activation_state {
     u32 activation_ok;
 };
 
+struct x86_64_paging_probe_state {
+    u64 identity_addr;
+    u64 direct_map_addr;
+    u64 kernel_alias_addr;
+    u32 identity_value;
+    u32 direct_map_value;
+    u32 kernel_alias_value;
+    u32 activation_ready;
+    u32 identity_probe_ok;
+    u32 direct_map_probe_ok;
+    u32 kernel_alias_probe_ok;
+    u32 probes_ok;
+};
+
 void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
                                 const struct x86_64_memory_layout *layout,
                                 const struct x86_64_paging_plan *plan);
 void x86_64_paging_builder_activate(struct x86_64_paging_activation_state *state,
                                     const struct x86_64_paging_builder_state *builder);
+void x86_64_paging_probe_active_mappings(struct x86_64_paging_probe_state *state,
+                                         const struct x86_64_paging_activation_state *activation,
+                                         const struct x86_64_memory_layout *layout,
+                                         const struct x86_64_paging_plan *plan);
 
 #endif
