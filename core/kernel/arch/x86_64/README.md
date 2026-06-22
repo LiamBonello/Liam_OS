@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, reports a required CPU capability baseline, loads a maintained GDT with a 64-bit TSS descriptor, installs an early exception IDT after the TSS is ready, routes NMI through IST2, double fault through IST1, and page fault through IST3, remaps the legacy PIC while keeping every legacy PIC line masked, reports a guarded IRQ policy while keeping hardware interrupts disabled, parses a bounded Multiboot2 command line, reports page-fault CR2/error-code diagnostic readiness, reports exception panic-halt readiness, supports an opt-in invalid-opcode exception self-test, builds an architecture boot context, parses boot information, computes an early PMM plan, initializes an isolated bounded PMM page allocator, captures bootstrap paging state, reports an explicit higher-half/direct-map virtual memory plan, builds C-owned page tables for that plan, switches CR3 to those C-owned tables, probes identity/direct-map/higher-half kernel data aliases, proves assembly and C higher-half execution probes can run through the kernel alias, validates a guarded higher-half handoff call using the current ABI and stack, enters a guarded higher-half runtime entry, prepares bootstrap IST stacks, and writes VGA/serial diagnostics:
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, reports a required CPU capability baseline, loads a maintained GDT with a 64-bit TSS descriptor, installs an early exception IDT after the TSS is ready, routes NMI through IST2, double fault through IST1, and page fault through IST3, remaps the legacy PIC, installs guarded legacy IRQ gates, runs bounded PIT and keyboard IRQ diagnostics on the normal boot path, parses bounded Multiboot2 boot information, builds an architecture boot context, initializes an isolated bounded PMM page allocator, builds PMM-backed C-owned page tables, switches CR3 to those tables, validates identity/direct-map/higher-half aliases, proves guarded higher-half execution and runtime-entry calls, initializes a PMM-backed direct-map early heap, and runs an architecture-local process scheduler smoke check with heap-backed kernel stacks.
 
 ```sh
 cd core
@@ -35,35 +35,43 @@ Expected screen messages include:
 
 ```txt
 Liam_OS x86_64 kernel diagnostics
-Stage: higher-half runtime entry
+Stage: x86_64 early heap
 Multiboot2: ok
-Bootloader: ...
-Boot info pointer: 0x........
-Boot info bytes: ...
-Memory map entries: ...
-Usable bytes: 0x................
 CPU baseline ok: 1
 IDT IST gates: 1
-Kernel start: 0x................
-Kernel end: 0x................
-Kernel bytes: 0x................
-Identity map bytes: 0x................
-PMM usable regions: ...
-PMM first page: 0x................
-PMM pages: 0x................
-PMM bytes: 0x................
-Reserved below: 0x................
-PMM tracked pages: ...
-PMM smoke page: 0x................
 PMM smoke free: 1
+Heap smoke ok: 1
+Process smoke ok: 1
+Desc/IST ok: 1
+```
+
+`make x86_64-run` routes COM1 serial output to the terminal. Key serial markers include:
+
+```txt
+PIT timer ok: 1
+Keyboard ready ok: 1
+Paging builder PMM backed: 1
+Paging builder table pages: 8
+Paging builder ok: 1
+Heap PMM backed: 1
+Heap direct map ok: 1
+Heap smoke ok: 1
+Process created: 2
+Process ready before run: 2
+Process run count: 2
+Process exited: 2
+Process failed: 0
+Process stack allocations: 2
+Process worker A count: 1
+Process worker B count: 1
+Process smoke ok: 1
+Runtime entry ok: 1
 Desc/IST ok: 1
 ```
 
 If an early CPU exception fires after IDT installation, the handler prints the exception name over VGA and the full vector/error-code diagnostics over serial. Page faults additionally report CR2 plus decoded present/write/user/reserved-bit/instruction-fetch error-code flags. All exceptions terminate through the shared panic halt helper, which announces the `cli; hlt` halt mode before stopping the CPU.
 
-`make x86_64-run` routes COM1 serial output to the terminal, including CPU capability diagnostics, bootstrap paging diagnostics for the original CR3, planned virtual memory diagnostics for the higher-half kernel and direct physical map, C-owned page-table diagnostics, active CR3 diagnostics after switching to the C-owned tables, identity/direct-map/higher-half data alias probe diagnostics, higher-half assembly/C execution and handoff probe diagnostics, runtime-entry diagnostics, IDTR base/limit, NMI/double-fault/page-fault IST routing, page-fault diagnostic readiness, panic-halt readiness, guarded IRQ policy diagnostics, legacy PIC remap/mask state, GDTR base/limit, active selectors, current task-register selector, descriptor values, TSS base/limit, and planned IST stack addresses.
-
-This is not the full x86_64 kernel yet. The current path proves an assembly handoff into long mode, a minimal C entry, early boot diagnostics, Multiboot2 tag parsing, bounded command-line parsing, CPU capability baseline reporting, an early CPU exception IDT with page-fault diagnostics and panic-halt readiness prepared, a guarded IRQ policy with interrupts still disabled, legacy PIC remapping with all PIC lines masked, an opt-in invalid-opcode exception self-test, dedicated critical-exception IST routing, a C-built maintained GDT, a loaded x86_64 TSS descriptor, an architecture-owned boot context, a planning PMM view over retained memory-map regions, an isolated physical page allocator smoke check, C-visible bootstrap paging-state diagnostics, a C-visible higher-half/direct-map virtual memory plan, a C-owned page-table set for that plan, activation of those page tables through CR3, validation that planned early aliases read the same kernel image bytes, safe higher-half assembly/C probes through the kernel alias, a guarded higher-half handoff probe through the kernel alias, a guarded higher-half runtime entry, and a C-visible bootstrap TSS/IST plan. It does not remove the low identity transition map yet, and it does not enable IRQ delivery, initialize APIC/PIT, initialize the shared paging subsystem, heap, processes, syscalls, or userspace.
+This is not the full x86_64 kernel yet. The current path proves the boot/descriptor/IRQ/memory/heap/process smoke foundations, but it does not yet provide real x86_64 context switching, process address spaces, syscalls, ELF64 loading, isolated userland, or a shell.
 
 ## Manual validation
 
@@ -81,40 +89,26 @@ make x86_64-run
 Check the serial output for:
 
 ```txt
-IDT PF CR2 reporting: 1
-IDT PF error decode: 1
-IDT panic halt ready: 1
-IDT panic cli before hlt: 1
-IDT diagnostics ok: 1
-IRQ interrupts enabled: 0
-IRQ interrupts guarded: 1
-IRQ legacy vector base: 32
-IRQ legacy vector count: 16
-IRQ PIT planned vector: 32
-IRQ keyboard planned vector: 33
-IRQ legacy PIC remapped: 1
-IRQ master mask: 0x000000FF
-IRQ slave mask: 0x000000FF
-IRQ all masked: 1
-IRQ APIC deferred: 1
-IRQ policy ok: 1
-Runtime high entry ready: 1
-Runtime arg ok: 1
-Runtime CR3 ok: 1
-Runtime return ok: 1
-Runtime entered ok: 1
-Runtime scratch ok: 1
-Runtime stack identity ok: 1
+PIT timer ok: 1
+Keyboard ready ok: 1
+Heap smoke ok: 1
+Process created: 2
+Process ready before run: 2
+Process run count: 2
+Process exited: 2
+Process failed: 0
+Process stack allocations: 2
+Process stack alignment ok: 1
+Process worker A count: 1
+Process worker B count: 1
+Process smoke ok: 1
 Runtime entry ok: 1
-Higher-half handoff ok: 1
-Higher-half C probe ok: 1
-Paging probes ok: 1
 Paging activation ok: 1
-VM plan ok: 1
+Paging probes ok: 1
 Desc/IST ok: 1
 ```
 
-Use this separate opt-in path for the x86_64 exception self-test:
+Use this separate opt-in path for the x86_64 IRQ and exception self-test:
 
 ```sh
 cd core
@@ -126,6 +120,10 @@ make x86_64-exception-test-run
 Check the serial output for:
 
 ```txt
+IRQ self-test requested: 1
+x86_64 IRQ received
+IRQ self-test delivered: 1
+IRQ self-test returned: 1
 Exception self-test requested: 1
 x86_64 exception self-test: ud2
 x86_64 exception
@@ -143,9 +141,10 @@ Panic halt mode: cli; hlt
 3. Enter long mode from a 32-bit bootstrap. Started.
 4. Bring up a minimal 64-bit C console path. Started.
 5. Parse Multiboot2 boot information and memory map. Started; command-line parsing is now present for controlled boot test flags.
-6. Add x86_64 GDT/IDT/interrupt handling. Started with a maintained GDT, loaded TSS, critical-exception IST routing, page-fault diagnostics, panic-halt readiness, guarded IRQ policy diagnostics, legacy PIC remapping with all PIC lines masked, an opt-in invalid-opcode exception self-test, and exception IDT.
-7. Port paging and memory layout to 64-bit addresses. Started with boot-context layout, PMM planning diagnostics, an isolated PMM allocator smoke test, bootstrap paging-state diagnostics, a smoke-validated higher-half/direct-map plan, smoke-validated C-owned page tables, CR3 activation of those tables, active alias probes, safe higher-half assembly/C execution probes, a guarded higher-half handoff probe, and a guarded higher-half runtime entry.
-8. Revisit syscalls and userspace after the 64-bit kernel path is stable.
+6. Add x86_64 GDT/IDT/interrupt handling. Started with maintained GDT/TSS, IST routing, exception diagnostics, guarded IRQ gates, legacy PIC setup, PIT, keyboard, and opt-in IRQ/exception self-tests.
+7. Port paging and memory layout to 64-bit addresses. Started with boot-context layout, PMM planning, PMM-backed page tables, CR3 activation, direct-map/higher-half aliases, guarded higher-half probes, runtime entry, and PMM-backed early heap.
+8. Bring up x86_64 process and userspace model. Started with an architecture-local process table and scheduler smoke model using heap-backed kernel stacks.
+9. Revisit syscalls and userspace after the 64-bit kernel path is stable.
 
 ## Guardrails
 
