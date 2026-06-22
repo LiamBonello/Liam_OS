@@ -312,6 +312,24 @@ static void run_irq_self_test(void)
     x86_64_serial_write_u32("IRQ self-test returned: ", 1U);
 }
 
+static void report_timer_state(void)
+{
+    struct x86_64_timer_state state;
+
+    x86_64_timer_get_state(&state);
+    x86_64_serial_write_line("x86_64 PIT timer online");
+    x86_64_serial_write_u32("PIT initialized: ", state.initialized);
+    x86_64_serial_write_u32("PIT frequency Hz: ", state.frequency_hz);
+    x86_64_serial_write_u32("PIT divisor: ", state.divisor);
+    x86_64_serial_write_u32("PIT IRQ0 unmasked: ", state.irq0_unmasked);
+    x86_64_serial_write_u32("PIT interrupts before: ", state.interrupts_enabled_before);
+    x86_64_serial_write_u32("PIT interrupts after: ", state.interrupts_enabled_after);
+    x86_64_serial_write_u32("PIT waited ticks: ", state.waited_ticks);
+    x86_64_serial_write_u32("PIT ticks: ", state.ticks);
+    x86_64_serial_write_u32("PIT wait ok: ", state.wait_ok);
+    x86_64_serial_write_u32("PIT timer ok: ", state.timer_ok);
+}
+
 static void report_page_fault_error(u64 error_code)
 {
     x86_64_serial_write_hex64("CR2 fault address: 0x", read_cr2());
@@ -370,6 +388,10 @@ void x86_64_idt_init(void)
         x86_64_serial_write_line("x86_64 exception self-test: ud2");
         __asm__ volatile ("ud2");
     }
+
+    x86_64_timer_initialize(X86_64_PIT_DEFAULT_FREQUENCY_HZ);
+    x86_64_timer_wait_for_ticks(3U);
+    report_timer_state();
 }
 
 void x86_64_idt_get_state(struct x86_64_idt_state *state)
@@ -475,7 +497,7 @@ void x86_64_timer_wait_for_ticks(u32 ticks)
 
     while (timer_ticks < target && spin_budget > 0U) {
         --spin_budget;
-        __asm__ volatile ("hlt" ::: "memory");
+        __asm__ volatile ("pause" ::: "memory");
     }
 
     timer_state.ticks = timer_ticks;
