@@ -57,8 +57,6 @@ Status: started.
 - Added `core/kernel/arch/x86_64/types.h` for local fixed-width types.
 - Added `core/kernel/arch/x86_64/cpuid.c` and `cpuid.h` for early CPU baseline capability diagnostics.
 - `make x86_64-run` routes serial output to the terminal with `-serial stdio`.
-- Added `make x86_64-smoke` to boot QEMU headlessly, capture COM1 serial output, and assert required boot markers.
-- Added a GitHub Actions workflow that runs the x86_64 headless smoke target and uploads the serial log.
 
 Remaining work:
 
@@ -97,17 +95,16 @@ Status: started for maintained GDT, loaded TSS, critical-exception IST routing, 
 - Routed the page-fault exception gate through IST3.
 - Report required CPU baseline capabilities from C, including CPUID, FPU, MSR, APIC, SSE, SSE2, SYSCALL/SYSRET, NX, and long mode.
 - The x86_64 C entry reports IDTR state, critical-exception IST routing, GDT selector validation, current task-register selector, and TSS load validation.
-- The headless smoke test validates CPU baseline, critical IST, PMM, paging, and descriptor serial markers before accepting the boot.
 
 Remaining work:
 
-- Add safe exception-path smoke tests only after the panic/reporting path is ready for intentional faults.
+- Add safe exception-path tests only after the panic/reporting path is ready for intentional faults.
 - Add IRQ routing deliberately, deciding what remains legacy PIC/PIT and what moves toward APIC later.
 - Keep interrupts disabled until the IRQ and timer strategy is explicit.
 
 ## Stage 7: 64-bit memory model
 
-Status: started with layout, PMM planning, an isolated allocator smoke test, bootstrap paging-state diagnostics, a smoke-validated higher-half/direct-map plan, smoke-validated C-owned page tables, CR3 activation of those tables, active alias probes, and a safe higher-half instruction-fetch probe.
+Status: started with layout, PMM planning, an isolated allocator smoke check, bootstrap paging-state diagnostics, a higher-half/direct-map plan, C-owned page tables, CR3 activation of those tables, active alias probes, and a safe higher-half instruction-fetch probe.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
@@ -117,19 +114,19 @@ Status: started with layout, PMM planning, an isolated allocator smoke test, boo
 - Report PMM usable region count, first planned free page, managed page count, managed bytes, and reserved-below boundary.
 - Added `core/kernel/arch/x86_64/pmm.c` and `pmm.h` as an isolated bounded page-stack allocator for early x86_64 physical pages.
 - The allocator rejects duplicate frees, unaligned pages, invalid pages, and obvious out-of-range frees.
-- The x86_64 C entry performs a one-page allocate/free smoke test and reports the result over VGA and serial.
+- The x86_64 C entry performs a one-page allocate/free smoke check and reports the result over VGA and serial.
 - Added `core/kernel/arch/x86_64/paging.c` and `paging.h` to capture the bootstrap CR3 and identity-mapped huge-page table state.
 - The x86_64 C entry reports the current bootstrap paging baseline before a permanent paging model is introduced.
 - Added `core/kernel/arch/x86_64/paging_plan.c` and `paging_plan.h` to define the planned higher-half kernel window, direct physical map window, and transition identity-map window.
-- The headless smoke test validates the planned PML4 slots, canonical virtual address windows, planned-region count, and `VM plan ok: 1` before accepting the boot.
+- The x86_64 diagnostics report planned PML4 slots, canonical virtual address windows, planned-region count, and `VM plan ok: 1`.
 - Added `core/kernel/arch/x86_64/paging_builder.c` and `paging_builder.h` to construct C-owned page tables for the planned identity, direct-map, and higher-half kernel windows.
-- The headless smoke test validates table alignment, PML4 population, identity/direct huge-page coverage, the 4 KiB kernel mapping, and `Paging builder ok: 1` before accepting the boot.
+- The x86_64 diagnostics report table alignment, PML4 population, identity/direct huge-page coverage, the 4 KiB kernel mapping, and `Paging builder ok: 1`.
 - The x86_64 C entry switches CR3 to the C-built page tables after the builder validates them.
-- The headless smoke test validates `Paging activation builder ready: 1`, `Paging activation active matches builder: 1`, and `Paging activation ok: 1`.
+- The x86_64 diagnostics report `Paging activation builder ready: 1`, `Paging activation active matches builder: 1`, and `Paging activation ok: 1`.
 - The x86_64 C entry probes the kernel image through the identity map, direct physical map, and higher-half kernel alias after the CR3 switch.
-- The headless smoke test validates `Paging probe identity ok: 1`, `Paging probe direct map ok: 1`, `Paging probe kernel alias ok: 1`, and `Paging probes ok: 1`.
+- The x86_64 diagnostics report `Paging probe identity ok: 1`, `Paging probe direct map ok: 1`, `Paging probe kernel alias ok: 1`, and `Paging probes ok: 1`.
 - Added a tiny assembly-only higher-half execution probe that returns a fixed value without touching globals or stack-owned data beyond the call/return path.
-- The headless smoke test validates `Higher-half probe low ok: 1`, `Higher-half probe high ok: 1`, and `Higher-half probe ok: 1`.
+- The x86_64 diagnostics report `Higher-half probe low ok: 1`, `Higher-half probe high ok: 1`, and `Higher-half probe ok: 1`.
 
 Remaining work:
 
