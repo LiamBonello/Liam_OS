@@ -169,7 +169,7 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path validates higher-half C execution after activating C-owned page tables."
+	@echo "Liam_OS x86_64 path validates a guarded higher-half handoff probe after activating C-owned page tables."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
@@ -177,7 +177,7 @@ x86_64-info:
 	@echo "Artifact output: $(X86_64_KERNEL)"
 	@echo "ISO output: $(X86_64_ISO)"
 	@echo "Expected x86_64 screen messages: CPU baseline ok: 1, IDT IST gates: 1, PMM smoke free: 1, Desc/IST ok: 1"
-	@echo "Expected serial markers include: Higher-half C probe ok: 1, Higher-half probe ok: 1, Paging probes ok: 1, Paging activation ok: 1, VM plan ok: 1, Desc/IST ok: 1"
+	@echo "Expected serial markers include: Higher-half handoff ok: 1, Higher-half C probe ok: 1, Higher-half probe ok: 1, Paging probes ok: 1, Paging activation ok: 1, VM plan ok: 1, Desc/IST ok: 1"
 	@echo "Serial output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
@@ -224,67 +224,67 @@ $(X86_64_HIGHER_HALF_PROBE_ASM_OBJ): kernel/arch/x86_64/higher_half_probe.asm | 
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
 
-$(X86_64_HIGHER_HALF_PROBE_C_OBJ): kernel/arch/x86_64/higher_half_probe.c kernel/arch/x86_64/higher_half_probe.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/paging_builder.h kernel/arch/x86_64/paging_plan.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_HIGHER_HALF_PROBE_C_OBJ): kernel/arch/x86_64/higher_half_probe.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_KERNEL_C_OBJ): kernel/arch/x86_64/kernel.c kernel/arch/x86_64/boot_context.h kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/console.h kernel/arch/x86_64/cpuid.h kernel/arch/x86_64/gdt.h kernel/arch/x86_64/higher_half_probe.h kernel/arch/x86_64/idt.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/paging.h kernel/arch/x86_64/paging_builder.h kernel/arch/x86_64/paging_plan.h kernel/arch/x86_64/pmm.h kernel/arch/x86_64/pmm_plan.h kernel/arch/x86_64/tss.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_KERNEL_C_OBJ): kernel/arch/x86_64/kernel.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_CONSOLE_OBJ): kernel/arch/x86_64/console.c kernel/arch/x86_64/console.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_CONSOLE_OBJ): kernel/arch/x86_64/console.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_BOOT_INFO_OBJ): kernel/arch/x86_64/boot_info.c kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_BOOT_INFO_OBJ): kernel/arch/x86_64/boot_info.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_BOOT_CONTEXT_OBJ): kernel/arch/x86_64/boot_context.c kernel/arch/x86_64/boot_context.h kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/pmm_plan.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_BOOT_CONTEXT_OBJ): kernel/arch/x86_64/boot_context.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_CPUID_OBJ): kernel/arch/x86_64/cpuid.c kernel/arch/x86_64/cpuid.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_CPUID_OBJ): kernel/arch/x86_64/cpuid.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_GDT_OBJ): kernel/arch/x86_64/gdt.c kernel/arch/x86_64/gdt.h kernel/arch/x86_64/tss.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_GDT_OBJ): kernel/arch/x86_64/gdt.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_TSS_OBJ): kernel/arch/x86_64/tss.c kernel/arch/x86_64/tss.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_TSS_OBJ): kernel/arch/x86_64/tss.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_MEMORY_LAYOUT_OBJ): kernel/arch/x86_64/memory_layout.c kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_MEMORY_LAYOUT_OBJ): kernel/arch/x86_64/memory_layout.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_PAGING_OBJ): kernel/arch/x86_64/paging.c kernel/arch/x86_64/paging.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_PAGING_OBJ): kernel/arch/x86_64/paging.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_PAGING_PLAN_OBJ): kernel/arch/x86_64/paging_plan.c kernel/arch/x86_64/paging_plan.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/pmm_plan.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_PAGING_PLAN_OBJ): kernel/arch/x86_64/paging_plan.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_PAGING_BUILDER_OBJ): kernel/arch/x86_64/paging_builder.c kernel/arch/x86_64/paging_builder.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/paging_plan.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_PAGING_BUILDER_OBJ): kernel/arch/x86_64/paging_builder.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_PMM_PLAN_OBJ): kernel/arch/x86_64/pmm_plan.c kernel/arch/x86_64/pmm_plan.h kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_PMM_PLAN_OBJ): kernel/arch/x86_64/pmm_plan.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_PMM_OBJ): kernel/arch/x86_64/pmm.c kernel/arch/x86_64/pmm.h kernel/arch/x86_64/boot_info.h kernel/arch/x86_64/memory_layout.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_PMM_OBJ): kernel/arch/x86_64/pmm.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_IDT_OBJ): kernel/arch/x86_64/idt.c kernel/arch/x86_64/idt.h kernel/arch/x86_64/console.h kernel/arch/x86_64/types.h | $(X86_64_BUILD_DIR)
+$(X86_64_IDT_OBJ): kernel/arch/x86_64/idt.c | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_x86_64) -c $< -o $@
 
-$(X86_64_KERNEL): linker.x86_64.ld $(X86_64_BOOT_OBJ)
+$(X86_64_KERNEL): $(X86_64_BOOT_OBJ) linker.x86_64.ld | $(X86_64_BUILD_DIR)
 	$(LD) $(LDFLAGS_x86_64) $(X86_64_BOOT_OBJ) -o $@
 	$(GRUB_FILE) --is-x86-multiboot2 $@
 
@@ -295,10 +295,6 @@ $(X86_64_ISO): $(X86_64_KERNEL) $(X86_64_GRUB_CFG)
 	cp $(X86_64_GRUB_CFG) $(X86_64_ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o $(X86_64_ISO) $(X86_64_ISO_DIR)
 
-$(BUILD_DIR)/kernel/userland/userland_images.o: kernel/userland/userland_images.asm $(USERLAND_FLAT_BIN) | $(BUILD_DIR)
-	mkdir -p $(dir $@)
-	$(ASM) $(ASMFLAGS) $< -o $@
-
 $(BUILD_DIR)/%.o: %.asm | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS) $< -o $@
@@ -307,8 +303,9 @@ $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL): $(USERLAND_FLAT_BIN) $(ASM_OBJ) $(C_OBJ)
+$(KERNEL): $(ASM_OBJ) $(C_OBJ) linker.ld | userland
 	$(LD) $(LDFLAGS) $(ASM_OBJ) $(C_OBJ) -o $@
+	$(GRUB_FILE) --is-x86-multiboot $@
 
 $(ISO): $(KERNEL) boot/grub.cfg
 	rm -rf $(ISO_DIR)
@@ -317,11 +314,11 @@ $(ISO): $(KERNEL) boot/grub.cfg
 	cp boot/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o $(ISO) $(ISO_DIR)
 
-run: $(ISO)
-	$(QEMU) -boot d -cdrom $(ISO)
-
-run-debug: debug
-	$(QEMU) -boot d -cdrom $(ISO)
-
 clean:
 	rm -rf $(BUILD_DIR)
+
+run: check-tools $(ISO)
+	$(QEMU) -cdrom $(ISO)
+
+run-debug: debug
+	$(QEMU) -cdrom $(ISO)
