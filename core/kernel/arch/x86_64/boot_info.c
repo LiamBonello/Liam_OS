@@ -9,6 +9,8 @@
 
 #define X86_64_EXCEPTION_TEST_FLAG "liam.x86_64.exception_test=ud2"
 
+u32 x86_64_exception_self_test_requested = 0U;
+
 struct multiboot2_info_header {
     u32 total_size;
     u32 reserved;
@@ -121,6 +123,7 @@ static void parse_mmap_tag(const struct multiboot2_mmap_tag *tag, struct x86_64_
 
 void x86_64_boot_info_parse(u32 magic, u32 boot_info_addr, struct x86_64_boot_summary *summary)
 {
+    x86_64_exception_self_test_requested = 0U;
     zero_summary(summary);
     summary->magic = magic;
     summary->boot_info_addr = boot_info_addr;
@@ -166,6 +169,7 @@ void x86_64_boot_info_parse(u32 magic, u32 boot_info_addr, struct x86_64_boot_su
                                 command_line, command_line_size);
             summary->exception_test_requested = bounded_string_contains(
                 summary->command_line, X86_64_BOOT_COMMAND_LINE_MAX, X86_64_EXCEPTION_TEST_FLAG);
+            x86_64_exception_self_test_requested = summary->exception_test_requested;
         } else if (tag->type == MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME) {
             const char *name = (const char *)(tag + 1);
             summary->bootloader_name_found = 1U;
