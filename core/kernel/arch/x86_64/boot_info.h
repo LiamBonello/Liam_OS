@@ -8,6 +8,8 @@
 #define X86_64_MEMORY_REGION_MAX 32U
 #define X86_64_MEMORY_REGION_AVAILABLE 1U
 
+extern u32 x86_64_exception_self_test_requested;
+
 struct x86_64_memory_region {
     u64 base;
     u64 length;
