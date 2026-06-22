@@ -4,6 +4,7 @@
 #include "gdt.h"
 #include "idt.h"
 #include "paging.h"
+#include "paging_builder.h"
 #include "paging_plan.h"
 #include "pmm.h"
 #include "tss.h"
@@ -189,6 +190,28 @@ static void report_paging_plan(const struct x86_64_paging_plan *plan)
     x86_64_serial_write_u32("VM plan ok: ", plan->plan_ok);
 }
 
+static void report_paging_builder(const struct x86_64_paging_builder_state *state)
+{
+    x86_64_serial_write_line("x86_64 paging builder online");
+    x86_64_serial_write_hex64("Paging builder PML4: 0x", state->pml4_table);
+    x86_64_serial_write_hex64("Paging builder identity PDPT: 0x", state->identity_pdpt_table);
+    x86_64_serial_write_hex64("Paging builder identity PD: 0x", state->identity_pd_table);
+    x86_64_serial_write_hex64("Paging builder direct PDPT: 0x", state->direct_pdpt_table);
+    x86_64_serial_write_hex64("Paging builder direct PD: 0x", state->direct_pd_table);
+    x86_64_serial_write_hex64("Paging builder kernel PDPT: 0x", state->kernel_pdpt_table);
+    x86_64_serial_write_hex64("Paging builder kernel PD: 0x", state->kernel_pd_table);
+    x86_64_serial_write_hex64("Paging builder kernel PT: 0x", state->kernel_pt_table);
+    x86_64_serial_write_u32("Paging builder PML4 entries: ", state->pml4_present_entries);
+    x86_64_serial_write_u32("Paging builder identity huge pages: ", state->identity_huge_pages);
+    x86_64_serial_write_u32("Paging builder direct huge pages: ", state->direct_huge_pages);
+    x86_64_serial_write_u32("Paging builder kernel pages: ", state->kernel_pages);
+    x86_64_serial_write_u32("Paging builder identity ok: ", state->identity_entry_ok);
+    x86_64_serial_write_u32("Paging builder direct map ok: ", state->direct_map_entry_ok);
+    x86_64_serial_write_u32("Paging builder kernel ok: ", state->kernel_entry_ok);
+    x86_64_serial_write_u32("Paging builder tables aligned: ", state->tables_aligned);
+    x86_64_serial_write_u32("Paging builder ok: ", state->builder_ok);
+}
+
 static void report_gdt_state(const struct x86_64_gdt_state *state)
 {
     x86_64_serial_write_line("x86_64 maintained GDT online");
@@ -253,6 +276,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_idt_state idt_state;
     struct x86_64_paging_state paging_state;
     struct x86_64_paging_plan paging_plan;
+    struct x86_64_paging_builder_state paging_builder;
     struct x86_64_tss_state tss_state;
 
     x86_64_console_init();
@@ -262,6 +286,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_cpuid_state_init(&cpuid_state);
     x86_64_paging_state_init(&paging_state);
     x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
+    x86_64_paging_builder_init(&paging_builder, &context.memory_layout, &paging_plan);
     x86_64_tss_init(&tss_state);
     x86_64_gdt_load_tss(&tss_state, &gdt_state);
     tss_state.loaded = gdt_state.tss_loaded;
@@ -270,10 +295,10 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: VM plan + descriptor + PMM", 1, 0);
+    x86_64_console_write_at("Stage: paging builder + descriptor", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: VM plan + descriptor + PMM");
+    x86_64_serial_write_line("Stage: paging builder + descriptor");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
@@ -283,6 +308,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_pmm_allocator();
     report_paging_state(&paging_state);
     report_paging_plan(&paging_plan);
+    report_paging_builder(&paging_builder);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
     report_descriptor_summary(&idt_state, &gdt_state, &tss_state);
