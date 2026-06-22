@@ -9,6 +9,10 @@
 #define X86_64_MSR_IA32_STAR 0xC0000081ULL
 #define X86_64_MSR_IA32_LSTAR 0xC0000082ULL
 #define X86_64_MSR_IA32_FMASK 0xC0000084ULL
+#define X86_64_SYSCALL_FMASK_VALUE 0x0000000000000200ULL
+#define X86_64_SYSCALL_STAR_VALUE 0x0013000800000000ULL
+
+extern void x86_64_syscall_entry_stub(void);
 
 struct x86_64_syscall_abi_state {
     u32 initialized;
@@ -30,6 +34,9 @@ struct x86_64_syscall_abi_state {
     u32 user_pointer_validation_required;
     u32 syscall_abi_ok;
     u32 syscall_entry_ready;
+    u64 entry_lstar_target;
+    u64 planned_star_value;
+    u64 planned_fmask_value;
     u64 ia32_efer_msr;
     u64 ia32_star_msr;
     u64 ia32_lstar_msr;
@@ -42,7 +49,8 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->fast_syscall_supported = fast_syscall_supported;
     state->syscall_sysret_planned = 1U;
     state->msr_programming_deferred = 1U;
-    state->entry_stub_installed = 0U;
+    state->entry_lstar_target = (u64)x86_64_syscall_entry_stub;
+    state->entry_stub_installed = (state->entry_lstar_target != 0ULL) ? 1U : 0U;
     state->user_entry_deferred = 1U;
     state->arg_register_count = X86_64_SYSCALL_MAX_ARGS;
     state->syscall_number_rax = 1U;
@@ -55,7 +63,8 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->arg5_r9 = 1U;
     state->clobbers_rcx_r11 = 1U;
     state->user_pointer_validation_required = 1U;
-    state->syscall_entry_ready = 0U;
+    state->planned_star_value = X86_64_SYSCALL_STAR_VALUE;
+    state->planned_fmask_value = X86_64_SYSCALL_FMASK_VALUE;
     state->ia32_efer_msr = X86_64_MSR_IA32_EFER;
     state->ia32_star_msr = X86_64_MSR_IA32_STAR;
     state->ia32_lstar_msr = X86_64_MSR_IA32_LSTAR;
@@ -65,6 +74,7 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
                              (state->fast_syscall_supported != 0U) &&
                              (state->syscall_sysret_planned != 0U) &&
                              (state->msr_programming_deferred != 0U) &&
+                             (state->entry_stub_installed != 0U) &&
                              (state->arg_register_count == X86_64_SYSCALL_MAX_ARGS) &&
                              (state->syscall_number_rax != 0U) &&
                              (state->return_rax != 0U) &&
@@ -76,6 +86,8 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
                              (state->arg5_r9 != 0U) &&
                              (state->clobbers_rcx_r11 != 0U) &&
                              (state->user_pointer_validation_required != 0U)) ? 1U : 0U;
+    state->syscall_entry_ready = ((state->syscall_abi_ok != 0U) &&
+                                  (state->entry_stub_installed != 0U)) ? 1U : 0U;
 }
 
 static inline void x86_64_syscall_abi_report(const struct x86_64_syscall_abi_state *state)
@@ -95,6 +107,10 @@ static inline void x86_64_syscall_abi_report(const struct x86_64_syscall_abi_sta
     x86_64_serial_write_u32("Syscall clobbers RCX/R11: ", state->clobbers_rcx_r11);
     x86_64_serial_write_u32("Syscall pointer validation required: ", state->user_pointer_validation_required);
     x86_64_serial_write_u32("Syscall MSR programming deferred: ", state->msr_programming_deferred);
+    x86_64_serial_write_u32("Syscall entry stub installed: ", state->entry_stub_installed);
+    x86_64_serial_write_hex64("Syscall LSTAR target: 0x", state->entry_lstar_target);
+    x86_64_serial_write_hex64("Syscall planned STAR: 0x", state->planned_star_value);
+    x86_64_serial_write_hex64("Syscall planned FMASK: 0x", state->planned_fmask_value);
     x86_64_serial_write_hex64("Syscall IA32_EFER MSR: ", state->ia32_efer_msr);
     x86_64_serial_write_hex64("Syscall IA32_STAR MSR: ", state->ia32_star_msr);
     x86_64_serial_write_hex64("Syscall IA32_LSTAR MSR: ", state->ia32_lstar_msr);
