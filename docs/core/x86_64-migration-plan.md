@@ -46,7 +46,7 @@ Status: started.
 Remaining work:
 
 - Add explicit failure diagnostics for unsupported CPUs or malformed boot state before enabling long mode.
-- Move the full C runtime to the planned higher-half kernel window after the higher-half execution probe is stable.
+- Move the full C runtime to the planned higher-half kernel window after the higher-half C execution probe is stable.
 
 ## Stage 4: early 64-bit kernel entry
 
@@ -104,7 +104,7 @@ Remaining work:
 
 ## Stage 7: 64-bit memory model
 
-Status: started with layout, PMM planning, an isolated allocator smoke check, bootstrap paging-state diagnostics, a higher-half/direct-map plan, C-owned page tables, CR3 activation of those tables, active alias probes, and a safe higher-half instruction-fetch probe.
+Status: started with layout, PMM planning, an isolated allocator smoke check, bootstrap paging-state diagnostics, a higher-half/direct-map plan, C-owned page tables, CR3 activation of those tables, active alias probes, and safe higher-half assembly/C execution probes.
 
 - Added `core/kernel/arch/x86_64/memory_layout.c` and `memory_layout.h`.
 - Exposed linker-provided x86_64 kernel image start and end symbols.
@@ -127,10 +127,12 @@ Status: started with layout, PMM planning, an isolated allocator smoke check, bo
 - The x86_64 diagnostics report `Paging probe identity ok: 1`, `Paging probe direct map ok: 1`, `Paging probe kernel alias ok: 1`, and `Paging probes ok: 1`.
 - Added a tiny assembly-only higher-half execution probe that returns a fixed value without touching globals or stack-owned data beyond the call/return path.
 - The x86_64 diagnostics report `Higher-half probe low ok: 1`, `Higher-half probe high ok: 1`, and `Higher-half probe ok: 1`.
+- Added a C higher-half execution probe that reads a kernel marker through normal compiler-generated code/data access.
+- The x86_64 diagnostics report `Higher-half C probe low ok: 1`, `Higher-half C probe high ok: 1`, and `Higher-half C probe ok: 1`.
 
 Remaining work:
 
-- Relocate the real C runtime path to the higher-half mapping after this isolated execution probe remains stable.
+- Relocate the real C runtime path to the higher-half mapping after this isolated C execution probe remains stable.
 - Introduce pointer-width-safe address types where needed.
 - Connect the x86_64 PMM to page-table allocation only after the active paging baseline stays stable.
 - Keep PMM/VMM interfaces honest about physical and virtual address width.
