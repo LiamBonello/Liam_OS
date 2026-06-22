@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.30-dev
+
+### Added
+
+- Added a guarded x86_64 higher-half handoff probe that calls a C function through the higher-half kernel alias after C-owned page tables are active.
+- Added serial diagnostics for the handoff entry addresses, scratch pointer, argument marker, result marker, scratch write marker, readiness, and `Higher-half handoff ok: 1`.
+
+### Changed
+
+- Updated the x86_64 boot stage to `Stage: higher-half handoff probe`.
+- Updated x86_64 documentation to describe manual validation for the handoff probe.
+- Updated Liam_OS version to `0.8.30-dev`.
+
+### Notes
+
+- This milestone proves a higher-half C call can use the current calling convention and stack, accept an argument, write through a caller-provided pointer, and return a validation marker.
+- This is still a guarded probe, not a full relocation of the x86_64 C runtime to the higher-half kernel window.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
+
 ## Core 0.8.29-dev
 
 ### Added
@@ -137,19 +156,3 @@
 
 - Added x86_64 CPUID baseline diagnostics to the C boot report.
 - Added headless smoke-test validation for required CPU capability markers.
-
-### Changed
-
-- Shifted early VGA diagnostic rows so CPU baseline, IDT IST, PMM smoke, and descriptor summary markers all fit.
-- Updated x86_64 documentation to include CPU baseline diagnostics.
-- Updated Liam_OS version to `0.8.22-dev`.
-
-### Notes
-
-- The x86_64 CPU baseline currently requires CPUID, FPU, MSR, APIC, SSE, SSE2, SYSCALL/SYSRET, NX, and long mode. 1 GiB pages are reported but not required yet.
-- The headless x86_64 smoke target now validates CPU baseline, descriptor/IST, PMM, paging, and GDT/TSS serial markers before passing.
-- The default stable boot path remains `ARCH=i386` through `make` and `make run`.
-
-## Earlier History
-
-Earlier milestones are preserved in the repository history. Core 0.8.21-dev and earlier covered x86_64 smoke automation, critical IST routing, maintained GDT/TSS loading, bootstrap paging diagnostics, the isolated x86_64 PMM allocator, Multiboot2 parsing, initial long-mode C entry, and the original i386 Core kernel milestones.
