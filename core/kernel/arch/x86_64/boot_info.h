@@ -4,6 +4,7 @@
 #include "types.h"
 
 #define X86_64_BOOTLOADER_NAME_MAX 64U
+#define X86_64_BOOT_COMMAND_LINE_MAX 128U
 #define X86_64_MEMORY_REGION_MAX 32U
 #define X86_64_MEMORY_REGION_AVAILABLE 1U
 
@@ -18,6 +19,9 @@ struct x86_64_boot_summary {
     u32 boot_info_addr;
     u32 multiboot2_valid;
     u32 total_size;
+    u32 command_line_found;
+    char command_line[X86_64_BOOT_COMMAND_LINE_MAX];
+    u32 exception_test_requested;
     u32 bootloader_name_found;
     char bootloader_name[X86_64_BOOTLOADER_NAME_MAX];
     u32 basic_meminfo_found;
