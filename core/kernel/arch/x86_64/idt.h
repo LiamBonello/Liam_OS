@@ -63,11 +63,26 @@ struct x86_64_timer_state {
     u32 timer_ok;
 };
 
+struct x86_64_keyboard_state {
+    u32 initialized;
+    u32 irq1_unmasked;
+    u32 scancodes_seen;
+    u32 make_codes_seen;
+    u32 break_codes_seen;
+    u32 translated_chars_seen;
+    u32 shift_pressed;
+    u32 last_scancode;
+    u32 last_ascii;
+    u32 keyboard_ok;
+};
+
 void x86_64_idt_init(void);
 void x86_64_idt_get_state(struct x86_64_idt_state *state);
 void x86_64_timer_initialize(u32 frequency_hz);
 void x86_64_timer_wait_for_ticks(u32 ticks);
 void x86_64_timer_get_state(struct x86_64_timer_state *state);
+void x86_64_keyboard_initialize(void);
+void x86_64_keyboard_get_state(struct x86_64_keyboard_state *state);
 void x86_64_exception_handler(u64 vector, u64 error_code);
 void x86_64_irq_handler(u64 vector);
 
