@@ -2,6 +2,18 @@
 
 typedef u32 (*x86_64_runtime_entry_fn)(struct x86_64_runtime_entry_state *, u64);
 
+void *memcpy(void *destination, const void *source, usize count)
+{
+    u8 *dst = (u8 *)destination;
+    const u8 *src = (const u8 *)source;
+
+    for (usize i = 0; i < count; ++i) {
+        dst[i] = src[i];
+    }
+
+    return destination;
+}
+
 static u64 read_cr3(void)
 {
     u64 value;
