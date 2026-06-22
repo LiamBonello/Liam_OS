@@ -77,7 +77,7 @@ require_line() {
 }
 
 require_line "Liam_OS x86_64 kernel diagnostics"
-require_line "Stage: VM plan + descriptor + PMM"
+require_line "Stage: paging builder + descriptor"
 require_line "Multiboot2: ok"
 require_line "CPU CPUID available: 1"
 require_line "CPU FPU: 1"
@@ -107,6 +107,14 @@ require_line "VM kernel canonical: 1"
 require_line "VM direct map canonical: 1"
 require_line "VM PML4 slots distinct: 1"
 require_line "VM plan ok: 1"
+require_line "Paging builder PML4 entries: 3"
+require_line "Paging builder identity huge pages: 512"
+require_line "Paging builder direct huge pages: 512"
+require_line "Paging builder identity ok: 1"
+require_line "Paging builder direct map ok: 1"
+require_line "Paging builder kernel ok: 1"
+require_line "Paging builder tables aligned: 1"
+require_line "Paging builder ok: 1"
 require_line "GDT/TSS loaded ok: 1"
 require_line "Desc/IST ok: 1"
 
