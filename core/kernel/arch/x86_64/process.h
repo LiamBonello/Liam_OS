@@ -47,6 +47,7 @@ struct x86_64_process_smoke_state {
     u32 worker_b_count;
     u32 userland_foundation_ok;
     u32 syscall_dispatcher_ok;
+    u32 user_context_ok;
     u32 smoke_ok;
     u64 first_stack_base;
     u64 first_stack_top;
