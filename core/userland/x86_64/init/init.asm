@@ -2,7 +2,9 @@ bits 64
 
 %define LIAM_SYSCALL_EXIT 1
 %define LIAM_SYSCALL_WRITE 2
+%define LIAM_SYSCALL_OPEN 3
 %define LIAM_SYSCALL_READ 4
+%define LIAM_SYSCALL_CLOSE 5
 %define LIAM_SYSCALL_GET_ARG 7
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
@@ -221,17 +223,29 @@ check_version:
 
 check_echo:
     cmp r15, 5
-    jb command_unknown
+    jb check_cat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'e'
-    jne command_unknown
+    jne check_cat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'c'
-    jne command_unknown
+    jne check_cat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'h'
-    jne command_unknown
+    jne check_cat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'o'
-    jne command_unknown
+    jne check_cat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], ' '
     je command_echo
+
+check_cat:
+    cmp r15, 5
+    jb command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'c'
+    jne command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'a'
+    jne command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 't'
+    jne command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], ' '
+    je command_cat
     jmp command_unknown
 
 command_help:
@@ -289,6 +303,54 @@ command_echo:
     syscall
     jmp command_done
 
+command_cat:
+    mov eax, LIAM_SYSCALL_OPEN
+    lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET + 4]
+    xor esi, esi
+    syscall
+    cmp rax, 3
+    jb cat_failed
+    cmp rax, 6
+    ja cat_failed
+    mov r14, rax
+
+cat_read_loop:
+    mov eax, LIAM_SYSCALL_READ
+    mov rdi, r14
+    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    mov edx, LIAM_READ_BUFFER_LEN
+    syscall
+    test rax, rax
+    jz cat_close
+    cmp rax, LIAM_READ_BUFFER_LEN
+    ja cat_close_failed
+
+    mov rdx, rax
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    syscall
+    jmp cat_read_loop
+
+cat_close:
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+    jmp command_done_fresh
+
+cat_close_failed:
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+
+cat_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel cat_error_text]
+    mov edx, cat_error_text_len
+    syscall
+    jmp command_done_fresh
+
 command_exit:
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
@@ -314,6 +376,15 @@ command_done:
     syscall
     jmp scan_input
 
+command_done_fresh:
+    xor r15d, r15d
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel shell_prompt]
+    mov edx, shell_prompt_len
+    syscall
+    jmp shell_loop
+
 section .rodata
 shell_banner:
     db "Liam_OS x86_64 shell online", 10
@@ -322,7 +393,7 @@ shell_prompt:
     db "$ "
 shell_prompt_len equ $ - shell_prompt
 help_text:
-    db "commands: help, about, version, pid, echo, clear, exit", 10
+    db "commands: help, about, version, pid, echo, cat, clear, exit", 10
 help_text_len equ $ - help_text
 pid_text:
     db "pid: 1", 10
@@ -345,6 +416,9 @@ newline_text_len equ $ - newline_text
 unknown_text:
     db "unknown command", 10
 unknown_text_len equ $ - unknown_text
+cat_error_text:
+    db "cat: not found", 10
+cat_error_text_len equ $ - cat_error_text
 bye_text:
     db "bye", 10
 bye_text_len equ $ - bye_text
