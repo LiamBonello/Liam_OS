@@ -11,6 +11,7 @@
 #include "pmm.h"
 #include "runtime.h"
 #include "tss.h"
+#include "user_mode.h"
 
 static void report_boot_summary(const struct x86_64_boot_summary *summary)
 {
@@ -313,6 +314,11 @@ static void report_runtime_entry(const struct x86_64_runtime_entry_state *state)
     x86_64_serial_write_u32("Runtime entry ok: ", state->runtime_ok);
 }
 
+static void report_user_mode(const struct x86_64_user_mode_smoke_state *state)
+{
+    x86_64_user_mode_report(state);
+}
+
 static void report_heap_state(const struct x86_64_heap_state *state)
 {
     x86_64_console_write_u32(24, 0, "Heap smoke ok: ", state->smoke_ok);
@@ -409,6 +415,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_paging_probe_state paging_probe;
     struct x86_64_runtime_entry_state runtime_entry;
     struct x86_64_tss_state tss_state;
+    struct x86_64_user_mode_smoke_state user_mode_smoke;
 
     x86_64_console_init();
     x86_64_serial_init();
@@ -433,12 +440,13 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
                                  &context.memory_layout, &paging_plan);
     x86_64_runtime_enter_higher_half(&runtime_entry, &paging_activation,
                                      &context.memory_layout, &paging_plan);
+    x86_64_user_mode_run_smoke(&user_mode_smoke, &paging_builder, 1U);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
-    x86_64_console_write_at("Stage: x86_64 early heap", 1, 0);
+    x86_64_console_write_at("Stage: x86_64 ring3 smoke", 1, 0);
 
     x86_64_serial_write_line("Liam_OS x86_64 kernel diagnostics");
-    x86_64_serial_write_line("Stage: x86_64 early heap");
+    x86_64_serial_write_line("Stage: x86_64 ring3 smoke");
 
     report_boot_summary(&context.boot_info);
     report_cpu_state(&cpuid_state);
@@ -453,6 +461,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_paging_probes(&paging_probe);
     report_higher_half_probe(&higher_half_probe);
     report_runtime_entry(&runtime_entry);
+    report_user_mode(&user_mode_smoke);
     report_heap_state(&heap_state);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
