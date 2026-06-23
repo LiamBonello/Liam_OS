@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.58-dev
+
+### Added
+
+- Added a structured x86_64 syscall frame for live ring-3 `syscall` entry.
+- Routed the live x86_64 ring-3 smoke syscalls through the architecture-local syscall dispatcher instead of a smoke-only syscall switch.
+- Added user-mode diagnostics for live dispatcher initialization, dispatcher acceptance, saved syscall frame state, user RIP, and user RFLAGS.
+
+### Changed
+
+- Updated the x86_64 syscall entry stub to save user return state, collect the six-argument syscall ABI registers, call the dispatcher-backed C entrypoint, and return through `sysret` unless `exit` requested kernel return.
+- Tightened the x86_64 syscall ABI report so user entry is no longer marked deferred.
+- Updated Liam_OS version to `0.8.58-dev`.
+
+### Notes
+
+- This is still a guarded early path, but ring-3 syscalls now use the same dispatcher contract as the kernel-side syscall dispatch smoke checks.
+- The normal x86_64 boot should report `Syscall user entry deferred: 0`, `User mode live dispatcher initialized: 1`, `User mode live dispatcher ok: 1`, `User mode syscall frame ok: 1`, and `User mode ok: 1`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.57-dev
 
 ### Added
