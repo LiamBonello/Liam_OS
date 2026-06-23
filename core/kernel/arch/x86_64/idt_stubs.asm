@@ -4,7 +4,7 @@ global x86_64_syscall_entry_stub
 extern x86_64_exception_handler
 extern x86_64_irq_handler
 extern x86_64_user_smoke_kernel_rsp
-extern x86_64_user_smoke_syscall
+extern x86_64_user_mode_syscall_entry
 
 section .text
 bits 64
@@ -34,11 +34,29 @@ x86_64_irq%1:
 x86_64_syscall_entry_stub:
     push rcx
     push r11
-    mov rsi, rdi
-    mov rdi, rax
-    call x86_64_user_smoke_syscall
-    cmp rax, -1
+    sub rsp, 96
+
+    mov [rsp + 0], rax
+    mov [rsp + 8], rdi
+    mov [rsp + 16], rsi
+    mov [rsp + 24], rdx
+    mov [rsp + 32], r10
+    mov [rsp + 40], r8
+    mov [rsp + 48], r9
+    mov rax, [rsp + 104]
+    mov [rsp + 56], rax
+    mov rax, [rsp + 96]
+    mov [rsp + 64], rax
+    mov qword [rsp + 72], 0
+    mov dword [rsp + 80], 0
+    mov dword [rsp + 84], 0
+
+    mov rdi, rsp
+    call x86_64_user_mode_syscall_entry
+    cmp dword [rsp + 80], 1
     je .exit_to_kernel
+
+    add rsp, 96
     pop r11
     pop rcx
     o64 sysret
