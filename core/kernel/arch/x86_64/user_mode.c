@@ -70,6 +70,11 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
                           result != X86_64_SYSCALL_RET_EINVAL) ? 1U : 0U;
         break;
 
+    case X86_64_SYSCALL_SERVICE_GET_ARG:
+        state->get_arg_ok = (result != X86_64_SYSCALL_RET_EFAULT &&
+                             result != X86_64_SYSCALL_RET_EINVAL) ? 1U : 0U;
+        break;
+
     case X86_64_SYSCALL_SERVICE_YIELD:
         state->yield_ok = ((result == X86_64_SYSCALL_RET_OK) &&
                            (active_dispatcher.yield_count >= 1U)) ? 1U : 0U;
@@ -89,8 +94,8 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
     state->live_dispatcher_ok =
         ((active_dispatcher.initialized != 0U) &&
          (active_dispatcher.service_count == X86_64_SYSCALL_SERVICE_COUNT) &&
-         (active_dispatcher.dispatch_calls >= 5U) &&
-         (active_dispatcher.dispatch_calls <= 32U) &&
+         (active_dispatcher.dispatch_calls >= 10U) &&
+         (active_dispatcher.dispatch_calls <= 40U) &&
          (state->unexpected_syscall == 0U)) ? 1U : 0U;
 
     return result;
@@ -126,11 +131,12 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
          (state->attempted != 0U) &&
          (state->entered != 0U) &&
          (state->returned_to_kernel != 0U) &&
-         (state->syscall_count >= 9U) &&
-         (state->syscall_count <= 32U) &&
+         (state->syscall_count >= 10U) &&
+         (state->syscall_count <= 40U) &&
          (state->getpid_ok != 0U) &&
          (state->write_ok != 0U) &&
          (state->read_ok != 0U) &&
+         (state->get_arg_ok != 0U) &&
          (state->yield_ok != 0U) &&
          (state->exit_ok != 0U) &&
          (state->unexpected_syscall == 0U) &&
@@ -153,6 +159,7 @@ void x86_64_user_mode_report(const struct x86_64_user_mode_smoke_state *state)
     x86_64_serial_write_u32("User mode getpid ok: ", state->getpid_ok);
     x86_64_serial_write_u32("User mode write ok: ", state->write_ok);
     x86_64_serial_write_u32("User mode read ok: ", state->read_ok);
+    x86_64_serial_write_u32("User mode get_arg ok: ", state->get_arg_ok);
     x86_64_serial_write_u32("User mode yield ok: ", state->yield_ok);
     x86_64_serial_write_u32("User mode exit ok: ", state->exit_ok);
     x86_64_serial_write_u32("User mode unexpected syscall: ", state->unexpected_syscall);
