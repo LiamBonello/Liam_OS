@@ -3,11 +3,14 @@ bits 64
 %define LIAM_SYSCALL_EXIT 1
 %define LIAM_SYSCALL_WRITE 2
 %define LIAM_SYSCALL_READ 4
+%define LIAM_SYSCALL_GET_ARG 7
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
 
 %define LIAM_STDIN 0
 %define LIAM_STDOUT 1
+%define LIAM_ARG_SHELL_MODE 0
+%define LIAM_MODE_BUFFER_LEN 16
 %define LIAM_READ_BUFFER_LEN 64
 %define LIAM_IDLE_POLL_LIMIT 3
 
@@ -24,6 +27,17 @@ _start:
     mov edx, shell_banner_len
     syscall
 
+    xor r14d, r14d
+    mov eax, LIAM_SYSCALL_GET_ARG
+    mov edi, LIAM_ARG_SHELL_MODE
+    lea rsi, [rsp - LIAM_READ_BUFFER_LEN - LIAM_MODE_BUFFER_LEN]
+    mov edx, LIAM_MODE_BUFFER_LEN
+    syscall
+    test rax, rax
+    jle .mode_ready
+    mov r14d, 1
+
+.mode_ready:
     xor r12d, r12d
 
 .shell_loop:
@@ -38,6 +52,9 @@ _start:
 
     mov eax, LIAM_SYSCALL_YIELD
     syscall
+
+    test r14d, r14d
+    jnz .shell_loop
 
     inc r12d
     cmp r12d, LIAM_IDLE_POLL_LIMIT
