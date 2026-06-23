@@ -157,7 +157,7 @@ VPATH := \
 	kernel/memory \
 	kernel/userland
 
-.PHONY: all clean run run-debug debug check-tools userland x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-run-check-tools x86_64-kernel x86_64-iso x86_64-run x86_64-exception-test-iso x86_64-exception-test-run
+.PHONY: all clean run run-debug debug check-tools userland x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-run-check-tools x86_64-kernel x86_64-iso x86_64-run x86_64-run-gui x86_64-exception-test-iso x86_64-exception-test-run
 
 all: $(ISO)
 
@@ -189,6 +189,7 @@ x86_64-info:
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
 	@echo "Run target: make x86_64-run"
+	@echo "GUI run target: make x86_64-run-gui"
 	@echo "Exception self-test ISO target: make x86_64-exception-test-iso"
 	@echo "Exception self-test run target: make x86_64-exception-test-run"
 	@echo "Artifact output: $(X86_64_KERNEL)"
@@ -197,7 +198,7 @@ x86_64-info:
 	@echo "Expected x86_64 screen messages: PIT timer ok: 1, Keyboard ready ok: 1, Heap smoke ok: 1, Process smoke ok: 1, Desc/IST ok: 1"
 	@echo "Expected serial markers include: User mode ok: 1, Paging builder ELF64 load ok: 1, Paging builder PMM backed: 1, Heap smoke ok: 1, Process stack execution ok: 1, Runtime entry ok: 1, Paging activation ok: 1, Paging probes ok: 1"
 	@echo "Expected exception self-test markers include: Exception self-test requested: 1, x86_64 exception self-test: ud2, Name: invalid opcode, Vector: 0x0000000000000006, x86_64 panic halt"
-	@echo "Serial output is routed to the terminal by make x86_64-run and make x86_64-exception-test-run."
+	@echo "Interactive x86_64 serial input/output is routed to the terminal by make x86_64-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
 
 x86_64-kernel: x86_64-check-tools $(X86_64_KERNEL)
@@ -207,13 +208,16 @@ x86_64-iso: x86_64-iso-check-tools $(X86_64_ISO)
 	@echo "Built experimental x86_64 ISO: $(X86_64_ISO)"
 
 x86_64-run: x86_64-run-check-tools $(X86_64_ISO)
+	$(QEMU_x86_64) -display none -monitor none -serial stdio -boot d -cdrom $(X86_64_ISO)
+
+x86_64-run-gui: x86_64-run-check-tools $(X86_64_ISO)
 	$(QEMU_x86_64) -serial stdio -boot d -cdrom $(X86_64_ISO)
 
 x86_64-exception-test-iso: x86_64-iso-check-tools $(X86_64_EXCEPTION_TEST_ISO)
 	@echo "Built experimental x86_64 exception self-test ISO: $(X86_64_EXCEPTION_TEST_ISO)"
 
 x86_64-exception-test-run: x86_64-run-check-tools $(X86_64_EXCEPTION_TEST_ISO)
-	$(QEMU_x86_64) -serial stdio -boot d -cdrom $(X86_64_EXCEPTION_TEST_ISO)
+	$(QEMU_x86_64) -display none -monitor none -serial stdio -boot d -cdrom $(X86_64_EXCEPTION_TEST_ISO)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
