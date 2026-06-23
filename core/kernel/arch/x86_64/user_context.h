@@ -39,6 +39,8 @@ struct x86_64_user_context_state {
     u32 stack_aligned;
     u32 selectors_ok;
     u32 rflags_ok;
+    u32 cr3_page_aligned;
+    u32 address_space_ready;
     u32 elf_entry_bound;
     u32 user_stack_mapped_planned;
     u32 user_code_mapped_planned;
@@ -77,6 +79,11 @@ static inline void x86_64_user_context_init(struct x86_64_user_context_state *st
     state->rflags_ok =
         (((state->frame.rflags & X86_64_USER_RFLAGS_RESERVED_ONE) != 0ULL) &&
          ((state->frame.rflags & X86_64_USER_RFLAGS_INTERRUPT_ENABLE) != 0ULL)) ? 1U : 0U;
+    state->cr3_page_aligned = x86_64_user_is_page_aligned(state->cr3_planned);
+    state->address_space_ready =
+        ((state->address_space_id != 0ULL) &&
+         (state->cr3_planned != 0ULL) &&
+         (state->cr3_page_aligned != 0U)) ? 1U : 0U;
     state->elf_entry_bound =
         ((foundation->foundation_ok != 0U) &&
          (state->frame.rip == foundation->sample_elf_entry) &&
@@ -97,8 +104,7 @@ static inline void x86_64_user_context_init(struct x86_64_user_context_state *st
     state->context_ok =
         ((state->initialized != 0U) &&
          (state->state == X86_64_USER_CONTEXT_READY) &&
-         (state->address_space_id != 0ULL) &&
-         (state->cr3_planned != 0ULL) &&
+         (state->address_space_ready != 0U) &&
          (state->elf_entry_bound != 0U) &&
          (state->user_stack_mapped_planned != 0U) &&
          (state->user_code_mapped_planned != 0U) &&
@@ -112,6 +118,8 @@ static inline void x86_64_user_context_report(const struct x86_64_user_context_s
     x86_64_serial_write_u32("User context state: ", state->state);
     x86_64_serial_write_hex64("User address space id: 0x", state->address_space_id);
     x86_64_serial_write_hex64("User planned CR3: 0x", state->cr3_planned);
+    x86_64_serial_write_u32("User CR3 page aligned: ", state->cr3_page_aligned);
+    x86_64_serial_write_u32("User address space ready: ", state->address_space_ready);
     x86_64_serial_write_hex64("User RIP: 0x", state->frame.rip);
     x86_64_serial_write_hex64("User RSP: 0x", state->frame.rsp);
     x86_64_serial_write_hex64("User RFLAGS: 0x", state->frame.rflags);
