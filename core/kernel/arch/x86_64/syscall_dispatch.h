@@ -40,6 +40,7 @@ struct x86_64_syscall_dispatch_state {
     u32 exit_ok;
     u32 write_ok;
     u32 write_fault_ok;
+    u32 write_output_enabled;
     u32 getpid_ok;
     u32 yield_ok;
     u32 exec_fault_ok;
@@ -103,6 +104,7 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->exit_ok = 0U;
     state->write_ok = 0U;
     state->write_fault_ok = 0U;
+    state->write_output_enabled = 0U;
     state->getpid_ok = 0U;
     state->yield_ok = 0U;
     state->exec_fault_ok = 0U;
@@ -147,7 +149,9 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
-        x86_64_syscall_write_serial((const char *)arg1, arg2);
+        if (state->write_output_enabled != 0U) {
+            x86_64_syscall_write_serial((const char *)arg1, arg2);
+        }
         state->last_result = arg2;
         return state->last_result;
 
