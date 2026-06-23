@@ -7,6 +7,7 @@
 u64 x86_64_user_smoke_kernel_rsp;
 
 static struct x86_64_user_mode_smoke_state *active_state;
+static struct x86_64_syscall_dispatch_state active_dispatcher;
 
 static void clear_state(struct x86_64_user_mode_smoke_state *state)
 {
@@ -33,38 +34,55 @@ static u32 is_user_stack_ready(const struct x86_64_paging_builder_state *paging_
             (paging_builder->user_stack_virtual == (X86_64_USER_STACK_TOP - X86_64_USER_PAGE_BYTES))) ? 1U : 0U;
 }
 
-u64 x86_64_user_smoke_syscall(u64 syscall_number, u64 arg0)
+u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
 {
     struct x86_64_user_mode_smoke_state *state = active_state;
-    if (state == (struct x86_64_user_mode_smoke_state *)0) {
-        return X86_64_USER_MODE_SYSCALL_EXIT_SENTINEL;
+    if (state == (struct x86_64_user_mode_smoke_state *)0 ||
+        frame == (struct x86_64_syscall_frame *)0) {
+        return X86_64_SYSCALL_RET_ENOSYS;
     }
 
-    state->syscall_count += 1U;
-    state->last_syscall = syscall_number;
+    u64 result = x86_64_syscall_dispatch_frame(&active_dispatcher, frame);
 
-    switch (syscall_number) {
+    state->syscall_count = active_dispatcher.dispatch_calls;
+    state->last_syscall = frame->number;
+    state->last_result = result;
+    state->last_user_rip = frame->user_rip;
+    state->last_user_rflags = frame->user_rflags;
+    state->live_dispatcher_initialized = active_dispatcher.initialized;
+    state->syscall_frame_ok =
+        ((frame->user_rip >= X86_64_USER_CODE_BASE) &&
+         (frame->user_rip < X86_64_USER_HEAP_BASE) &&
+         ((frame->user_rflags & 0x200ULL) != 0ULL)) ? 1U : 0U;
+
+    switch (frame->number) {
     case X86_64_SYSCALL_SERVICE_GETPID:
-        state->getpid_ok = 1U;
-        state->last_result = (u64)state->current_pid;
-        return state->last_result;
+        state->getpid_ok = (result == (u64)state->current_pid) ? 1U : 0U;
+        break;
 
     case X86_64_SYSCALL_SERVICE_YIELD:
-        state->yield_ok = 1U;
-        state->last_result = 0ULL;
-        return state->last_result;
+        state->yield_ok = ((result == X86_64_SYSCALL_RET_OK) &&
+                           (active_dispatcher.yield_count == 1U)) ? 1U : 0U;
+        break;
 
     case X86_64_SYSCALL_SERVICE_EXIT:
-        state->exit_ok = 1U;
-        state->exit_code = (u32)arg0;
-        state->last_result = X86_64_USER_MODE_SYSCALL_EXIT_SENTINEL;
-        return state->last_result;
+        state->exit_ok = ((result == X86_64_SYSCALL_RET_OK) &&
+                          (frame->exit_requested != 0U)) ? 1U : 0U;
+        state->exit_code = active_dispatcher.exit_code;
+        break;
 
     default:
         state->unexpected_syscall = 1U;
-        state->last_result = X86_64_USER_MODE_SYSCALL_EXIT_SENTINEL;
-        return state->last_result;
+        break;
     }
+
+    state->live_dispatcher_ok =
+        ((active_dispatcher.initialized != 0U) &&
+         (active_dispatcher.service_count == X86_64_SYSCALL_SERVICE_COUNT) &&
+         (active_dispatcher.dispatch_calls <= 3U) &&
+         (state->unexpected_syscall == 0U)) ? 1U : 0U;
+
+    return result;
 }
 
 void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
@@ -83,6 +101,7 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
         return;
     }
 
+    x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
     active_state = state;
     state->attempted = 1U;
     state->entered = 1U;
@@ -100,6 +119,9 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
          (state->yield_ok != 0U) &&
          (state->exit_ok != 0U) &&
          (state->unexpected_syscall == 0U) &&
+         (state->live_dispatcher_initialized != 0U) &&
+         (state->live_dispatcher_ok != 0U) &&
+         (state->syscall_frame_ok != 0U) &&
          (state->exit_code == 0U) &&
          (state->user_entry_ready != 0U) &&
          (state->user_stack_ready != 0U)) ? 1U : 0U;
@@ -117,12 +139,17 @@ void x86_64_user_mode_report(const struct x86_64_user_mode_smoke_state *state)
     x86_64_serial_write_u32("User mode yield ok: ", state->yield_ok);
     x86_64_serial_write_u32("User mode exit ok: ", state->exit_ok);
     x86_64_serial_write_u32("User mode unexpected syscall: ", state->unexpected_syscall);
+    x86_64_serial_write_u32("User mode live dispatcher initialized: ", state->live_dispatcher_initialized);
+    x86_64_serial_write_u32("User mode live dispatcher ok: ", state->live_dispatcher_ok);
+    x86_64_serial_write_u32("User mode syscall frame ok: ", state->syscall_frame_ok);
     x86_64_serial_write_u32("User mode current pid: ", state->current_pid);
     x86_64_serial_write_u32("User mode exit code: ", state->exit_code);
     x86_64_serial_write_hex64("User mode entry RIP: 0x", state->entry_rip);
     x86_64_serial_write_hex64("User mode entry RSP: 0x", state->entry_rsp);
     x86_64_serial_write_hex64("User mode last syscall: 0x", state->last_syscall);
     x86_64_serial_write_hex64("User mode last result: 0x", state->last_result);
+    x86_64_serial_write_hex64("User mode last user RIP: 0x", state->last_user_rip);
+    x86_64_serial_write_hex64("User mode last user RFLAGS: 0x", state->last_user_rflags);
     x86_64_serial_write_u32("User mode entry ready: ", state->user_entry_ready);
     x86_64_serial_write_u32("User mode stack ready: ", state->user_stack_ready);
     x86_64_serial_write_u32("User mode ok: ", state->user_mode_ok);
