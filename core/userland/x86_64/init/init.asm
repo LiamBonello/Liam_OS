@@ -5,6 +5,7 @@ bits 64
 %define LIAM_SYSCALL_OPEN 3
 %define LIAM_SYSCALL_READ 4
 %define LIAM_SYSCALL_CLOSE 5
+%define LIAM_SYSCALL_STAT 6
 %define LIAM_SYSCALL_GET_ARG 7
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
@@ -15,10 +16,13 @@ bits 64
 %define LIAM_MODE_BUFFER_LEN 16
 %define LIAM_READ_BUFFER_LEN 64
 %define LIAM_LINE_BUFFER_LEN 80
+%define LIAM_DEC_BUFFER_LEN 24
 %define LIAM_MODE_BUFFER_OFFSET 0
 %define LIAM_READ_BUFFER_OFFSET LIAM_MODE_BUFFER_LEN
 %define LIAM_LINE_BUFFER_OFFSET (LIAM_MODE_BUFFER_LEN + LIAM_READ_BUFFER_LEN)
-%define LIAM_STACK_BYTES 256
+%define LIAM_STAT_SIZE_OFFSET (LIAM_MODE_BUFFER_LEN + LIAM_READ_BUFFER_LEN + LIAM_LINE_BUFFER_LEN)
+%define LIAM_DEC_BUFFER_OFFSET (LIAM_STAT_SIZE_OFFSET + 8)
+%define LIAM_STACK_BYTES 320
 
 section .text
 global _start
@@ -223,17 +227,31 @@ check_version:
 
 check_echo:
     cmp r15, 5
-    jb check_cat
+    jb check_stat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'e'
-    jne check_cat
+    jne check_stat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'c'
-    jne check_cat
+    jne check_stat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'h'
-    jne check_cat
+    jne check_stat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'o'
-    jne check_cat
+    jne check_stat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], ' '
     je command_echo
+
+check_stat:
+    cmp r15, 6
+    jb check_cat
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 's'
+    jne check_cat
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 't'
+    jne check_cat
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'a'
+    jne check_cat
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 't'
+    jne check_cat
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], ' '
+    je command_stat
 
 check_cat:
     cmp r15, 5
@@ -300,6 +318,63 @@ command_echo:
     mov edi, LIAM_STDOUT
     lea rsi, [rel newline_text]
     mov edx, newline_text_len
+    syscall
+    jmp command_done
+
+command_stat:
+    mov eax, LIAM_SYSCALL_STAT
+    lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET + 5]
+    lea rsi, [rsp + LIAM_STAT_SIZE_OFFSET]
+    syscall
+    test rax, rax
+    jnz stat_failed
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel stat_size_text]
+    mov edx, stat_size_text_len
+    syscall
+
+    mov rax, [rsp + LIAM_STAT_SIZE_OFFSET]
+    lea rdi, [rsp + LIAM_DEC_BUFFER_OFFSET + LIAM_DEC_BUFFER_LEN]
+    xor ecx, ecx
+    cmp rax, 0
+    jne stat_convert_loop
+    dec rdi
+    mov byte [rdi], '0'
+    mov ecx, 1
+    jmp stat_write_number
+
+stat_convert_loop:
+    xor edx, edx
+    mov r8, 10
+    div r8
+    add dl, '0'
+    dec rdi
+    mov [rdi], dl
+    inc ecx
+    test rax, rax
+    jne stat_convert_loop
+
+stat_write_number:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov rsi, rdi
+    mov edi, LIAM_STDOUT
+    mov edx, ecx
+    syscall
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel newline_text]
+    mov edx, newline_text_len
+    syscall
+    jmp command_done
+
+stat_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel stat_error_text]
+    mov edx, stat_error_text_len
     syscall
     jmp command_done
 
@@ -393,7 +468,7 @@ shell_prompt:
     db "$ "
 shell_prompt_len equ $ - shell_prompt
 help_text:
-    db "commands: help, about, version, pid, echo, cat, clear, exit", 10
+    db "commands: help, about, version, pid, echo, cat, stat, clear, exit", 10
 help_text_len equ $ - help_text
 pid_text:
     db "pid: 1", 10
@@ -419,6 +494,12 @@ unknown_text_len equ $ - unknown_text
 cat_error_text:
     db "cat: not found", 10
 cat_error_text_len equ $ - cat_error_text
+stat_size_text:
+    db "size: "
+stat_size_text_len equ $ - stat_size_text
+stat_error_text:
+    db "stat: not found", 10
+stat_error_text_len equ $ - stat_error_text
 bye_text:
     db "bye", 10
 bye_text_len equ $ - bye_text
