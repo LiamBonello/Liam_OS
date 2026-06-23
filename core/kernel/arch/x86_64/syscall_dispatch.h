@@ -11,6 +11,21 @@
 #define X86_64_SYSCALL_RET_EINVAL 0xFFFFFFFFFFFFFFEAULL
 #define X86_64_SYSCALL_RET_ENOSYS 0xFFFFFFFFFFFFFFDAULL
 
+struct x86_64_syscall_frame {
+    u64 number;
+    u64 arg0;
+    u64 arg1;
+    u64 arg2;
+    u64 arg3;
+    u64 arg4;
+    u64 arg5;
+    u64 user_rip;
+    u64 user_rflags;
+    u64 result;
+    u32 exit_requested;
+    u32 reserved;
+};
+
 struct x86_64_syscall_dispatch_state {
     u32 initialized;
     u32 service_count;
@@ -55,6 +70,32 @@ static inline u32 x86_64_syscall_user_range_ok(u64 address, u64 size)
     }
 
     return 1U;
+}
+
+static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_state *state,
+                                                u32 current_pid)
+{
+    state->initialized = 1U;
+    state->service_count = X86_64_SYSCALL_SERVICE_COUNT;
+    state->current_pid = current_pid;
+    state->dispatch_calls = 0U;
+    state->pointer_validation_ok = 0U;
+    state->user_buffer_accepted = 0U;
+    state->kernel_pointer_rejected = 0U;
+    state->exit_ok = 0U;
+    state->write_ok = 0U;
+    state->write_fault_ok = 0U;
+    state->getpid_ok = 0U;
+    state->yield_ok = 0U;
+    state->exec_fault_ok = 0U;
+    state->unknown_rejected = 0U;
+    state->dispatcher_ok = 0U;
+    state->exit_code = 0U;
+    state->yield_count = 0U;
+    state->last_syscall = 0ULL;
+    state->last_result = 0ULL;
+    state->sample_user_buffer = X86_64_USER_CODE_BASE;
+    state->sample_kernel_pointer = 0xFFFF800000100000ULL;
 }
 
 static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *state,
@@ -125,30 +166,31 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
     }
 }
 
+static inline u64 x86_64_syscall_dispatch_frame(struct x86_64_syscall_dispatch_state *state,
+                                                struct x86_64_syscall_frame *frame)
+{
+    frame->exit_requested = 0U;
+    frame->reserved = 0U;
+    frame->result = x86_64_syscall_dispatch(state,
+                                            frame->number,
+                                            frame->arg0,
+                                            frame->arg1,
+                                            frame->arg2,
+                                            frame->arg3,
+                                            frame->arg4,
+                                            frame->arg5);
+
+    if (frame->number == X86_64_SYSCALL_SERVICE_EXIT && frame->result == X86_64_SYSCALL_RET_OK) {
+        frame->exit_requested = 1U;
+    }
+
+    return frame->result;
+}
+
 static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispatch_state *state,
                                                      u32 current_pid)
 {
-    state->initialized = 1U;
-    state->service_count = X86_64_SYSCALL_SERVICE_COUNT;
-    state->current_pid = current_pid;
-    state->dispatch_calls = 0U;
-    state->pointer_validation_ok = 0U;
-    state->user_buffer_accepted = 0U;
-    state->kernel_pointer_rejected = 0U;
-    state->exit_ok = 0U;
-    state->write_ok = 0U;
-    state->write_fault_ok = 0U;
-    state->getpid_ok = 0U;
-    state->yield_ok = 0U;
-    state->exec_fault_ok = 0U;
-    state->unknown_rejected = 0U;
-    state->dispatcher_ok = 0U;
-    state->exit_code = 0U;
-    state->yield_count = 0U;
-    state->last_syscall = 0ULL;
-    state->last_result = 0ULL;
-    state->sample_user_buffer = X86_64_USER_CODE_BASE;
-    state->sample_kernel_pointer = 0xFFFF800000100000ULL;
+    x86_64_syscall_dispatch_init(state, current_pid);
 
     state->user_buffer_accepted =
         x86_64_syscall_user_range_ok(state->sample_user_buffer, 4ULL);
