@@ -105,6 +105,7 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
     }
 
     x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
+    active_dispatcher.write_output_enabled = 1U;
     active_state = state;
     state->attempted = 1U;
     state->entered = 1U;
