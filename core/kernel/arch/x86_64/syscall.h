@@ -33,6 +33,7 @@ struct x86_64_syscall_abi_state {
     u32 fast_syscall_supported;
     u32 syscall_sysret_planned;
     u32 msr_programming_deferred;
+    u32 msr_programming_required;
     u32 entry_stub_installed;
     u32 user_entry_deferred;
     u32 user_selectors_ready;
@@ -74,7 +75,8 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->initialized = 1U;
     state->fast_syscall_supported = fast_syscall_supported;
     state->syscall_sysret_planned = 1U;
-    state->msr_programming_deferred = 1U;
+    state->msr_programming_deferred = 0U;
+    state->msr_programming_required = 1U;
     state->entry_lstar_target = (u64)x86_64_syscall_entry_stub;
     state->entry_stub_installed = (state->entry_lstar_target != 0ULL) ? 1U : 0U;
     state->user_entry_deferred = 1U;
@@ -111,11 +113,13 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->syscall_abi_ok = ((state->initialized != 0U) &&
                              (state->fast_syscall_supported != 0U) &&
                              (state->syscall_sysret_planned != 0U) &&
-                             (state->msr_programming_deferred != 0U) &&
+                             (state->msr_programming_deferred == 0U) &&
+                             (state->msr_programming_required != 0U) &&
                              (state->entry_stub_installed != 0U) &&
                              (state->user_entry_deferred != 0U) &&
                              (state->user_selectors_ready != 0U) &&
                              (state->planned_star_value != 0ULL) &&
+                             (state->planned_fmask_value != 0ULL) &&
                              (state->arg_register_count == X86_64_SYSCALL_MAX_ARGS) &&
                              (state->syscall_number_rax != 0U) &&
                              (state->return_rax != 0U) &&
@@ -170,6 +174,7 @@ static inline void x86_64_syscall_abi_report(const struct x86_64_syscall_abi_sta
     x86_64_serial_write_u32("Syscall getpid planned: ", state->service_getpid_planned);
     x86_64_serial_write_u32("Syscall yield planned: ", state->service_yield_planned);
     x86_64_serial_write_u32("Syscall MSR programming deferred: ", state->msr_programming_deferred);
+    x86_64_serial_write_u32("Syscall MSR programming required: ", state->msr_programming_required);
     x86_64_serial_write_u32("Syscall user entry deferred: ", state->user_entry_deferred);
     x86_64_serial_write_u32("Syscall STAR selectors ready: ", state->user_selectors_ready);
     x86_64_serial_write_u32("Syscall entry stub installed: ", state->entry_stub_installed);
