@@ -6,7 +6,10 @@
 #include "types.h"
 
 #define X86_64_PAGING_BUILDER_ENTRIES 512U
-#define X86_64_PAGING_BUILDER_TABLE_PAGES 8U
+#define X86_64_PAGING_BUILDER_TABLE_PAGES 11U
+#define X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES 2U
+#define X86_64_PAGING_BUILDER_ALLOCATED_PAGES \
+    (X86_64_PAGING_BUILDER_TABLE_PAGES + X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES)
 
 struct x86_64_paging_builder_state {
     u64 pml4_table;
@@ -17,18 +20,30 @@ struct x86_64_paging_builder_state {
     u64 kernel_pdpt_table;
     u64 kernel_pd_table;
     u64 kernel_pt_table;
+    u64 user_code_pt_table;
+    u64 user_stack_pd_table;
+    u64 user_stack_pt_table;
+    u64 user_code_page;
+    u64 user_stack_page;
+    u64 user_code_virtual;
+    u64 user_stack_virtual;
     u32 pml4_present_entries;
     u32 identity_huge_pages;
     u32 direct_huge_pages;
     u32 kernel_pages;
     u32 pmm_backed;
     u32 allocated_table_pages;
+    u32 allocated_user_pages;
     u32 pmm_free_pages_before;
     u32 pmm_free_pages_after;
     u32 allocation_ok;
     u32 identity_entry_ok;
     u32 direct_map_entry_ok;
     u32 kernel_entry_ok;
+    u32 user_code_entry_ok;
+    u32 user_stack_entry_ok;
+    u32 user_pages_user_accessible;
+    u32 user_mapping_ok;
     u32 tables_aligned;
     u32 builder_ok;
 };
