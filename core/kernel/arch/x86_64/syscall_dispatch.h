@@ -98,6 +98,16 @@ static inline void x86_64_syscall_write_serial(const char *buffer, u64 size)
     }
 }
 
+static inline u64 x86_64_syscall_read_stdin(char *buffer, u64 size)
+{
+    u64 bytes = x86_64_keyboard_read(buffer, size);
+    if (bytes < size) {
+        bytes += x86_64_serial_read(buffer + bytes, size - bytes);
+    }
+
+    return bytes;
+}
+
 static inline u64 x86_64_syscall_copy_string_arg(char *buffer, u64 size, const char *value)
 {
     if (buffer == (char *)0 || size == 0ULL || value == (const char *)0) {
@@ -190,7 +200,7 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
-        state->last_result = x86_64_keyboard_read((char *)arg1, arg2);
+        state->last_result = x86_64_syscall_read_stdin((char *)arg1, arg2);
         return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_GET_ARG:
