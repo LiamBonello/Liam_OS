@@ -3,6 +3,8 @@ global x86_64_irq_table
 global x86_64_syscall_entry_stub
 extern x86_64_exception_handler
 extern x86_64_irq_handler
+extern x86_64_user_smoke_kernel_rsp
+extern x86_64_user_smoke_syscall
 
 section .text
 bits 64
@@ -30,11 +32,20 @@ x86_64_irq%1:
 %endmacro
 
 x86_64_syscall_entry_stub:
-    cli
+    push rcx
+    push r11
+    mov rsi, rdi
+    mov rdi, rax
+    call x86_64_user_smoke_syscall
+    cmp rax, -1
+    je .exit_to_kernel
+    pop r11
+    pop rcx
+    sysretq
 
-.hang:
-    hlt
-    jmp .hang
+.exit_to_kernel:
+    mov rsp, [rel x86_64_user_smoke_kernel_rsp]
+    ret
 
 x86_64_isr_common:
     mov rdi, [rsp]
