@@ -5,7 +5,9 @@ KERNEL := $(BUILD_DIR)/kernel.bin
 ISO := $(BUILD_DIR)/liam_os.iso
 X86_64_BUILD_DIR := $(BUILD_DIR)/x86_64
 X86_64_USERLAND_BUILD_DIR := $(X86_64_BUILD_DIR)/userland
-X86_64_USERLAND_INIT_BIN := $(X86_64_USERLAND_BUILD_DIR)/init.bin
+X86_64_USERLAND_INIT_OBJ := $(X86_64_USERLAND_BUILD_DIR)/init.o
+X86_64_USERLAND_INIT_ELF := $(X86_64_USERLAND_BUILD_DIR)/init.elf
+X86_64_USERLAND_LINKER := userland/x86_64/linker.ld
 X86_64_ISO_DIR := $(X86_64_BUILD_DIR)/iso
 X86_64_EXCEPTION_TEST_ISO_DIR := $(X86_64_BUILD_DIR)/iso-exception-test
 X86_64_KERNEL := $(X86_64_BUILD_DIR)/kernel.elf
@@ -58,6 +60,7 @@ QEMU_i386 := qemu-system-i386
 ASMFLAGS_x86_64 := -f elf64
 CFLAGS_x86_64 := -target x86_64-elf -ffreestanding -fno-stack-protector -fno-pic -fno-builtin -mno-red-zone -Wall -Wextra -O0
 LDFLAGS_x86_64 := -T linker.x86_64.ld -nostdlib -m elf_x86_64
+X86_64_USERLAND_LDFLAGS := -nostdlib -m elf_x86_64
 QEMU_x86_64 := qemu-system-x86_64
 
 ASMFLAGS := $(ASMFLAGS_$(ARCH))
@@ -181,7 +184,7 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path now builds an embedded x86_64 user init image before running the ring-3 syscall smoke path."
+	@echo "Liam_OS x86_64 path now builds and embeds a real ELF64 user init image before running the ring-3 syscall smoke path."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
@@ -192,7 +195,7 @@ x86_64-info:
 	@echo "ISO output: $(X86_64_ISO)"
 	@echo "Exception self-test ISO output: $(X86_64_EXCEPTION_TEST_ISO)"
 	@echo "Expected x86_64 screen messages: PIT timer ok: 1, Keyboard ready ok: 1, Heap smoke ok: 1, Process smoke ok: 1, Desc/IST ok: 1"
-	@echo "Expected serial markers include: User mode ok: 1, Paging builder user image source ok: 1, Paging builder PMM backed: 1, Heap smoke ok: 1, Process stack execution ok: 1, Runtime entry ok: 1, Paging activation ok: 1, Paging probes ok: 1"
+	@echo "Expected serial markers include: User mode ok: 1, Paging builder ELF64 load ok: 1, Paging builder PMM backed: 1, Heap smoke ok: 1, Process stack execution ok: 1, Runtime entry ok: 1, Paging activation ok: 1, Paging probes ok: 1"
 	@echo "Expected exception self-test markers include: Exception self-test requested: 1, x86_64 exception self-test: ud2, Name: invalid opcode, Vector: 0x0000000000000006, x86_64 panic halt"
 	@echo "Serial output is routed to the terminal by make x86_64-run and make x86_64-exception-test-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
@@ -235,8 +238,11 @@ $(foreach name,$(USERLAND_FLAT_NAMES),$(eval $(call BUILD_USERLAND_FLAT,$(name))
 
 $(USERLAND_IMAGES_OBJ): $(USERLAND_FLAT_BIN)
 
-$(X86_64_USERLAND_INIT_BIN): userland/x86_64/init/init.asm | $(X86_64_USERLAND_BUILD_DIR)
-	$(ASM) -f bin $< -o $@
+$(X86_64_USERLAND_INIT_OBJ): userland/x86_64/init/init.asm | $(X86_64_USERLAND_BUILD_DIR)
+	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
+
+$(X86_64_USERLAND_INIT_ELF): $(X86_64_USERLAND_INIT_OBJ) $(X86_64_USERLAND_LINKER) | $(X86_64_USERLAND_BUILD_DIR)
+	$(LD) $(X86_64_USERLAND_LDFLAGS) -T $(X86_64_USERLAND_LINKER) $(X86_64_USERLAND_INIT_OBJ) -o $@
 
 $(X86_64_BOOT32_OBJ): kernel/arch/x86_64/boot32.asm | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
@@ -254,7 +260,7 @@ $(X86_64_USER_MODE_ASM_OBJ): kernel/arch/x86_64/user_mode.asm | $(X86_64_BUILD_D
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
 
-$(X86_64_USERLAND_IMAGES_OBJ): kernel/arch/x86_64/userland_images.asm $(X86_64_USERLAND_INIT_BIN) | $(X86_64_BUILD_DIR)
+$(X86_64_USERLAND_IMAGES_OBJ): kernel/arch/x86_64/userland_images.asm $(X86_64_USERLAND_INIT_ELF) | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
 
