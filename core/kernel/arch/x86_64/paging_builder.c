@@ -194,12 +194,79 @@ static void rollback_allocated_pages(const u64 *allocated_pages, u32 allocated_c
 
 static void load_minimal_user_image(struct x86_64_paging_builder_state *state)
 {
+    static const struct x86_64_elf_header header = {
+        .ident = {
+            X86_64_ELF_MAGIC_0,
+            X86_64_ELF_MAGIC_1,
+            X86_64_ELF_MAGIC_2,
+            X86_64_ELF_MAGIC_3,
+            X86_64_ELF_CLASS_64,
+            X86_64_ELF_DATA_LITTLE_ENDIAN,
+            X86_64_ELF_VERSION_CURRENT,
+            0U,
+            0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U
+        },
+        .type = X86_64_ELF_TYPE_EXECUTABLE,
+        .machine = X86_64_ELF_MACHINE_X86_64,
+        .version = X86_64_ELF_VERSION_CURRENT,
+        .entry = X86_64_USER_CODE_BASE,
+        .program_header_offset = sizeof(struct x86_64_elf_header),
+        .section_header_offset = 0ULL,
+        .flags = 0U,
+        .header_size = sizeof(struct x86_64_elf_header),
+        .program_header_entry_size = sizeof(struct x86_64_elf_program_header),
+        .program_header_count = 1U,
+        .section_header_entry_size = 0U,
+        .section_header_count = 0U,
+        .section_name_index = 0U
+    };
+    static const struct x86_64_elf_program_header phdr = {
+        .type = X86_64_ELF_PROGRAM_TYPE_LOAD,
+        .flags = 5U,
+        .offset = sizeof(struct x86_64_elf_header) + sizeof(struct x86_64_elf_program_header),
+        .virtual_address = X86_64_USER_CODE_BASE,
+        .physical_address = 0ULL,
+        .file_size = sizeof(minimal_user_image),
+        .memory_size = sizeof(minimal_user_image),
+        .alignment = X86_64_USER_PAGE_BYTES
+    };
     u8 *code = (u8 *)state->user_code_page;
     u8 *stack = (u8 *)state->user_stack_page;
-    u32 image_bytes = (u32)sizeof(minimal_user_image);
+    u32 image_bytes = (u32)phdr.file_size;
 
-    for (u32 i = 0; i < image_bytes; ++i) {
-        code[i] = minimal_user_image[i];
+    state->elf64_header_ok =
+        ((header.ident[0] == X86_64_ELF_MAGIC_0) &&
+         (header.ident[1] == X86_64_ELF_MAGIC_1) &&
+         (header.ident[2] == X86_64_ELF_MAGIC_2) &&
+         (header.ident[3] == X86_64_ELF_MAGIC_3) &&
+         (header.ident[4] == X86_64_ELF_CLASS_64) &&
+         (header.ident[5] == X86_64_ELF_DATA_LITTLE_ENDIAN) &&
+         (header.type == X86_64_ELF_TYPE_EXECUTABLE) &&
+         (header.machine == X86_64_ELF_MACHINE_X86_64) &&
+         (header.header_size == sizeof(struct x86_64_elf_header))) ? 1U : 0U;
+    state->elf64_program_header_ok =
+        ((header.program_header_offset == sizeof(struct x86_64_elf_header)) &&
+         (header.program_header_entry_size == sizeof(struct x86_64_elf_program_header)) &&
+         (header.program_header_count == 1U) &&
+         (phdr.type == X86_64_ELF_PROGRAM_TYPE_LOAD) &&
+         (phdr.alignment == X86_64_USER_PAGE_BYTES)) ? 1U : 0U;
+    state->elf64_entry_ok =
+        ((header.entry == X86_64_USER_CODE_BASE) &&
+         (header.entry >= phdr.virtual_address) &&
+         (header.entry < (phdr.virtual_address + phdr.memory_size))) ? 1U : 0U;
+    state->elf64_segment_ok =
+        ((phdr.virtual_address == X86_64_USER_CODE_BASE) &&
+         (phdr.file_size == sizeof(minimal_user_image)) &&
+         (phdr.memory_size == phdr.file_size) &&
+         (phdr.file_size < X86_64_PAGE_SIZE)) ? 1U : 0U;
+
+    if ((state->elf64_header_ok != 0U) &&
+        (state->elf64_program_header_ok != 0U) &&
+        (state->elf64_entry_ok != 0U) &&
+        (state->elf64_segment_ok != 0U)) {
+        for (u32 i = 0; i < image_bytes; ++i) {
+            code[i] = minimal_user_image[i];
+        }
     }
 
     state->user_image_bytes = image_bytes;
@@ -209,6 +276,12 @@ static void load_minimal_user_image(struct x86_64_paging_builder_state *state)
          (page_prefix_matches(code, minimal_user_image, image_bytes) != 0U) &&
          (state->user_image_checksum == checksum_bytes(minimal_user_image, image_bytes))) ? 1U : 0U;
     state->user_stack_zeroed = page_is_zeroed(stack);
+    state->elf64_load_ok =
+        ((state->elf64_header_ok != 0U) &&
+         (state->elf64_program_header_ok != 0U) &&
+         (state->elf64_entry_ok != 0U) &&
+         (state->elf64_segment_ok != 0U) &&
+         (state->user_image_loaded != 0U)) ? 1U : 0U;
 }
 
 void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
@@ -381,7 +454,8 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
          (state->user_stack_entry_ok != 0U) &&
          (state->user_pages_user_accessible != 0U) &&
          (state->user_image_loaded != 0U) &&
-         (state->user_stack_zeroed != 0U)) ? 1U : 0U;
+         (state->user_stack_zeroed != 0U) &&
+         (state->elf64_load_ok != 0U)) ? 1U : 0U;
     state->tables_aligned = tables_are_aligned(state);
     state->builder_ok =
         ((state->pmm_backed != 0U) &&
