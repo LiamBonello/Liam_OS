@@ -47,6 +47,8 @@ struct x86_64_syscall_dispatch_state {
     u32 write_output_enabled;
     u32 read_ok;
     u32 read_fault_ok;
+    u32 blocking_read_enabled;
+    u32 blocking_read_spins;
     u32 get_arg_ok;
     u32 getpid_ok;
     u32 yield_ok;
@@ -108,6 +110,24 @@ static inline u64 x86_64_syscall_read_stdin(char *buffer, u64 size)
     return bytes;
 }
 
+static inline u64 x86_64_syscall_read_stdin_blocking(struct x86_64_syscall_dispatch_state *state,
+                                                     char *buffer,
+                                                     u64 size)
+{
+    if (size == 0ULL) {
+        return 0ULL;
+    }
+
+    u64 bytes = x86_64_syscall_read_stdin(buffer, size);
+    while (bytes == 0ULL) {
+        state->blocking_read_spins += 1U;
+        __asm__ volatile("pause");
+        bytes = x86_64_syscall_read_stdin(buffer, size);
+    }
+
+    return bytes;
+}
+
 static inline u64 x86_64_syscall_copy_string_arg(char *buffer, u64 size, const char *value)
 {
     if (buffer == (char *)0 || size == 0ULL || value == (const char *)0) {
@@ -140,6 +160,8 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->write_output_enabled = 0U;
     state->read_ok = 0U;
     state->read_fault_ok = 0U;
+    state->blocking_read_enabled = 0U;
+    state->blocking_read_spins = 0U;
     state->get_arg_ok = 0U;
     state->getpid_ok = 0U;
     state->yield_ok = 0U;
@@ -198,6 +220,10 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         }
         if (x86_64_syscall_user_range_ok(arg1, arg2) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        if (state->blocking_read_enabled != 0U) {
+            state->last_result = x86_64_syscall_read_stdin_blocking(state, (char *)arg1, arg2);
             return state->last_result;
         }
         state->last_result = x86_64_syscall_read_stdin((char *)arg1, arg2);
@@ -363,6 +389,8 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall write fault ok: ", state->write_fault_ok);
     x86_64_serial_write_u32("Syscall read dispatch ok: ", state->read_ok);
     x86_64_serial_write_u32("Syscall read fault ok: ", state->read_fault_ok);
+    x86_64_serial_write_u32("Syscall blocking read enabled: ", state->blocking_read_enabled);
+    x86_64_serial_write_u32("Syscall blocking read spins: ", state->blocking_read_spins);
     x86_64_serial_write_u32("Syscall get_arg dispatch ok: ", state->get_arg_ok);
     x86_64_serial_write_u32("Syscall getpid dispatch ok: ", state->getpid_ok);
     x86_64_serial_write_u32("Syscall yield dispatch ok: ", state->yield_ok);
