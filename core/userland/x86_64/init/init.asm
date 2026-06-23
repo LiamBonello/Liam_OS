@@ -8,6 +8,7 @@ bits 64
 
 %define LIAM_STDIN 0
 %define LIAM_STDOUT 1
+%define LIAM_READ_BUFFER_LEN 64
 
 section .text
 global _start
@@ -24,8 +25,8 @@ _start:
 
     mov eax, LIAM_SYSCALL_READ
     mov edi, LIAM_STDIN
-    lea rsi, [rel input_buffer]
-    mov edx, input_buffer_len
+    lea rsi, [rsp - LIAM_READ_BUFFER_LEN]
+    mov edx, LIAM_READ_BUFFER_LEN
     syscall
 
     mov eax, LIAM_SYSCALL_YIELD
@@ -44,9 +45,3 @@ shell_banner:
     db "Liam_OS x86_64 shell online", 10
     db "$ "
 shell_banner_len equ $ - shell_banner
-
-section .bss
-align 16
-input_buffer:
-    resb 64
-input_buffer_len equ 64
