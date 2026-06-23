@@ -62,13 +62,6 @@ shell_loop:
 
 process_input:
     mov r13, rax
-
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
-    mov rdx, r13
-    syscall
-
     xor ebx, ebx
 
 scan_input:
@@ -79,7 +72,7 @@ scan_input:
     inc rbx
 
     cmp al, 13
-    je line_ready
+    je carriage_return
     cmp al, 10
     je line_ready
     cmp al, 8
@@ -90,6 +83,13 @@ scan_input:
     cmp r15, LIAM_LINE_BUFFER_LEN - 1
     jae scan_input
     mov [rsp + LIAM_LINE_BUFFER_OFFSET + r15], al
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_LINE_BUFFER_OFFSET + r15]
+    mov edx, 1
+    syscall
+
     inc r15
     jmp scan_input
 
@@ -97,9 +97,28 @@ backspace:
     test r15, r15
     jz scan_input
     dec r15
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel erase_text]
+    mov edx, erase_text_len
+    syscall
     jmp scan_input
 
+carriage_return:
+    cmp rbx, r13
+    jae line_ready
+    cmp byte [rsp + LIAM_READ_BUFFER_OFFSET + rbx], 10
+    jne line_ready
+    inc rbx
+
 line_ready:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel newline_text]
+    mov edx, newline_text_len
+    syscall
+
     mov byte [rsp + LIAM_LINE_BUFFER_OFFSET + r15], 0
     jmp handle_line
 
@@ -314,6 +333,9 @@ version_text_len equ $ - version_text
 clear_text:
     db 27, "[2J", 27, "[H"
 clear_text_len equ $ - clear_text
+erase_text:
+    db 8, " ", 8
+erase_text_len equ $ - erase_text
 newline_text:
     db 10
 newline_text_len equ $ - newline_text
