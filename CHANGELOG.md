@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.56-dev
+
+### Added
+
+- Added guarded x86_64 syscall MSR bring-up for `IA32_EFER`, `IA32_STAR`, `IA32_LSTAR`, and `IA32_FMASK`.
+- Added serial diagnostics that read back the programmed fast-syscall MSRs and report EFER.SCE, STAR, LSTAR, FMASK, and overall `Syscall MSR ok` status.
+
+### Changed
+
+- Tightened the x86_64 syscall ABI report so syscall MSR programming is no longer marked deferred.
+- Kept the current LSTAR target on the guarded syscall entry stub until the real ring-3 syscall return path is implemented.
+- Updated Liam_OS version to `0.8.56-dev`.
+
+### Notes
+
+- This configures the CPU fast-syscall registers, but it still does not enter x86_64 user mode or dispatch live user syscalls from ring 3.
+- The normal x86_64 boot should report `Syscall MSR programming deferred: 0`, `Syscall EFER SCE enabled: 1`, `Syscall STAR programmed: 1`, `Syscall LSTAR programmed: 1`, `Syscall FMASK programmed: 1`, and `Syscall MSR ok: 1`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.55-dev
 
 ### Changed
