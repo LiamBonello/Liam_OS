@@ -41,7 +41,7 @@ x86_64_syscall_entry_stub:
     je .exit_to_kernel
     pop r11
     pop rcx
-    sysretq
+    o64 sysret
 
 .exit_to_kernel:
     mov rsp, [rel x86_64_user_smoke_kernel_rsp]
