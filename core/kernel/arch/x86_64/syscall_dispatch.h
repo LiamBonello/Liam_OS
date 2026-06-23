@@ -2,6 +2,7 @@
 #define LIAM_OS_X86_64_SYSCALL_DISPATCH_H
 
 #include "console.h"
+#include "idt.h"
 #include "syscall.h"
 #include "types.h"
 #include "userland.h"
@@ -169,7 +170,7 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
-        state->last_result = X86_64_SYSCALL_RET_OK;
+        state->last_result = x86_64_keyboard_read((char *)arg1, arg2);
         return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_OPEN:
