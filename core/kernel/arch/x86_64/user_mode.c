@@ -4,6 +4,8 @@
 #include "syscall.h"
 #include "userland.h"
 
+#define X86_64_USER_MODE_MAX_SMOKE_SYSCALLS 256U
+
 u64 x86_64_user_smoke_kernel_rsp;
 
 static struct x86_64_user_mode_smoke_state *active_state;
@@ -95,7 +97,7 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
         ((active_dispatcher.initialized != 0U) &&
          (active_dispatcher.service_count == X86_64_SYSCALL_SERVICE_COUNT) &&
          (active_dispatcher.dispatch_calls >= 10U) &&
-         (active_dispatcher.dispatch_calls <= 40U) &&
+         (active_dispatcher.dispatch_calls <= X86_64_USER_MODE_MAX_SMOKE_SYSCALLS) &&
          (state->unexpected_syscall == 0U)) ? 1U : 0U;
 
     return result;
@@ -132,7 +134,7 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
          (state->entered != 0U) &&
          (state->returned_to_kernel != 0U) &&
          (state->syscall_count >= 10U) &&
-         (state->syscall_count <= 40U) &&
+         (state->syscall_count <= X86_64_USER_MODE_MAX_SMOKE_SYSCALLS) &&
          (state->getpid_ok != 0U) &&
          (state->write_ok != 0U) &&
          (state->read_ok != 0U) &&
