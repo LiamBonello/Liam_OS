@@ -15,5 +15,6 @@ void x86_64_serial_write_line(const char *message);
 void x86_64_serial_write_u32(const char *label, u32 value);
 void x86_64_serial_write_hex32(const char *label, u32 value);
 void x86_64_serial_write_hex64(const char *label, u64 value);
+u64 x86_64_serial_read(char *buffer, u64 size);
 
 #endif
