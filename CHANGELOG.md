@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.57-dev
+
+### Added
+
+- Added a guarded x86_64 ring-3 smoke runner that enters user mode through an `iretq` frame and executes the mapped ELF64 smoke image.
+- Added a live x86_64 syscall smoke path for `getpid`, `yield`, and `exit`, returning through `sysretq` for continuing calls and restoring the kernel stack on user exit.
+- Added serial diagnostics for user-mode entry readiness, stack readiness, syscall count, syscall results, exit code, and overall `User mode ok` status.
+
+### Changed
+
+- Wired the x86_64 boot path to run the ring-3 smoke after the higher-half runtime and before the remaining diagnostics.
+- Updated `make x86_64-info` validation markers for the first live ring-3 syscall milestone.
+- Updated Liam_OS version to `0.8.57-dev`.
+
+### Notes
+
+- This is the first real x86_64 ring-3 execution checkpoint, but the syscall entry is still a guarded smoke path rather than the final production syscall dispatcher.
+- The normal x86_64 boot should report `x86_64 ring3 user smoke online`, `User mode attempted: 1`, `User mode returned to kernel: 1`, `User mode syscall count: 3`, `User mode getpid ok: 1`, `User mode yield ok: 1`, `User mode exit ok: 1`, and `User mode ok: 1`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.56-dev
 
 ### Added
