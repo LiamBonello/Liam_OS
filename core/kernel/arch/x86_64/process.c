@@ -50,6 +50,13 @@ static u64 read_rsp(void)
     return value;
 }
 
+static u64 read_cr3(void)
+{
+    u64 value;
+    __asm__ volatile ("mov %%cr3, %0" : "=r"(value) :: "memory");
+    return value;
+}
+
 static u32 is_aligned_u64(u64 value, u64 alignment)
 {
     return ((value & (alignment - 1ULL)) == 0ULL) ? 1U : 0U;
@@ -253,9 +260,10 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     (void)x86_64_process_run_all_ready(X86_64_PROCESS_MAX_PROCESSES);
     refresh_counts();
 
+    u64 active_cr3 = read_cr3();
     x86_64_userland_foundation_init(&userland_state);
     x86_64_syscall_dispatch_run_smoke(&syscall_dispatch_state, first_pid);
-    x86_64_user_context_init(&user_context_state, &userland_state, (u64)first_pid, process_state.first_stack_base);
+    x86_64_user_context_init(&user_context_state, &userland_state, (u64)first_pid, active_cr3);
     process_state.userland_foundation_ok = userland_state.foundation_ok;
     process_state.syscall_dispatcher_ok = syscall_dispatch_state.dispatcher_ok;
     process_state.user_context_ok = user_context_state.context_ok;
