@@ -79,7 +79,7 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->msr_programming_required = 1U;
     state->entry_lstar_target = (u64)x86_64_syscall_entry_stub;
     state->entry_stub_installed = (state->entry_lstar_target != 0ULL) ? 1U : 0U;
-    state->user_entry_deferred = 1U;
+    state->user_entry_deferred = 0U;
     state->user_selectors_ready = 1U;
     state->arg_register_count = X86_64_SYSCALL_MAX_ARGS;
     state->syscall_number_rax = 1U;
@@ -116,7 +116,7 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
                              (state->msr_programming_deferred == 0U) &&
                              (state->msr_programming_required != 0U) &&
                              (state->entry_stub_installed != 0U) &&
-                             (state->user_entry_deferred != 0U) &&
+                             (state->user_entry_deferred == 0U) &&
                              (state->user_selectors_ready != 0U) &&
                              (state->planned_star_value != 0ULL) &&
                              (state->planned_fmask_value != 0ULL) &&
