@@ -10,6 +10,7 @@
 #define X86_64_SYSCALL_RET_EFAULT 0xFFFFFFFFFFFFFFF2ULL
 #define X86_64_SYSCALL_RET_EINVAL 0xFFFFFFFFFFFFFFEAULL
 #define X86_64_SYSCALL_RET_ENOSYS 0xFFFFFFFFFFFFFFDAULL
+#define X86_64_SYSCALL_STDIN 0ULL
 #define X86_64_SYSCALL_STDOUT 1ULL
 #define X86_64_SYSCALL_STDERR 2ULL
 #define X86_64_SYSCALL_WRITE_MAX_BYTES 256ULL
@@ -41,6 +42,8 @@ struct x86_64_syscall_dispatch_state {
     u32 write_ok;
     u32 write_fault_ok;
     u32 write_output_enabled;
+    u32 read_ok;
+    u32 read_fault_ok;
     u32 getpid_ok;
     u32 yield_ok;
     u32 exec_fault_ok;
@@ -105,6 +108,8 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->write_ok = 0U;
     state->write_fault_ok = 0U;
     state->write_output_enabled = 0U;
+    state->read_ok = 0U;
+    state->read_fault_ok = 0U;
     state->getpid_ok = 0U;
     state->yield_ok = 0U;
     state->exec_fault_ok = 0U;
@@ -155,19 +160,23 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->last_result = arg2;
         return state->last_result;
 
+    case X86_64_SYSCALL_SERVICE_READ:
+        if (arg0 != X86_64_SYSCALL_STDIN) {
+            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+            return state->last_result;
+        }
+        if (x86_64_syscall_user_range_ok(arg1, arg2) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        state->last_result = X86_64_SYSCALL_RET_OK;
+        return state->last_result;
+
     case X86_64_SYSCALL_SERVICE_OPEN:
     case X86_64_SYSCALL_SERVICE_STAT:
     case X86_64_SYSCALL_SERVICE_GET_ARG:
     case X86_64_SYSCALL_SERVICE_EXEC:
         if (x86_64_syscall_user_range_ok(arg0, 1ULL) == 0U) {
-            state->last_result = X86_64_SYSCALL_RET_EFAULT;
-            return state->last_result;
-        }
-        state->last_result = X86_64_SYSCALL_RET_ENOSYS;
-        return state->last_result;
-
-    case X86_64_SYSCALL_SERVICE_READ:
-        if (x86_64_syscall_user_range_ok(arg1, arg2) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
@@ -237,6 +246,16 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
                                               0ULL, 0ULL, 0ULL);
     state->write_fault_ok = (write_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
 
+    u64 read_result = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_READ,
+                                              X86_64_SYSCALL_STDIN, state->sample_user_buffer, 4ULL,
+                                              0ULL, 0ULL, 0ULL);
+    state->read_ok = (read_result == X86_64_SYSCALL_RET_OK) ? 1U : 0U;
+
+    u64 read_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_READ,
+                                             X86_64_SYSCALL_STDIN, state->sample_kernel_pointer, 4ULL,
+                                             0ULL, 0ULL, 0ULL);
+    state->read_fault_ok = (read_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
+
     u64 getpid_result = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_GETPID,
                                                 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL);
     state->getpid_ok = (getpid_result == (u64)current_pid) ? 1U : 0U;
@@ -266,12 +285,14 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
          (state->pointer_validation_ok != 0U) &&
          (state->write_ok != 0U) &&
          (state->write_fault_ok != 0U) &&
+         (state->read_ok != 0U) &&
+         (state->read_fault_ok != 0U) &&
          (state->getpid_ok != 0U) &&
          (state->yield_ok != 0U) &&
          (state->exec_fault_ok != 0U) &&
          (state->unknown_rejected != 0U) &&
          (state->exit_ok != 0U) &&
-         (state->dispatch_calls == 7U)) ? 1U : 0U;
+         (state->dispatch_calls == 9U)) ? 1U : 0U;
 }
 
 static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_dispatch_state *state)
@@ -287,6 +308,8 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall pointer validation ok: ", state->pointer_validation_ok);
     x86_64_serial_write_u32("Syscall write dispatch ok: ", state->write_ok);
     x86_64_serial_write_u32("Syscall write fault ok: ", state->write_fault_ok);
+    x86_64_serial_write_u32("Syscall read dispatch ok: ", state->read_ok);
+    x86_64_serial_write_u32("Syscall read fault ok: ", state->read_fault_ok);
     x86_64_serial_write_u32("Syscall getpid dispatch ok: ", state->getpid_ok);
     x86_64_serial_write_u32("Syscall yield dispatch ok: ", state->yield_ok);
     x86_64_serial_write_u32("Syscall exec fault ok: ", state->exec_fault_ok);
