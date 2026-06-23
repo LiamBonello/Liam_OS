@@ -65,6 +65,11 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
                            result != X86_64_SYSCALL_RET_EINVAL) ? 1U : 0U;
         break;
 
+    case X86_64_SYSCALL_SERVICE_OPEN:
+    case X86_64_SYSCALL_SERVICE_CLOSE:
+    case X86_64_SYSCALL_SERVICE_STAT:
+        break;
+
     case X86_64_SYSCALL_SERVICE_READ:
         state->read_ok = (result != X86_64_SYSCALL_RET_EFAULT &&
                           result != X86_64_SYSCALL_RET_EINVAL) ? 1U : 0U;
