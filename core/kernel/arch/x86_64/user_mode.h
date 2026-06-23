@@ -14,6 +14,8 @@ struct x86_64_user_mode_smoke_state {
     u32 returned_to_kernel;
     u32 syscall_count;
     u32 getpid_ok;
+    u32 write_ok;
+    u32 read_ok;
     u32 yield_ok;
     u32 exit_ok;
     u32 unexpected_syscall;
