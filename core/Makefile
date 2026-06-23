@@ -4,6 +4,8 @@ USERLAND_BUILD_DIR := $(BUILD_DIR)/userland
 KERNEL := $(BUILD_DIR)/kernel.bin
 ISO := $(BUILD_DIR)/liam_os.iso
 X86_64_BUILD_DIR := $(BUILD_DIR)/x86_64
+X86_64_USERLAND_BUILD_DIR := $(X86_64_BUILD_DIR)/userland
+X86_64_USERLAND_INIT_BIN := $(X86_64_USERLAND_BUILD_DIR)/init.bin
 X86_64_ISO_DIR := $(X86_64_BUILD_DIR)/iso
 X86_64_EXCEPTION_TEST_ISO_DIR := $(X86_64_BUILD_DIR)/iso-exception-test
 X86_64_KERNEL := $(X86_64_BUILD_DIR)/kernel.elf
@@ -15,6 +17,7 @@ X86_64_BOOT32_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/boot32.o
 X86_64_START_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/start.o
 X86_64_IDT_STUBS_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/idt_stubs.o
 X86_64_USER_MODE_ASM_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/user_mode_asm.o
+X86_64_USERLAND_IMAGES_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/userland_images.o
 X86_64_HIGHER_HALF_PROBE_ASM_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/higher_half_probe_asm.o
 X86_64_HIGHER_HALF_PROBE_C_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/higher_half_probe.o
 X86_64_KERNEL_C_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/kernel.o
@@ -35,7 +38,7 @@ X86_64_PAGING_BUILDER_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/paging_build
 X86_64_PMM_PLAN_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/pmm_plan.o
 X86_64_PMM_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/pmm.o
 X86_64_IDT_OBJ := $(X86_64_BUILD_DIR)/kernel/arch/x86_64/idt.o
-X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_IDT_STUBS_OBJ) $(X86_64_USER_MODE_ASM_OBJ) $(X86_64_HIGHER_HALF_PROBE_ASM_OBJ) $(X86_64_HIGHER_HALF_PROBE_C_OBJ) $(X86_64_KERNEL_C_OBJ) $(X86_64_CONSOLE_OBJ) $(X86_64_BOOT_INFO_OBJ) $(X86_64_BOOT_CONTEXT_OBJ) $(X86_64_CPUID_OBJ) $(X86_64_RUNTIME_OBJ) $(X86_64_HEAP_OBJ) $(X86_64_PROCESS_OBJ) $(X86_64_USER_MODE_OBJ) $(X86_64_GDT_OBJ) $(X86_64_TSS_OBJ) $(X86_64_MEMORY_LAYOUT_OBJ) $(X86_64_PAGING_OBJ) $(X86_64_PAGING_PLAN_OBJ) $(X86_64_PAGING_BUILDER_OBJ) $(X86_64_PMM_PLAN_OBJ) $(X86_64_PMM_OBJ) $(X86_64_IDT_OBJ)
+X86_64_BOOT_OBJ := $(X86_64_BOOT32_OBJ) $(X86_64_START_OBJ) $(X86_64_IDT_STUBS_OBJ) $(X86_64_USER_MODE_ASM_OBJ) $(X86_64_USERLAND_IMAGES_OBJ) $(X86_64_HIGHER_HALF_PROBE_ASM_OBJ) $(X86_64_HIGHER_HALF_PROBE_C_OBJ) $(X86_64_KERNEL_C_OBJ) $(X86_64_CONSOLE_OBJ) $(X86_64_BOOT_INFO_OBJ) $(X86_64_BOOT_CONTEXT_OBJ) $(X86_64_CPUID_OBJ) $(X86_64_RUNTIME_OBJ) $(X86_64_HEAP_OBJ) $(X86_64_PROCESS_OBJ) $(X86_64_USER_MODE_OBJ) $(X86_64_GDT_OBJ) $(X86_64_TSS_OBJ) $(X86_64_MEMORY_LAYOUT_OBJ) $(X86_64_PAGING_OBJ) $(X86_64_PAGING_PLAN_OBJ) $(X86_64_PAGING_BUILDER_OBJ) $(X86_64_PMM_PLAN_OBJ) $(X86_64_PMM_OBJ) $(X86_64_IDT_OBJ)
 
 ARCH ?= i386
 SUPPORTED_ARCHES := i386 x86_64
@@ -178,7 +181,7 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path now has an architecture-local process scheduler smoke check and a guarded syscall entry plan."
+	@echo "Liam_OS x86_64 path now builds an embedded x86_64 user init image before running the ring-3 syscall smoke path."
 	@echo "Current stable bootable default remains: ARCH=i386"
 	@echo "Artifact target: make x86_64-kernel"
 	@echo "ISO target: make x86_64-iso"
@@ -189,7 +192,7 @@ x86_64-info:
 	@echo "ISO output: $(X86_64_ISO)"
 	@echo "Exception self-test ISO output: $(X86_64_EXCEPTION_TEST_ISO)"
 	@echo "Expected x86_64 screen messages: PIT timer ok: 1, Keyboard ready ok: 1, Heap smoke ok: 1, Process smoke ok: 1, Desc/IST ok: 1"
-	@echo "Expected serial markers include: Syscall MSR ok: 1, User mode ok: 1, Syscall entry ready: 1, Paging builder PMM backed: 1, Heap smoke ok: 1, Process stack execution ok: 1, Runtime entry ok: 1, Paging activation ok: 1, Paging probes ok: 1"
+	@echo "Expected serial markers include: User mode ok: 1, Paging builder user image source ok: 1, Paging builder PMM backed: 1, Heap smoke ok: 1, Process stack execution ok: 1, Runtime entry ok: 1, Paging activation ok: 1, Paging probes ok: 1"
 	@echo "Expected exception self-test markers include: Exception self-test requested: 1, x86_64 exception self-test: ud2, Name: invalid opcode, Vector: 0x0000000000000006, x86_64 panic halt"
 	@echo "Serial output is routed to the terminal by make x86_64-run and make x86_64-exception-test-run."
 	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
@@ -215,6 +218,9 @@ $(BUILD_DIR):
 $(X86_64_BUILD_DIR): | $(BUILD_DIR)
 	mkdir -p $(X86_64_BUILD_DIR)
 
+$(X86_64_USERLAND_BUILD_DIR): | $(X86_64_BUILD_DIR)
+	mkdir -p $(X86_64_USERLAND_BUILD_DIR)
+
 $(USERLAND_BUILD_DIR): | $(BUILD_DIR)
 	mkdir -p $(USERLAND_BUILD_DIR)
 
@@ -229,6 +235,9 @@ $(foreach name,$(USERLAND_FLAT_NAMES),$(eval $(call BUILD_USERLAND_FLAT,$(name))
 
 $(USERLAND_IMAGES_OBJ): $(USERLAND_FLAT_BIN)
 
+$(X86_64_USERLAND_INIT_BIN): userland/x86_64/init/init.asm | $(X86_64_USERLAND_BUILD_DIR)
+	$(ASM) -f bin $< -o $@
+
 $(X86_64_BOOT32_OBJ): kernel/arch/x86_64/boot32.asm | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
@@ -242,6 +251,10 @@ $(X86_64_IDT_STUBS_OBJ): kernel/arch/x86_64/idt_stubs.asm | $(X86_64_BUILD_DIR)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
 
 $(X86_64_USER_MODE_ASM_OBJ): kernel/arch/x86_64/user_mode.asm | $(X86_64_BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
+
+$(X86_64_USERLAND_IMAGES_OBJ): kernel/arch/x86_64/userland_images.asm $(X86_64_USERLAND_INIT_BIN) | $(X86_64_BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS_x86_64) $< -o $@
 
