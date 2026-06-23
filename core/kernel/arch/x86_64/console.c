@@ -40,6 +40,11 @@ static void serial_write_char(char c)
     }
 }
 
+static u32 serial_received(void)
+{
+    return ((inb(COM1 + 5U) & 0x01U) != 0U) ? 1U : 0U;
+}
+
 static void make_hex32(char *buffer, u32 value)
 {
     for (u32 i = 0; i < 8U; ++i) {
@@ -195,4 +200,19 @@ void x86_64_serial_write_hex64(const char *label, u64 value)
     usize index = append_label(buffer, label);
     make_hex64(buffer + index, value);
     x86_64_serial_write_line(buffer);
+}
+
+u64 x86_64_serial_read(char *buffer, u64 size)
+{
+    if (buffer == (char *)0 || size == 0ULL) {
+        return 0ULL;
+    }
+
+    u64 bytes = 0ULL;
+    while (bytes < size && serial_received() != 0U) {
+        buffer[bytes] = (char)inb(COM1);
+        bytes += 1ULL;
+    }
+
+    return bytes;
 }
