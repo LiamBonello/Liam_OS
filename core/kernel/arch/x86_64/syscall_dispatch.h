@@ -10,6 +10,9 @@
 #define X86_64_SYSCALL_RET_EFAULT 0xFFFFFFFFFFFFFFF2ULL
 #define X86_64_SYSCALL_RET_EINVAL 0xFFFFFFFFFFFFFFEAULL
 #define X86_64_SYSCALL_RET_ENOSYS 0xFFFFFFFFFFFFFFDAULL
+#define X86_64_SYSCALL_STDOUT 1ULL
+#define X86_64_SYSCALL_STDERR 2ULL
+#define X86_64_SYSCALL_WRITE_MAX_BYTES 256ULL
 
 struct x86_64_syscall_frame {
     u64 number;
@@ -72,6 +75,21 @@ static inline u32 x86_64_syscall_user_range_ok(u64 address, u64 size)
     return 1U;
 }
 
+static inline void x86_64_syscall_write_serial(const char *buffer, u64 size)
+{
+    u64 limit = size;
+    if (limit > X86_64_SYSCALL_WRITE_MAX_BYTES) {
+        limit = X86_64_SYSCALL_WRITE_MAX_BYTES;
+    }
+
+    for (u64 i = 0ULL; i < limit; ++i) {
+        char message[2];
+        message[0] = buffer[i];
+        message[1] = '\0';
+        x86_64_serial_write(message);
+    }
+}
+
 static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_state *state,
                                                 u32 current_pid)
 {
@@ -121,10 +139,15 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_WRITE:
+        if (arg0 != X86_64_SYSCALL_STDOUT && arg0 != X86_64_SYSCALL_STDERR) {
+            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+            return state->last_result;
+        }
         if (x86_64_syscall_user_range_ok(arg1, arg2) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
+        x86_64_syscall_write_serial((const char *)arg1, arg2);
         state->last_result = arg2;
         return state->last_result;
 
@@ -201,12 +224,12 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
          (state->kernel_pointer_rejected != 0U)) ? 1U : 0U;
 
     u64 write_result = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_WRITE,
-                                               1ULL, state->sample_user_buffer, 4ULL,
+                                               X86_64_SYSCALL_STDOUT, state->sample_user_buffer, 4ULL,
                                                0ULL, 0ULL, 0ULL);
     state->write_ok = (write_result == 4ULL) ? 1U : 0U;
 
     u64 write_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_WRITE,
-                                              1ULL, state->sample_kernel_pointer, 4ULL,
+                                              X86_64_SYSCALL_STDOUT, state->sample_kernel_pointer, 4ULL,
                                               0ULL, 0ULL, 0ULL);
     state->write_fault_ok = (write_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
 
