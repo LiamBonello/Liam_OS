@@ -12,11 +12,17 @@
 #define X86_64_SYSCALL_RET_EFAULT 0xFFFFFFFFFFFFFFF2ULL
 #define X86_64_SYSCALL_RET_EINVAL 0xFFFFFFFFFFFFFFEAULL
 #define X86_64_SYSCALL_RET_ENOSYS 0xFFFFFFFFFFFFFFDAULL
+#define X86_64_SYSCALL_RET_ENOENT 0xFFFFFFFFFFFFFFFEULL
+#define X86_64_SYSCALL_RET_EBADF 0xFFFFFFFFFFFFFFF7ULL
 #define X86_64_SYSCALL_STDIN 0ULL
 #define X86_64_SYSCALL_STDOUT 1ULL
 #define X86_64_SYSCALL_STDERR 2ULL
+#define X86_64_SYSCALL_FD_BASE 3ULL
+#define X86_64_SYSCALL_MAX_OPEN_FILES 4U
 #define X86_64_SYSCALL_WRITE_MAX_BYTES 256ULL
+#define X86_64_SYSCALL_PATH_MAX_BYTES 64ULL
 #define X86_64_SYSCALL_ARG_SHELL_MODE 0ULL
+#define X86_64_SYSCALL_NO_FILE 0xFFFFFFFFU
 
 struct x86_64_syscall_frame {
     u64 number;
@@ -33,6 +39,35 @@ struct x86_64_syscall_frame {
     u32 reserved;
 };
 
+struct x86_64_kernel_file {
+    const char *path;
+    const char *data;
+    u64 size;
+};
+
+static const char x86_64_kernel_file_os_release[] =
+    "NAME=Liam_OS\n"
+    "ARCH=x86_64\n"
+    "BUILD=dev\n";
+
+static const char x86_64_kernel_file_version[] =
+    "Liam_OS Core x86_64 dev\n";
+
+static const char x86_64_kernel_file_help[] =
+    "Available files:\n"
+    "/etc/os-release\n"
+    "/proc/version\n"
+    "/usr/share/help.txt\n";
+
+static const struct x86_64_kernel_file x86_64_kernel_files[] = {
+    {"/etc/os-release", x86_64_kernel_file_os_release, sizeof(x86_64_kernel_file_os_release) - 1ULL},
+    {"/proc/version", x86_64_kernel_file_version, sizeof(x86_64_kernel_file_version) - 1ULL},
+    {"/usr/share/help.txt", x86_64_kernel_file_help, sizeof(x86_64_kernel_file_help) - 1ULL},
+};
+
+#define X86_64_SYSCALL_KERNEL_FILE_COUNT \
+    ((u32)(sizeof(x86_64_kernel_files) / sizeof(x86_64_kernel_files[0])))
+
 struct x86_64_syscall_dispatch_state {
     u32 initialized;
     u32 service_count;
@@ -41,6 +76,9 @@ struct x86_64_syscall_dispatch_state {
     u32 pointer_validation_ok;
     u32 user_buffer_accepted;
     u32 kernel_pointer_rejected;
+    u32 file_service_ready;
+    u32 file_count;
+    u32 open_file_count;
     u32 exit_ok;
     u32 write_ok;
     u32 write_fault_ok;
@@ -57,6 +95,9 @@ struct x86_64_syscall_dispatch_state {
     u32 dispatcher_ok;
     u32 exit_code;
     u32 yield_count;
+    u32 fd_used[X86_64_SYSCALL_MAX_OPEN_FILES];
+    u32 fd_file_index[X86_64_SYSCALL_MAX_OPEN_FILES];
+    u64 fd_offset[X86_64_SYSCALL_MAX_OPEN_FILES];
     u64 last_syscall;
     u64 last_result;
     u64 sample_user_buffer;
@@ -83,6 +124,70 @@ static inline u32 x86_64_syscall_user_range_ok(u64 address, u64 size)
     }
 
     return 1U;
+}
+
+static inline u32 x86_64_syscall_user_cstring_equals(u64 user_address,
+                                                     const char *kernel_string,
+                                                     u64 max_bytes,
+                                                     u32 *valid)
+{
+    *valid = 0U;
+    for (u64 i = 0ULL; i < max_bytes; ++i) {
+        if (x86_64_syscall_user_range_ok(user_address + i, 1ULL) == 0U) {
+            return 0U;
+        }
+
+        char user_char = ((const char *)user_address)[i];
+        char kernel_char = kernel_string[i];
+        if (user_char != kernel_char) {
+            if (user_char == '\0' || kernel_char == '\0') {
+                *valid = 1U;
+            }
+            return 0U;
+        }
+
+        if (user_char == '\0') {
+            *valid = 1U;
+            return 1U;
+        }
+    }
+
+    return 0U;
+}
+
+static inline u32 x86_64_syscall_find_kernel_file(u64 user_path, u32 *valid_path)
+{
+    *valid_path = 0U;
+    for (u32 i = 0U; i < X86_64_SYSCALL_KERNEL_FILE_COUNT; ++i) {
+        u32 valid = 0U;
+        if (x86_64_syscall_user_cstring_equals(user_path,
+                                               x86_64_kernel_files[i].path,
+                                               X86_64_SYSCALL_PATH_MAX_BYTES,
+                                               &valid) != 0U) {
+            *valid_path = 1U;
+            return i;
+        }
+        if (valid == 0U) {
+            return X86_64_SYSCALL_NO_FILE;
+        }
+        *valid_path = 1U;
+    }
+
+    return X86_64_SYSCALL_NO_FILE;
+}
+
+static inline u32 x86_64_syscall_fd_slot(u64 fd)
+{
+    if (fd < X86_64_SYSCALL_FD_BASE) {
+        return X86_64_SYSCALL_MAX_OPEN_FILES;
+    }
+
+    u64 slot = fd - X86_64_SYSCALL_FD_BASE;
+    if (slot >= (u64)X86_64_SYSCALL_MAX_OPEN_FILES) {
+        return X86_64_SYSCALL_MAX_OPEN_FILES;
+    }
+
+    return (u32)slot;
 }
 
 static inline void x86_64_syscall_write_serial(const char *buffer, u64 size)
@@ -128,6 +233,37 @@ static inline u64 x86_64_syscall_read_stdin_blocking(struct x86_64_syscall_dispa
     return bytes;
 }
 
+static inline u64 x86_64_syscall_read_file(struct x86_64_syscall_dispatch_state *state,
+                                           u64 fd,
+                                           char *buffer,
+                                           u64 size)
+{
+    u32 slot = x86_64_syscall_fd_slot(fd);
+    if (slot >= X86_64_SYSCALL_MAX_OPEN_FILES || state->fd_used[slot] == 0U) {
+        return X86_64_SYSCALL_RET_EBADF;
+    }
+
+    u32 file_index = state->fd_file_index[slot];
+    if (file_index >= X86_64_SYSCALL_KERNEL_FILE_COUNT) {
+        return X86_64_SYSCALL_RET_EBADF;
+    }
+
+    const struct x86_64_kernel_file *file = &x86_64_kernel_files[file_index];
+    u64 offset = state->fd_offset[slot];
+    if (offset >= file->size || size == 0ULL) {
+        return 0ULL;
+    }
+
+    u64 remaining = file->size - offset;
+    u64 bytes = (size < remaining) ? size : remaining;
+    for (u64 i = 0ULL; i < bytes; ++i) {
+        buffer[i] = file->data[offset + i];
+    }
+
+    state->fd_offset[slot] = offset + bytes;
+    return bytes;
+}
+
 static inline u64 x86_64_syscall_copy_string_arg(char *buffer, u64 size, const char *value)
 {
     if (buffer == (char *)0 || size == 0ULL || value == (const char *)0) {
@@ -154,6 +290,9 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->pointer_validation_ok = 0U;
     state->user_buffer_accepted = 0U;
     state->kernel_pointer_rejected = 0U;
+    state->file_service_ready = 1U;
+    state->file_count = X86_64_SYSCALL_KERNEL_FILE_COUNT;
+    state->open_file_count = 0U;
     state->exit_ok = 0U;
     state->write_ok = 0U;
     state->write_fault_ok = 0U;
@@ -170,10 +309,80 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->dispatcher_ok = 0U;
     state->exit_code = 0U;
     state->yield_count = 0U;
+    for (u32 i = 0U; i < X86_64_SYSCALL_MAX_OPEN_FILES; ++i) {
+        state->fd_used[i] = 0U;
+        state->fd_file_index[i] = X86_64_SYSCALL_NO_FILE;
+        state->fd_offset[i] = 0ULL;
+    }
     state->last_syscall = 0ULL;
     state->last_result = 0ULL;
     state->sample_user_buffer = X86_64_USER_CODE_BASE;
     state->sample_kernel_pointer = 0xFFFF800000100000ULL;
+}
+
+static inline u64 x86_64_syscall_open(struct x86_64_syscall_dispatch_state *state,
+                                      u64 user_path,
+                                      u64 flags)
+{
+    if (flags != 0ULL) {
+        return X86_64_SYSCALL_RET_EINVAL;
+    }
+
+    u32 valid_path = 0U;
+    u32 file_index = x86_64_syscall_find_kernel_file(user_path, &valid_path);
+    if (valid_path == 0U) {
+        return X86_64_SYSCALL_RET_EFAULT;
+    }
+    if (file_index == X86_64_SYSCALL_NO_FILE) {
+        return X86_64_SYSCALL_RET_ENOENT;
+    }
+
+    for (u32 slot = 0U; slot < X86_64_SYSCALL_MAX_OPEN_FILES; ++slot) {
+        if (state->fd_used[slot] == 0U) {
+            state->fd_used[slot] = 1U;
+            state->fd_file_index[slot] = file_index;
+            state->fd_offset[slot] = 0ULL;
+            state->open_file_count += 1U;
+            return X86_64_SYSCALL_FD_BASE + (u64)slot;
+        }
+    }
+
+    return X86_64_SYSCALL_RET_EINVAL;
+}
+
+static inline u64 x86_64_syscall_close(struct x86_64_syscall_dispatch_state *state, u64 fd)
+{
+    u32 slot = x86_64_syscall_fd_slot(fd);
+    if (slot >= X86_64_SYSCALL_MAX_OPEN_FILES || state->fd_used[slot] == 0U) {
+        return X86_64_SYSCALL_RET_EBADF;
+    }
+
+    state->fd_used[slot] = 0U;
+    state->fd_file_index[slot] = X86_64_SYSCALL_NO_FILE;
+    state->fd_offset[slot] = 0ULL;
+    if (state->open_file_count > 0U) {
+        state->open_file_count -= 1U;
+    }
+    return X86_64_SYSCALL_RET_OK;
+}
+
+static inline u64 x86_64_syscall_stat(u64 user_path, u64 user_size_pointer)
+{
+    if (x86_64_syscall_user_range_ok(user_size_pointer, sizeof(u64)) == 0U) {
+        return X86_64_SYSCALL_RET_EFAULT;
+    }
+
+    u32 valid_path = 0U;
+    u32 file_index = x86_64_syscall_find_kernel_file(user_path, &valid_path);
+    if (valid_path == 0U) {
+        return X86_64_SYSCALL_RET_EFAULT;
+    }
+    if (file_index == X86_64_SYSCALL_NO_FILE) {
+        return X86_64_SYSCALL_RET_ENOENT;
+    }
+
+    *((u64 *)user_size_pointer) = x86_64_kernel_files[file_index].size;
+    return X86_64_SYSCALL_RET_OK;
 }
 
 static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *state,
@@ -213,20 +422,40 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->last_result = arg2;
         return state->last_result;
 
-    case X86_64_SYSCALL_SERVICE_READ:
-        if (arg0 != X86_64_SYSCALL_STDIN) {
-            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+    case X86_64_SYSCALL_SERVICE_OPEN:
+        if (x86_64_syscall_user_range_ok(arg0, 1ULL) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
+        state->last_result = x86_64_syscall_open(state, arg0, arg1);
+        return state->last_result;
+
+    case X86_64_SYSCALL_SERVICE_READ:
         if (x86_64_syscall_user_range_ok(arg1, arg2) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
-        if (state->blocking_read_enabled != 0U) {
-            state->last_result = x86_64_syscall_read_stdin_blocking(state, (char *)arg1, arg2);
+        if (arg0 == X86_64_SYSCALL_STDIN) {
+            if (state->blocking_read_enabled != 0U) {
+                state->last_result = x86_64_syscall_read_stdin_blocking(state, (char *)arg1, arg2);
+                return state->last_result;
+            }
+            state->last_result = x86_64_syscall_read_stdin((char *)arg1, arg2);
             return state->last_result;
         }
-        state->last_result = x86_64_syscall_read_stdin((char *)arg1, arg2);
+        state->last_result = x86_64_syscall_read_file(state, arg0, (char *)arg1, arg2);
+        return state->last_result;
+
+    case X86_64_SYSCALL_SERVICE_CLOSE:
+        state->last_result = x86_64_syscall_close(state, arg0);
+        return state->last_result;
+
+    case X86_64_SYSCALL_SERVICE_STAT:
+        if (x86_64_syscall_user_range_ok(arg0, 1ULL) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        state->last_result = x86_64_syscall_stat(arg0, arg1);
         return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_GET_ARG:
@@ -245,17 +474,11 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->last_result = x86_64_syscall_copy_string_arg((char *)arg1, arg2, "interactive");
         return state->last_result;
 
-    case X86_64_SYSCALL_SERVICE_OPEN:
-    case X86_64_SYSCALL_SERVICE_STAT:
     case X86_64_SYSCALL_SERVICE_EXEC:
         if (x86_64_syscall_user_range_ok(arg0, 1ULL) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
-        state->last_result = X86_64_SYSCALL_RET_ENOSYS;
-        return state->last_result;
-
-    case X86_64_SYSCALL_SERVICE_CLOSE:
         state->last_result = X86_64_SYSCALL_RET_ENOSYS;
         return state->last_result;
 
@@ -361,6 +584,8 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
         ((state->initialized != 0U) &&
          (state->service_count == X86_64_SYSCALL_SERVICE_COUNT) &&
          (state->pointer_validation_ok != 0U) &&
+         (state->file_service_ready != 0U) &&
+         (state->file_count == X86_64_SYSCALL_KERNEL_FILE_COUNT) &&
          (state->write_ok != 0U) &&
          (state->write_fault_ok != 0U) &&
          (state->read_ok != 0U) &&
@@ -385,6 +610,9 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall user buffer accepted: ", state->user_buffer_accepted);
     x86_64_serial_write_u32("Syscall kernel pointer rejected: ", state->kernel_pointer_rejected);
     x86_64_serial_write_u32("Syscall pointer validation ok: ", state->pointer_validation_ok);
+    x86_64_serial_write_u32("Syscall file service ready: ", state->file_service_ready);
+    x86_64_serial_write_u32("Syscall file count: ", state->file_count);
+    x86_64_serial_write_u32("Syscall open files: ", state->open_file_count);
     x86_64_serial_write_u32("Syscall write dispatch ok: ", state->write_ok);
     x86_64_serial_write_u32("Syscall write fault ok: ", state->write_fault_ok);
     x86_64_serial_write_u32("Syscall read dispatch ok: ", state->read_ok);
