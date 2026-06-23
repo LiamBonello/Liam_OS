@@ -2,6 +2,7 @@
 
 #include "console.h"
 #include "heap.h"
+#include "syscall_dispatch.h"
 #include "userland.h"
 
 #define X86_64_PROCESS_INVALID_PID 0U
@@ -239,6 +240,7 @@ static void process_worker_b(void *arg)
 void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
 {
     struct x86_64_userland_foundation_state userland_state;
+    struct x86_64_syscall_dispatch_state syscall_dispatch_state;
 
     x86_64_process_initialize(&process_state);
 
@@ -250,7 +252,9 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     refresh_counts();
 
     x86_64_userland_foundation_init(&userland_state);
+    x86_64_syscall_dispatch_run_smoke(&syscall_dispatch_state, first_pid);
     process_state.userland_foundation_ok = userland_state.foundation_ok;
+    process_state.syscall_dispatcher_ok = syscall_dispatch_state.dispatcher_ok;
 
     u32 worker_a_stack_ok = is_inside_stack(process_state.worker_a_stack_sample,
                                             process_state.first_stack_base,
@@ -286,7 +290,8 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.stack_execution_ok != 0U) &&
          (process_state.worker_a_count == 1U) &&
          (process_state.worker_b_count == 1U) &&
-         (process_state.userland_foundation_ok != 0U)) ? 1U : 0U;
+         (process_state.userland_foundation_ok != 0U) &&
+         (process_state.syscall_dispatcher_ok != 0U)) ? 1U : 0U;
 
     x86_64_console_write_u32(25, 0, "Process smoke ok: ", process_state.smoke_ok);
 
@@ -314,7 +319,9 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process worker A count: ", process_state.worker_a_count);
     x86_64_serial_write_u32("Process worker B count: ", process_state.worker_b_count);
     x86_64_serial_write_u32("Process userland foundation ok: ", process_state.userland_foundation_ok);
+    x86_64_serial_write_u32("Process syscall dispatcher ok: ", process_state.syscall_dispatcher_ok);
     x86_64_userland_foundation_report(&userland_state);
+    x86_64_syscall_dispatch_report(&syscall_dispatch_state);
     x86_64_serial_write_u32("Process smoke ok: ", process_state.smoke_ok);
 
     if (state != &process_state) {
