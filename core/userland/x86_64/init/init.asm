@@ -28,6 +28,9 @@ _start:
     mov eax, LIAM_SYSCALL_GETPID
     syscall
 
+    mov eax, LIAM_SYSCALL_YIELD
+    syscall
+
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
     lea rsi, [rel shell_banner]
