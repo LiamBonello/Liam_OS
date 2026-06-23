@@ -4,6 +4,7 @@ bits 64
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
 
+section .text
 global _start
 
 _start:
