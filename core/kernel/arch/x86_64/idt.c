@@ -22,6 +22,7 @@
 #define X86_64_PIT_BASE_FREQUENCY 1193182U
 #define X86_64_PIT_MODE_RATE_GENERATOR 0x36U
 #define X86_64_KEYBOARD_DATA_PORT 0x60U
+#define X86_64_KEYBOARD_BUFFER_CAPACITY 128U
 #define X86_64_SCANCODE_LEFT_SHIFT_PRESS 0x2AU
 #define X86_64_SCANCODE_RIGHT_SHIFT_PRESS 0x36U
 #define X86_64_SCANCODE_LEFT_SHIFT_RELEASE 0xAAU
@@ -62,6 +63,10 @@ static u32 irq_self_test_active;
 static volatile u32 timer_ticks;
 static struct x86_64_timer_state timer_state;
 static struct x86_64_keyboard_state keyboard_state;
+static char keyboard_buffer[X86_64_KEYBOARD_BUFFER_CAPACITY];
+static u32 keyboard_buffer_head;
+static u32 keyboard_buffer_tail;
+static u32 keyboard_buffer_count;
 
 static const u8 scancode_ascii_map[128] = {
     0, 27, '1', '2', '3', '4', '5', '6',
@@ -307,6 +312,31 @@ static u32 timer_handle_irq(u64 vector)
     return 1U;
 }
 
+static void keyboard_buffer_reset(void)
+{
+    keyboard_buffer_head = 0U;
+    keyboard_buffer_tail = 0U;
+    keyboard_buffer_count = 0U;
+    keyboard_state.buffered_chars = 0U;
+    keyboard_state.buffer_capacity = X86_64_KEYBOARD_BUFFER_CAPACITY;
+    keyboard_state.buffer_overflows = 0U;
+    keyboard_state.read_calls = 0U;
+    keyboard_state.bytes_read = 0U;
+}
+
+static void keyboard_buffer_push(u8 ascii)
+{
+    if (keyboard_buffer_count >= X86_64_KEYBOARD_BUFFER_CAPACITY) {
+        keyboard_state.buffer_overflows += 1U;
+        return;
+    }
+
+    keyboard_buffer[keyboard_buffer_tail] = (char)ascii;
+    keyboard_buffer_tail = (keyboard_buffer_tail + 1U) % X86_64_KEYBOARD_BUFFER_CAPACITY;
+    keyboard_buffer_count += 1U;
+    keyboard_state.buffered_chars = keyboard_buffer_count;
+}
+
 static u8 keyboard_translate_scancode(u8 scancode)
 {
     if (scancode >= 128U) {
@@ -327,6 +357,7 @@ static void report_keyboard_input(u8 scancode, u8 ascii)
     x86_64_serial_write_u32("Keyboard ascii: ", ascii);
     x86_64_serial_write_u32("Keyboard scancodes seen: ", keyboard_state.scancodes_seen);
     x86_64_serial_write_u32("Keyboard translated chars: ", keyboard_state.translated_chars_seen);
+    x86_64_serial_write_u32("Keyboard buffered chars: ", keyboard_state.buffered_chars);
 }
 
 static u32 keyboard_handle_irq(u64 vector)
@@ -364,6 +395,7 @@ static u32 keyboard_handle_irq(u64 vector)
     keyboard_state.last_ascii = ascii;
     if (ascii != 0U) {
         keyboard_state.translated_chars_seen += 1U;
+        keyboard_buffer_push(ascii);
         report_keyboard_input(scancode, ascii);
     }
 
@@ -441,6 +473,11 @@ static void report_keyboard_state(void)
     x86_64_serial_write_u32("Keyboard translated chars: ", state.translated_chars_seen);
     x86_64_serial_write_u32("Keyboard last scancode: ", state.last_scancode);
     x86_64_serial_write_u32("Keyboard last ascii: ", state.last_ascii);
+    x86_64_serial_write_u32("Keyboard buffered chars: ", state.buffered_chars);
+    x86_64_serial_write_u32("Keyboard buffer capacity: ", state.buffer_capacity);
+    x86_64_serial_write_u32("Keyboard buffer overflows: ", state.buffer_overflows);
+    x86_64_serial_write_u32("Keyboard read calls: ", state.read_calls);
+    x86_64_serial_write_u32("Keyboard bytes read: ", state.bytes_read);
     x86_64_serial_write_u32("Keyboard ready ok: ", state.keyboard_ok);
 }
 
@@ -642,6 +679,7 @@ void x86_64_keyboard_initialize(void)
     keyboard_state.last_scancode = 0U;
     keyboard_state.last_ascii = 0U;
     keyboard_state.keyboard_ok = 0U;
+    keyboard_buffer_reset();
 
     unmask_irq1();
     keyboard_state.keyboard_ok = ((keyboard_state.initialized != 0U) &&
@@ -651,7 +689,30 @@ void x86_64_keyboard_initialize(void)
 
 void x86_64_keyboard_get_state(struct x86_64_keyboard_state *state)
 {
+    keyboard_state.buffered_chars = keyboard_buffer_count;
+    keyboard_state.buffer_capacity = X86_64_KEYBOARD_BUFFER_CAPACITY;
     *state = keyboard_state;
+}
+
+u64 x86_64_keyboard_read(char *buffer, u64 size)
+{
+    if (buffer == (char *)0 || size == 0ULL || keyboard_state.initialized == 0U) {
+        return 0ULL;
+    }
+
+    keyboard_state.read_calls += 1U;
+
+    u64 bytes = 0ULL;
+    while (bytes < size && keyboard_buffer_count > 0U) {
+        buffer[bytes] = keyboard_buffer[keyboard_buffer_head];
+        keyboard_buffer_head = (keyboard_buffer_head + 1U) % X86_64_KEYBOARD_BUFFER_CAPACITY;
+        keyboard_buffer_count -= 1U;
+        bytes += 1ULL;
+    }
+
+    keyboard_state.buffered_chars = keyboard_buffer_count;
+    keyboard_state.bytes_read += (u32)bytes;
+    return bytes;
 }
 
 void x86_64_exception_handler(u64 vector, u64 error_code)
