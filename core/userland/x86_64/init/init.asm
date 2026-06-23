@@ -13,7 +13,6 @@ bits 64
 %define LIAM_MODE_BUFFER_LEN 16
 %define LIAM_READ_BUFFER_LEN 64
 %define LIAM_LINE_BUFFER_LEN 80
-%define LIAM_IDLE_POLL_LIMIT 3
 %define LIAM_MODE_BUFFER_OFFSET 0
 %define LIAM_READ_BUFFER_OFFSET LIAM_MODE_BUFFER_LEN
 %define LIAM_LINE_BUFFER_OFFSET (LIAM_MODE_BUFFER_LEN + LIAM_READ_BUFFER_LEN)
@@ -41,18 +40,11 @@ _start:
     mov edx, shell_prompt_len
     syscall
 
-    xor r14d, r14d
     mov eax, LIAM_SYSCALL_GET_ARG
     mov edi, LIAM_ARG_SHELL_MODE
     lea rsi, [rsp + LIAM_MODE_BUFFER_OFFSET]
     mov edx, LIAM_MODE_BUFFER_LEN
     syscall
-    test rax, rax
-    jle mode_ready
-    mov r14d, 1
-
-mode_ready:
-    xor r12d, r12d
 
 shell_loop:
     mov eax, LIAM_SYSCALL_READ
@@ -66,18 +58,9 @@ shell_loop:
 
     mov eax, LIAM_SYSCALL_YIELD
     syscall
-
-    test r14d, r14d
-    jnz shell_loop
-
-    inc r12d
-    cmp r12d, LIAM_IDLE_POLL_LIMIT
-    jb shell_loop
-
-    jmp exit_success
+    jmp shell_loop
 
 process_input:
-    xor r12d, r12d
     mov r13, rax
 
     mov eax, LIAM_SYSCALL_WRITE
