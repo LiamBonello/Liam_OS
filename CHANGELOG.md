@@ -1,5 +1,20 @@
 # Liam_OS Changelog
 
+## Core 0.8.55-dev
+
+### Changed
+
+- Bound the x86_64 process/user-context smoke path to the currently active CR3 instead of using a kernel stack address as a placeholder page-table value.
+- Added user-context diagnostics for CR3 page alignment and address-space readiness.
+- Tightened `User context ok: 1` so it now requires a nonzero, page-aligned planned CR3.
+- Updated Liam_OS version to `0.8.55-dev`.
+
+### Notes
+
+- This is still a kernel-side user context readiness checkpoint. It does not yet switch to ring 3, execute ELF64 user code, or boot the x86_64 shell.
+- The normal x86_64 boot should report `User planned CR3: 0x...`, `User CR3 page aligned: 1`, `User address space ready: 1`, `User context ok: 1`, and `Process user context ok: 1`.
+- The default stable boot path remains `ARCH=i386` through `make` and `make run` until x86_64 reaches feature parity.
+
 ## Core 0.8.47-dev
 
 ### Added
