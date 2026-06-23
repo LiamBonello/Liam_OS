@@ -126,28 +126,31 @@ static inline u32 x86_64_syscall_user_range_ok(u64 address, u64 size)
     return 1U;
 }
 
-static inline u32 x86_64_syscall_user_cstring_equals(u64 user_address,
-                                                     const char *kernel_string,
-                                                     u64 max_bytes,
-                                                     u32 *valid)
+static inline u32 x86_64_syscall_user_cstring_valid(u64 user_address, u64 max_bytes)
 {
-    *valid = 0U;
     for (u64 i = 0ULL; i < max_bytes; ++i) {
         if (x86_64_syscall_user_range_ok(user_address + i, 1ULL) == 0U) {
             return 0U;
         }
+        if (((const char *)user_address)[i] == '\0') {
+            return 1U;
+        }
+    }
 
+    return 0U;
+}
+
+static inline u32 x86_64_syscall_user_cstring_equals(u64 user_address,
+                                                     const char *kernel_string,
+                                                     u64 max_bytes)
+{
+    for (u64 i = 0ULL; i < max_bytes; ++i) {
         char user_char = ((const char *)user_address)[i];
         char kernel_char = kernel_string[i];
         if (user_char != kernel_char) {
-            if (user_char == '\0' || kernel_char == '\0') {
-                *valid = 1U;
-            }
             return 0U;
         }
-
         if (user_char == '\0') {
-            *valid = 1U;
             return 1U;
         }
     }
@@ -157,20 +160,17 @@ static inline u32 x86_64_syscall_user_cstring_equals(u64 user_address,
 
 static inline u32 x86_64_syscall_find_kernel_file(u64 user_path, u32 *valid_path)
 {
-    *valid_path = 0U;
+    *valid_path = x86_64_syscall_user_cstring_valid(user_path, X86_64_SYSCALL_PATH_MAX_BYTES);
+    if (*valid_path == 0U) {
+        return X86_64_SYSCALL_NO_FILE;
+    }
+
     for (u32 i = 0U; i < X86_64_SYSCALL_KERNEL_FILE_COUNT; ++i) {
-        u32 valid = 0U;
         if (x86_64_syscall_user_cstring_equals(user_path,
                                                x86_64_kernel_files[i].path,
-                                               X86_64_SYSCALL_PATH_MAX_BYTES,
-                                               &valid) != 0U) {
-            *valid_path = 1U;
+                                               X86_64_SYSCALL_PATH_MAX_BYTES) != 0U) {
             return i;
         }
-        if (valid == 0U) {
-            return X86_64_SYSCALL_NO_FILE;
-        }
-        *valid_path = 1U;
     }
 
     return X86_64_SYSCALL_NO_FILE;
