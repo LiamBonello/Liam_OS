@@ -13,16 +13,8 @@
 #define X86_64_USER_STACK_FLAGS (X86_64_PAGE_PRESENT | X86_64_PAGE_WRITABLE | X86_64_PAGE_USER)
 #define X86_64_PAGE_MASK (X86_64_PAGE_SIZE - 1ULL)
 
-static const u8 minimal_user_image[] = {
-    0x48U, 0xC7U, 0xC0U, X86_64_SYSCALL_SERVICE_GETPID, 0x00U, 0x00U, 0x00U,
-    0x0FU, 0x05U,
-    0x48U, 0xC7U, 0xC0U, X86_64_SYSCALL_SERVICE_YIELD, 0x00U, 0x00U, 0x00U,
-    0x0FU, 0x05U,
-    0x48U, 0xC7U, 0xC0U, X86_64_SYSCALL_SERVICE_EXIT, 0x00U, 0x00U, 0x00U,
-    0x48U, 0x31U, 0xFFU,
-    0x0FU, 0x05U,
-    0xF4U
-};
+extern const u8 x86_64_user_init_image_start[];
+extern const u8 x86_64_user_init_image_end[];
 
 static void clear_page(u64 page)
 {
@@ -143,6 +135,16 @@ static u32 page_is_zeroed(const u8 *page)
     return 1U;
 }
 
+static u32 embedded_user_image_size(void)
+{
+    usize image_bytes = (usize)(x86_64_user_init_image_end - x86_64_user_init_image_start);
+    if (image_bytes > 0xFFFFFFFFULL) {
+        return 0U;
+    }
+
+    return (u32)image_bytes;
+}
+
 static u32 tables_are_aligned(const struct x86_64_paging_builder_state *state)
 {
     return ((is_page_aligned(state->pml4_table) != 0U) &&
@@ -192,9 +194,11 @@ static void rollback_allocated_pages(const u64 *allocated_pages, u32 allocated_c
     }
 }
 
-static void load_minimal_user_image(struct x86_64_paging_builder_state *state)
+static void load_embedded_user_image(struct x86_64_paging_builder_state *state)
 {
-    static const struct x86_64_elf_header header = {
+    const u8 *image = x86_64_user_init_image_start;
+    u32 image_bytes = embedded_user_image_size();
+    struct x86_64_elf_header header = {
         .ident = {
             X86_64_ELF_MAGIC_0,
             X86_64_ELF_MAGIC_1,
@@ -220,19 +224,25 @@ static void load_minimal_user_image(struct x86_64_paging_builder_state *state)
         .section_header_count = 0U,
         .section_name_index = 0U
     };
-    static const struct x86_64_elf_program_header phdr = {
+    struct x86_64_elf_program_header phdr = {
         .type = X86_64_ELF_PROGRAM_TYPE_LOAD,
         .flags = 5U,
         .offset = sizeof(struct x86_64_elf_header) + sizeof(struct x86_64_elf_program_header),
         .virtual_address = X86_64_USER_CODE_BASE,
         .physical_address = 0ULL,
-        .file_size = sizeof(minimal_user_image),
-        .memory_size = sizeof(minimal_user_image),
+        .file_size = image_bytes,
+        .memory_size = image_bytes,
         .alignment = X86_64_USER_PAGE_BYTES
     };
     u8 *code = (u8 *)state->user_code_page;
     u8 *stack = (u8 *)state->user_stack_page;
-    u32 image_bytes = (u32)phdr.file_size;
+
+    state->user_image_embedded =
+        ((image != (const u8 *)0) &&
+         (x86_64_user_init_image_end > x86_64_user_init_image_start) &&
+         (image_bytes > 0U) &&
+         (image_bytes < X86_64_PAGE_SIZE)) ? 1U : 0U;
+    state->user_image_source_ok = state->user_image_embedded;
 
     state->elf64_header_ok =
         ((header.ident[0] == X86_64_ELF_MAGIC_0) &&
@@ -255,8 +265,9 @@ static void load_minimal_user_image(struct x86_64_paging_builder_state *state)
          (header.entry >= phdr.virtual_address) &&
          (header.entry < (phdr.virtual_address + phdr.memory_size))) ? 1U : 0U;
     state->elf64_segment_ok =
-        ((phdr.virtual_address == X86_64_USER_CODE_BASE) &&
-         (phdr.file_size == sizeof(minimal_user_image)) &&
+        ((state->user_image_source_ok != 0U) &&
+         (phdr.virtual_address == X86_64_USER_CODE_BASE) &&
+         (phdr.file_size == image_bytes) &&
          (phdr.memory_size == phdr.file_size) &&
          (phdr.file_size < X86_64_PAGE_SIZE)) ? 1U : 0U;
 
@@ -265,19 +276,21 @@ static void load_minimal_user_image(struct x86_64_paging_builder_state *state)
         (state->elf64_entry_ok != 0U) &&
         (state->elf64_segment_ok != 0U)) {
         for (u32 i = 0; i < image_bytes; ++i) {
-            code[i] = minimal_user_image[i];
+            code[i] = image[i];
         }
     }
 
     state->user_image_bytes = image_bytes;
     state->user_image_checksum = checksum_bytes(code, image_bytes);
     state->user_image_loaded =
-        ((image_bytes < X86_64_PAGE_SIZE) &&
-         (page_prefix_matches(code, minimal_user_image, image_bytes) != 0U) &&
-         (state->user_image_checksum == checksum_bytes(minimal_user_image, image_bytes))) ? 1U : 0U;
+        ((state->user_image_source_ok != 0U) &&
+         (image_bytes < X86_64_PAGE_SIZE) &&
+         (page_prefix_matches(code, image, image_bytes) != 0U) &&
+         (state->user_image_checksum == checksum_bytes(image, image_bytes))) ? 1U : 0U;
     state->user_stack_zeroed = page_is_zeroed(stack);
     state->elf64_load_ok =
-        ((state->elf64_header_ok != 0U) &&
+        ((state->user_image_source_ok != 0U) &&
+         (state->elf64_header_ok != 0U) &&
          (state->elf64_program_header_ok != 0U) &&
          (state->elf64_entry_ok != 0U) &&
          (state->elf64_segment_ok != 0U) &&
@@ -347,7 +360,7 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     state->allocated_user_pages = X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES;
     state->pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
     state->allocation_ok = (allocated_count == X86_64_PAGING_BUILDER_ALLOCATED_PAGES) ? 1U : 0U;
-    load_minimal_user_image(state);
+    load_embedded_user_image(state);
 
     u32 identity_pages = huge_page_count_for(plan->identity_window_bytes);
     if (identity_pages > X86_64_PAGING_BUILDER_ENTRIES) {
