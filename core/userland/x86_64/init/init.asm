@@ -42,13 +42,13 @@ _start:
     mov edx, LIAM_MODE_BUFFER_LEN
     syscall
     test rax, rax
-    jle .mode_ready
+    jle mode_ready
     mov r14d, 1
 
-.mode_ready:
+mode_ready:
     xor r12d, r12d
 
-.shell_loop:
+shell_loop:
     mov eax, LIAM_SYSCALL_READ
     mov edi, LIAM_STDIN
     lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
@@ -56,21 +56,21 @@ _start:
     syscall
 
     test rax, rax
-    jg .process_input
+    jg process_input
 
     mov eax, LIAM_SYSCALL_YIELD
     syscall
 
     test r14d, r14d
-    jnz .shell_loop
+    jnz shell_loop
 
     inc r12d
     cmp r12d, LIAM_IDLE_POLL_LIMIT
-    jb .shell_loop
+    jb shell_loop
 
     jmp exit_success
 
-.process_input:
+process_input:
     xor r12d, r12d
     mov r13, rax
 
@@ -82,67 +82,64 @@ _start:
 
     xor ebx, ebx
 
-.scan_input:
+scan_input:
     cmp rbx, r13
-    jae .shell_loop
+    jae shell_loop
 
     mov al, [rsp + LIAM_READ_BUFFER_OFFSET + rbx]
     inc rbx
 
     cmp al, 13
-    je .line_ready
+    je line_ready
     cmp al, 10
-    je .line_ready
+    je line_ready
     cmp al, 8
-    je .backspace
+    je backspace
     cmp al, 127
-    je .backspace
+    je backspace
 
     cmp r15, LIAM_LINE_BUFFER_LEN - 1
-    jae .scan_input
+    jae scan_input
     mov [rsp + LIAM_LINE_BUFFER_OFFSET + r15], al
     inc r15
-    jmp .scan_input
+    jmp scan_input
 
-.backspace:
+backspace:
     test r15, r15
-    jz .scan_input
+    jz scan_input
     dec r15
-    jmp .scan_input
+    jmp scan_input
 
-.line_ready:
+line_ready:
     mov byte [rsp + LIAM_LINE_BUFFER_OFFSET + r15], 0
-    call handle_line
-    test rax, rax
-    jnz exit_success
-    jmp .scan_input
-
-.halt:
-    hlt
-    jmp .halt
+    jmp handle_line
 
 exit_success:
     mov eax, LIAM_SYSCALL_EXIT
     xor edi, edi
     syscall
-    jmp _start.halt
+    jmp halt
+
+halt:
+    hlt
+    jmp halt
 
 handle_line:
     cmp r15, 0
-    je command_empty
+    je command_done
 
     cmp r15, 4
-    jne .check_pid
+    jne check_pid
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'h'
-    jne .check_exit
+    jne check_exit
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'e'
-    jne .check_exit
+    jne check_exit
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'l'
-    jne .check_exit
+    jne check_exit
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'p'
     je command_help
 
-.check_exit:
+check_exit:
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'e'
     jne command_unknown
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'x'
@@ -153,7 +150,7 @@ handle_line:
     je command_exit
     jmp command_unknown
 
-.check_pid:
+check_pid:
     cmp r15, 3
     jne command_unknown
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'p'
@@ -164,22 +161,13 @@ handle_line:
     je command_pid
     jmp command_unknown
 
-command_empty:
-    xor r15d, r15d
-    call write_prompt
-    xor eax, eax
-    ret
-
 command_help:
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
     lea rsi, [rel help_text]
     mov edx, help_text_len
     syscall
-    xor r15d, r15d
-    call write_prompt
-    xor eax, eax
-    ret
+    jmp command_done
 
 command_pid:
     mov eax, LIAM_SYSCALL_WRITE
@@ -187,10 +175,7 @@ command_pid:
     lea rsi, [rel pid_text]
     mov edx, pid_text_len
     syscall
-    xor r15d, r15d
-    call write_prompt
-    xor eax, eax
-    ret
+    jmp command_done
 
 command_exit:
     mov eax, LIAM_SYSCALL_WRITE
@@ -198,8 +183,7 @@ command_exit:
     lea rsi, [rel bye_text]
     mov edx, bye_text_len
     syscall
-    mov eax, 1
-    ret
+    jmp exit_success
 
 command_unknown:
     mov eax, LIAM_SYSCALL_WRITE
@@ -207,18 +191,16 @@ command_unknown:
     lea rsi, [rel unknown_text]
     mov edx, unknown_text_len
     syscall
-    xor r15d, r15d
-    call write_prompt
-    xor eax, eax
-    ret
+    jmp command_done
 
-write_prompt:
+command_done:
+    xor r15d, r15d
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
     lea rsi, [rel shell_prompt]
     mov edx, shell_prompt_len
     syscall
-    ret
+    jmp scan_input
 
 section .rodata
 shell_banner:
