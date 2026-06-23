@@ -47,6 +47,11 @@ struct x86_64_paging_builder_state {
     u32 user_image_checksum;
     u32 user_image_loaded;
     u32 user_stack_zeroed;
+    u32 elf64_header_ok;
+    u32 elf64_program_header_ok;
+    u32 elf64_entry_ok;
+    u32 elf64_segment_ok;
+    u32 elf64_load_ok;
     u32 user_mapping_ok;
     u32 tables_aligned;
     u32 builder_ok;
