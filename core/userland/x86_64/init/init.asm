@@ -35,6 +35,12 @@ _start:
     mov edx, shell_banner_len
     syscall
 
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel shell_prompt]
+    mov edx, shell_prompt_len
+    syscall
+
     xor r14d, r14d
     mov eax, LIAM_SYSCALL_GET_ARG
     mov edi, LIAM_ARG_SHELL_MODE
@@ -128,6 +134,7 @@ handle_line:
     cmp r15, 0
     je command_done
 
+check_help:
     cmp r15, 4
     jne check_pid
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'h'
@@ -140,25 +147,86 @@ handle_line:
     je command_help
 
 check_exit:
+    cmp r15, 4
+    jne check_pid
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'e'
-    jne command_unknown
+    jne check_pid
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'x'
-    jne command_unknown
+    jne check_pid
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'i'
-    jne command_unknown
+    jne check_pid
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 't'
     je command_exit
-    jmp command_unknown
 
 check_pid:
     cmp r15, 3
-    jne command_unknown
+    jne check_clear
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'p'
-    jne command_unknown
+    jne check_clear
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'i'
-    jne command_unknown
+    jne check_clear
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'd'
     je command_pid
+
+check_clear:
+    cmp r15, 5
+    jne check_about
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'c'
+    jne check_about
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'l'
+    jne check_about
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'e'
+    jne check_about
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'a'
+    jne check_about
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], 'r'
+    je command_clear
+
+check_about:
+    cmp r15, 5
+    jne check_version
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'a'
+    jne check_version
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'b'
+    jne check_version
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'o'
+    jne check_version
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'u'
+    jne check_version
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], 't'
+    je command_about
+
+check_version:
+    cmp r15, 7
+    jne check_echo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'v'
+    jne check_echo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'e'
+    jne check_echo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'r'
+    jne check_echo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 's'
+    jne check_echo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], 'i'
+    jne check_echo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 5], 'o'
+    jne check_echo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 6], 'n'
+    je command_version
+
+check_echo:
+    cmp r15, 5
+    jb command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'e'
+    jne command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'c'
+    jne command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'h'
+    jne command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'o'
+    jne command_unknown
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], ' '
+    je command_echo
     jmp command_unknown
 
 command_help:
@@ -174,6 +242,45 @@ command_pid:
     mov edi, LIAM_STDOUT
     lea rsi, [rel pid_text]
     mov edx, pid_text_len
+    syscall
+    jmp command_done
+
+command_clear:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel clear_text]
+    mov edx, clear_text_len
+    syscall
+    jmp command_done
+
+command_about:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel about_text]
+    mov edx, about_text_len
+    syscall
+    jmp command_done
+
+command_version:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel version_text]
+    mov edx, version_text_len
+    syscall
+    jmp command_done
+
+command_echo:
+    mov rdx, r15
+    sub rdx, 5
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_LINE_BUFFER_OFFSET + 5]
+    syscall
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel newline_text]
+    mov edx, newline_text_len
     syscall
     jmp command_done
 
@@ -205,16 +312,28 @@ command_done:
 section .rodata
 shell_banner:
     db "Liam_OS x86_64 shell online", 10
+shell_banner_len equ $ - shell_banner
 shell_prompt:
     db "$ "
 shell_prompt_len equ $ - shell_prompt
-shell_banner_len equ $ - shell_banner
 help_text:
-    db "commands: help, pid, exit", 10
+    db "commands: help, about, version, pid, echo, clear, exit", 10
 help_text_len equ $ - help_text
 pid_text:
     db "pid: 1", 10
 pid_text_len equ $ - pid_text
+about_text:
+    db "Liam_OS Core x86_64 user shell", 10
+about_text_len equ $ - about_text
+version_text:
+    db "Liam_OS Core x86_64 dev", 10
+version_text_len equ $ - version_text
+clear_text:
+    db 27, "[2J", 27, "[H"
+clear_text_len equ $ - clear_text
+newline_text:
+    db 10
+newline_text_len equ $ - newline_text
 unknown_text:
     db "unknown command", 10
 unknown_text_len equ $ - unknown_text
