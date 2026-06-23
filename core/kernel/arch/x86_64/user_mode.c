@@ -4,7 +4,7 @@
 #include "syscall.h"
 #include "userland.h"
 
-#define X86_64_USER_MODE_MAX_SMOKE_SYSCALLS 256U
+#define X86_64_USER_MODE_MAX_SMOKE_SYSCALLS 4096U
 
 u64 x86_64_user_smoke_kernel_rsp;
 
