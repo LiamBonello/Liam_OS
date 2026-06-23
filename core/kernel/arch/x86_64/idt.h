@@ -71,6 +71,11 @@ struct x86_64_keyboard_state {
     u32 break_codes_seen;
     u32 translated_chars_seen;
     u32 shift_pressed;
+    u32 buffered_chars;
+    u32 buffer_capacity;
+    u32 buffer_overflows;
+    u32 read_calls;
+    u32 bytes_read;
     u32 last_scancode;
     u32 last_ascii;
     u32 keyboard_ok;
@@ -83,6 +88,7 @@ void x86_64_timer_wait_for_ticks(u32 ticks);
 void x86_64_timer_get_state(struct x86_64_timer_state *state);
 void x86_64_keyboard_initialize(void);
 void x86_64_keyboard_get_state(struct x86_64_keyboard_state *state);
+u64 x86_64_keyboard_read(char *buffer, u64 size);
 void x86_64_exception_handler(u64 vector, u64 error_code);
 void x86_64_irq_handler(u64 vector);
 
