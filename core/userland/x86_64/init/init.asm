@@ -5,6 +5,8 @@ bits 64
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
 
+%define LIAM_STDOUT 1
+
 section .text
 global _start
 
@@ -13,8 +15,9 @@ _start:
     syscall
 
     mov eax, LIAM_SYSCALL_WRITE
-    lea rdi, [rel shell_banner]
-    mov esi, shell_banner_len
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel shell_banner]
+    mov edx, shell_banner_len
     syscall
 
     mov eax, LIAM_SYSCALL_YIELD
