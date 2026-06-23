@@ -60,6 +60,9 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
         state->getpid_ok = (result == (u64)state->current_pid) ? 1U : 0U;
         break;
 
+    case X86_64_SYSCALL_SERVICE_WRITE:
+        break;
+
     case X86_64_SYSCALL_SERVICE_YIELD:
         state->yield_ok = ((result == X86_64_SYSCALL_RET_OK) &&
                            (active_dispatcher.yield_count == 1U)) ? 1U : 0U;
@@ -79,7 +82,7 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
     state->live_dispatcher_ok =
         ((active_dispatcher.initialized != 0U) &&
          (active_dispatcher.service_count == X86_64_SYSCALL_SERVICE_COUNT) &&
-         (active_dispatcher.dispatch_calls <= 3U) &&
+         (active_dispatcher.dispatch_calls <= 4U) &&
          (state->unexpected_syscall == 0U)) ? 1U : 0U;
 
     return result;
@@ -114,7 +117,7 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
          (state->attempted != 0U) &&
          (state->entered != 0U) &&
          (state->returned_to_kernel != 0U) &&
-         (state->syscall_count == 3U) &&
+         (state->syscall_count == 4U) &&
          (state->getpid_ok != 0U) &&
          (state->yield_ok != 0U) &&
          (state->exit_ok != 0U) &&
