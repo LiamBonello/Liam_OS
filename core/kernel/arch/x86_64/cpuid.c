@@ -1,5 +1,6 @@
 #include "cpuid.h"
 #include "syscall.h"
+#include "syscall_msr.h"
 
 #define CPUID_BASIC_INFO 0x00000000U
 #define CPUID_BASIC_FEATURES 0x00000001U
@@ -85,6 +86,14 @@ static void report_syscall_abi_plan(const struct x86_64_cpuid_state *state)
     x86_64_syscall_abi_report(&syscall_abi);
 }
 
+static void report_syscall_msr_state(const struct x86_64_cpuid_state *state)
+{
+    struct x86_64_syscall_msr_state syscall_msr;
+
+    x86_64_syscall_msr_program(&syscall_msr, state->has_fast_syscall, state->has_msr);
+    x86_64_syscall_msr_report(&syscall_msr);
+}
+
 void x86_64_cpuid_state_init(struct x86_64_cpuid_state *state)
 {
     struct cpuid_regs regs;
@@ -130,4 +139,5 @@ void x86_64_cpuid_state_init(struct x86_64_cpuid_state *state)
                           (state->has_long_mode != 0U)) ? 1U : 0U;
 
     report_syscall_abi_plan(state);
+    report_syscall_msr_state(state);
 }
