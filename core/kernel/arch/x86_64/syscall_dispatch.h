@@ -294,7 +294,7 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
 
     u64 get_arg_result = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_GET_ARG,
                                                  X86_64_SYSCALL_ARG_SHELL_MODE,
-                                                 state->sample_user_buffer, 4ULL,
+                                                 state->sample_user_buffer, 0ULL,
                                                  0ULL, 0ULL, 0ULL);
     state->get_arg_ok = (get_arg_result == X86_64_SYSCALL_RET_OK) ? 1U : 0U;
 
