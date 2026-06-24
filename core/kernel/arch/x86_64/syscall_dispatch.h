@@ -57,11 +57,16 @@ struct x86_64_syscall_dispatch_state {
     u32 getpid_ok;
     u32 yield_ok;
     u32 exec_fault_ok;
+    u32 exec_path_found;
+    u32 exec_type_ok;
+    u32 exec_loaded;
     u32 unknown_rejected;
     u32 dispatcher_ok;
     u32 exit_code;
     u32 yield_count;
     struct x86_64_vfs_state vfs;
+    u64 exec_user_code_page;
+    u64 exec_entry;
     u64 last_syscall;
     u64 last_result;
     u64 sample_user_buffer;
@@ -163,6 +168,110 @@ static inline u64 x86_64_syscall_copy_string_arg(char *buffer, u64 size, const c
     return written;
 }
 
+static inline u32 x86_64_syscall_image_range_fits(u64 offset, u64 size, u64 image_size)
+{
+    return ((offset <= image_size) && (size <= (image_size - offset))) ? 1U : 0U;
+}
+
+static inline const struct x86_64_elf_program_header *x86_64_syscall_program_header_at(
+    const u8 *image,
+    const struct x86_64_elf_header *header,
+    u16 index)
+{
+    u64 offset = header->program_header_offset +
+                 ((u64)index * (u64)header->program_header_entry_size);
+    return (const struct x86_64_elf_program_header *)(image + offset);
+}
+
+static inline void x86_64_syscall_clear_user_code_page(struct x86_64_syscall_dispatch_state *state)
+{
+    u8 *code = (u8 *)state->exec_user_code_page;
+    for (u64 i = 0ULL; i < X86_64_USER_PAGE_BYTES; ++i) {
+        code[i] = 0U;
+    }
+}
+
+static inline u32 x86_64_syscall_load_exec_elf(struct x86_64_syscall_dispatch_state *state,
+                                               const u8 *image,
+                                               u64 image_size)
+{
+    if (state->exec_user_code_page == 0ULL ||
+        image == (const u8 *)0 ||
+        image_size < sizeof(struct x86_64_elf_header) ||
+        image_size > X86_64_USER_STACK_BYTES) {
+        return 0U;
+    }
+
+    const struct x86_64_elf_header *header = (const struct x86_64_elf_header *)image;
+    u64 phdr_bytes = (u64)header->program_header_entry_size *
+                     (u64)header->program_header_count;
+
+    u32 header_ok =
+        ((header->ident[0] == X86_64_ELF_MAGIC_0) &&
+         (header->ident[1] == X86_64_ELF_MAGIC_1) &&
+         (header->ident[2] == X86_64_ELF_MAGIC_2) &&
+         (header->ident[3] == X86_64_ELF_MAGIC_3) &&
+         (header->ident[4] == X86_64_ELF_CLASS_64) &&
+         (header->ident[5] == X86_64_ELF_DATA_LITTLE_ENDIAN) &&
+         (header->ident[6] == X86_64_ELF_VERSION_CURRENT) &&
+         (header->type == X86_64_ELF_TYPE_EXECUTABLE) &&
+         (header->machine == X86_64_ELF_MACHINE_X86_64) &&
+         (header->version == X86_64_ELF_VERSION_CURRENT) &&
+         (header->header_size == sizeof(struct x86_64_elf_header)) &&
+         (header->program_header_entry_size == sizeof(struct x86_64_elf_program_header)) &&
+         (header->program_header_count > 0U) &&
+         (header->program_header_count <= 8U) &&
+         (x86_64_syscall_image_range_fits(header->program_header_offset, phdr_bytes, image_size) != 0U)) ? 1U : 0U;
+    if (header_ok == 0U) {
+        return 0U;
+    }
+
+    const struct x86_64_elf_program_header *load_phdr =
+        (const struct x86_64_elf_program_header *)0;
+    for (u16 i = 0U; i < header->program_header_count; ++i) {
+        const struct x86_64_elf_program_header *candidate =
+            x86_64_syscall_program_header_at(image, header, i);
+        if (candidate->type == X86_64_ELF_PROGRAM_TYPE_LOAD) {
+            load_phdr = candidate;
+            break;
+        }
+    }
+
+    if (load_phdr == (const struct x86_64_elf_program_header *)0) {
+        return 0U;
+    }
+
+    u64 segment_end = load_phdr->virtual_address + load_phdr->memory_size;
+    if (segment_end < load_phdr->virtual_address) {
+        return 0U;
+    }
+
+    u32 load_ok =
+        ((load_phdr->type == X86_64_ELF_PROGRAM_TYPE_LOAD) &&
+         ((load_phdr->flags & 1U) != 0U) &&
+         (load_phdr->alignment == X86_64_USER_PAGE_BYTES) &&
+         (load_phdr->virtual_address == X86_64_USER_CODE_BASE) &&
+         (load_phdr->file_size <= load_phdr->memory_size) &&
+         (load_phdr->memory_size <= X86_64_USER_PAGE_BYTES) &&
+         (header->entry >= load_phdr->virtual_address) &&
+         (header->entry < segment_end) &&
+         (x86_64_syscall_image_range_fits(load_phdr->offset, load_phdr->file_size, image_size) != 0U)) ? 1U : 0U;
+    if (load_ok == 0U) {
+        return 0U;
+    }
+
+    x86_64_syscall_clear_user_code_page(state);
+    const u8 *segment = image + load_phdr->offset;
+    u8 *code = (u8 *)state->exec_user_code_page;
+    for (u64 i = 0ULL; i < load_phdr->file_size; ++i) {
+        code[i] = segment[i];
+    }
+
+    state->exec_entry = header->entry;
+    state->exec_loaded = 1U;
+    return 1U;
+}
+
 static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_state *state,
                                                 u32 current_pid)
 {
@@ -189,10 +298,15 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->getpid_ok = 0U;
     state->yield_ok = 0U;
     state->exec_fault_ok = 0U;
+    state->exec_path_found = 0U;
+    state->exec_type_ok = 0U;
+    state->exec_loaded = 0U;
     state->unknown_rejected = 0U;
     state->dispatcher_ok = 0U;
     state->exit_code = 0U;
     state->yield_count = 0U;
+    state->exec_user_code_page = 0ULL;
+    state->exec_entry = 0ULL;
     state->last_syscall = 0ULL;
     state->last_result = 0ULL;
     state->sample_user_buffer = X86_64_USER_CODE_BASE;
@@ -301,19 +415,36 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_EXEC: {
+        state->exec_loaded = 0U;
+        state->exec_entry = 0ULL;
         if (x86_64_syscall_user_path_ok(arg0) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
 
-        u64 file_size = 0ULL;
-        u64 stat_result = x86_64_vfs_stat(&state->vfs, (const char *)arg0, &file_size);
-        if (stat_result != X86_64_VFS_RET_OK) {
-            state->last_result = stat_result;
+        const u8 *image = (const u8 *)0;
+        u64 image_size = 0ULL;
+        u64 node_type = 0ULL;
+        u64 resolve_result = x86_64_vfs_resolve(&state->vfs, (const char *)arg0,
+                                                &image, &image_size, &node_type);
+        if (resolve_result != X86_64_VFS_RET_OK) {
+            state->last_result = resolve_result;
             return state->last_result;
         }
 
-        state->last_result = X86_64_SYSCALL_RET_ENOSYS;
+        state->exec_path_found = 1U;
+        if (node_type != X86_64_VFS_NODE_EXECUTABLE) {
+            state->last_result = X86_64_SYSCALL_RET_ENOSYS;
+            return state->last_result;
+        }
+
+        state->exec_type_ok = 1U;
+        if (x86_64_syscall_load_exec_elf(state, image, image_size) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+            return state->last_result;
+        }
+
+        state->last_result = X86_64_SYSCALL_RET_OK;
         return state->last_result;
     }
 
@@ -345,6 +476,12 @@ static inline u64 x86_64_syscall_dispatch_frame(struct x86_64_syscall_dispatch_s
                                             frame->arg3,
                                             frame->arg4,
                                             frame->arg5);
+
+    if (frame->number == X86_64_SYSCALL_SERVICE_EXEC &&
+        frame->result == X86_64_SYSCALL_RET_OK &&
+        state->exec_loaded != 0U) {
+        frame->user_rip = state->exec_entry;
+    }
 
     if (frame->number == X86_64_SYSCALL_SERVICE_EXIT && frame->result == X86_64_SYSCALL_RET_OK) {
         frame->exit_requested = 1U;
@@ -458,6 +595,10 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall getpid dispatch ok: ", state->getpid_ok);
     x86_64_serial_write_u32("Syscall yield dispatch ok: ", state->yield_ok);
     x86_64_serial_write_u32("Syscall exec fault ok: ", state->exec_fault_ok);
+    x86_64_serial_write_u32("Syscall exec path found: ", state->exec_path_found);
+    x86_64_serial_write_u32("Syscall exec type ok: ", state->exec_type_ok);
+    x86_64_serial_write_u32("Syscall exec loaded: ", state->exec_loaded);
+    x86_64_serial_write_hex64("Syscall exec entry: 0x", state->exec_entry);
     x86_64_serial_write_u32("Syscall unknown rejected: ", state->unknown_rejected);
     x86_64_serial_write_u32("Syscall exit dispatch ok: ", state->exit_ok);
     x86_64_serial_write_u32("Syscall exit code: ", state->exit_code);
