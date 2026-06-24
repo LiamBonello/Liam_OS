@@ -402,34 +402,6 @@ static u32 keyboard_handle_irq(u64 vector)
     return 1U;
 }
 
-static void report_irq_policy(void)
-{
-    u32 interrupts_enabled = ((read_rflags() & X86_64_RFLAGS_INTERRUPT_ENABLE) != 0ULL) ? 1U : 0U;
-    u32 interrupts_guarded = (interrupts_enabled == 0U) ? 1U : 0U;
-    u32 irq_gates = count_irq_gates();
-    u32 irq_gates_ok = (irq_gates == X86_64_IRQ_VECTOR_COUNT) ? 1U : 0U;
-    u32 irq_policy_ok = ((interrupts_guarded != 0U) &&
-                         (irq_gates_ok != 0U) &&
-                         (legacy_pic_remapped != 0U) &&
-                         (legacy_pic_all_masked != 0U)) ? 1U : 0U;
-
-    x86_64_serial_write_line("x86_64 IRQ policy online");
-    x86_64_serial_write_u32("IRQ interrupts enabled: ", interrupts_enabled);
-    x86_64_serial_write_u32("IRQ interrupts guarded: ", interrupts_guarded);
-    x86_64_serial_write_u32("IRQ legacy vector base: ", X86_64_IRQ_VECTOR_BASE);
-    x86_64_serial_write_u32("IRQ legacy vector count: ", X86_64_IRQ_VECTOR_COUNT);
-    x86_64_serial_write_u32("IRQ PIT planned vector: ", X86_64_IRQ_PIT_VECTOR);
-    x86_64_serial_write_u32("IRQ keyboard planned vector: ", X86_64_IRQ_KEYBOARD_VECTOR);
-    x86_64_serial_write_u32("IRQ gates installed: ", irq_gates);
-    x86_64_serial_write_u32("IRQ gates ok: ", irq_gates_ok);
-    x86_64_serial_write_u32("IRQ legacy PIC remapped: ", legacy_pic_remapped);
-    x86_64_serial_write_hex32("IRQ master mask: 0x", legacy_pic_master_mask);
-    x86_64_serial_write_hex32("IRQ slave mask: 0x", legacy_pic_slave_mask);
-    x86_64_serial_write_u32("IRQ all masked: ", legacy_pic_all_masked);
-    x86_64_serial_write_u32("IRQ APIC deferred: ", 1U);
-    x86_64_serial_write_u32("IRQ policy ok: ", irq_policy_ok);
-}
-
 static void run_irq_self_test(void)
 {
     u32 before = irq_delivery_count;
@@ -441,44 +413,6 @@ static void run_irq_self_test(void)
     irq_self_test_active = 0U;
     x86_64_serial_write_u32("IRQ self-test delivered: ", irq_delivery_count - before);
     x86_64_serial_write_u32("IRQ self-test returned: ", 1U);
-}
-
-static void report_timer_state(void)
-{
-    struct x86_64_timer_state state;
-
-    x86_64_timer_get_state(&state);
-    x86_64_serial_write_line("x86_64 PIT timer online");
-    x86_64_serial_write_u32("PIT initialized: ", state.initialized);
-    x86_64_serial_write_u32("PIT frequency Hz: ", state.frequency_hz);
-    x86_64_serial_write_u32("PIT divisor: ", state.divisor);
-    x86_64_serial_write_u32("PIT IRQ0 unmasked: ", state.irq0_unmasked);
-    x86_64_serial_write_u32("PIT interrupts before: ", state.interrupts_enabled_before);
-    x86_64_serial_write_u32("PIT interrupts after: ", state.interrupts_enabled_after);
-    x86_64_serial_write_u32("PIT waited ticks: ", state.waited_ticks);
-    x86_64_serial_write_u32("PIT ticks: ", state.ticks);
-    x86_64_serial_write_u32("PIT wait ok: ", state.wait_ok);
-    x86_64_serial_write_u32("PIT timer ok: ", state.timer_ok);
-}
-
-static void report_keyboard_state(void)
-{
-    struct x86_64_keyboard_state state;
-
-    x86_64_keyboard_get_state(&state);
-    x86_64_serial_write_line("x86_64 keyboard IRQ online");
-    x86_64_serial_write_u32("Keyboard initialized: ", state.initialized);
-    x86_64_serial_write_u32("Keyboard IRQ1 unmasked: ", state.irq1_unmasked);
-    x86_64_serial_write_u32("Keyboard scancodes seen: ", state.scancodes_seen);
-    x86_64_serial_write_u32("Keyboard translated chars: ", state.translated_chars_seen);
-    x86_64_serial_write_u32("Keyboard last scancode: ", state.last_scancode);
-    x86_64_serial_write_u32("Keyboard last ascii: ", state.last_ascii);
-    x86_64_serial_write_u32("Keyboard buffered chars: ", state.buffered_chars);
-    x86_64_serial_write_u32("Keyboard buffer capacity: ", state.buffer_capacity);
-    x86_64_serial_write_u32("Keyboard buffer overflows: ", state.buffer_overflows);
-    x86_64_serial_write_u32("Keyboard read calls: ", state.read_calls);
-    x86_64_serial_write_u32("Keyboard bytes read: ", state.bytes_read);
-    x86_64_serial_write_u32("Keyboard ready ok: ", state.keyboard_ok);
 }
 
 static void report_page_fault_error(u64 error_code)
@@ -523,13 +457,6 @@ void x86_64_idt_init(void)
     load_idt(&idt_descriptor);
     remap_and_mask_legacy_pic();
 
-    x86_64_serial_write_u32("IDT PF CR2 reporting: ", 1U);
-    x86_64_serial_write_u32("IDT PF error decode: ", 1U);
-    x86_64_serial_write_u32("IDT panic halt ready: ", 1U);
-    x86_64_serial_write_u32("IDT panic cli before hlt: ", 1U);
-    x86_64_serial_write_u32("IDT diagnostics ok: ", 1U);
-    report_irq_policy();
-
     if (x86_64_irq_self_test_requested != 0U) {
         run_irq_self_test();
     }
@@ -542,9 +469,7 @@ void x86_64_idt_init(void)
 
     x86_64_timer_initialize(X86_64_PIT_DEFAULT_FREQUENCY_HZ);
     x86_64_timer_wait_for_ticks(3U);
-    report_timer_state();
     x86_64_keyboard_initialize();
-    report_keyboard_state();
 }
 
 void x86_64_idt_get_state(struct x86_64_idt_state *state)
