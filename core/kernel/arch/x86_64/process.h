@@ -47,6 +47,28 @@ struct x86_64_process {
     u32 exit_code;
 };
 
+struct x86_64_user_schedule_state {
+    u32 initialized;
+    u32 candidate_found;
+    u32 selected_pid;
+    u32 selected_state;
+    u32 selected_mode;
+    u32 entry_valid;
+    u32 stack_valid;
+    u32 cr3_valid;
+    u32 code_page_valid;
+    u32 stack_page_valid;
+    u32 transition_ready;
+    u32 scheduler_ok;
+    u64 address_space_id;
+    u64 cr3;
+    u64 user_entry;
+    u64 user_rsp;
+    u64 user_rflags;
+    u64 user_code_page;
+    u64 user_stack_page;
+};
+
 struct x86_64_process_smoke_state {
     u32 initialized;
     u32 table_capacity;
@@ -68,8 +90,10 @@ struct x86_64_process_smoke_state {
     u32 user_image_bytes;
     u32 user_image_copied;
     u32 user_process_ready;
+    u32 user_scheduler_ready;
     u32 last_created_pid;
     u32 last_user_pid;
+    u32 last_scheduled_user_pid;
     u32 last_run_pid;
     u32 worker_a_count;
     u32 worker_b_count;
@@ -93,6 +117,8 @@ struct x86_64_process_smoke_state {
     u64 last_user_cr3;
     u64 last_user_code_page;
     u64 last_user_stack_page;
+    u64 scheduled_user_rsp;
+    u64 scheduled_user_rflags;
     u64 worker_a_stack_sample;
     u64 worker_b_stack_sample;
 };
@@ -105,6 +131,7 @@ u32 x86_64_process_create_user_image(const char *path,
                                       const u8 *loaded_code_page,
                                       u64 code_bytes,
                                       u64 entry);
+u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state);
 u32 x86_64_process_run_next_ready(void);
 u32 x86_64_process_run_all_ready(u32 max_runs);
 void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state);
