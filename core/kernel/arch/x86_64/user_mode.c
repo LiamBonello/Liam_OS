@@ -157,6 +157,11 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
          (state->exit_code == 0U) &&
          (state->user_entry_ready != 0U) &&
          (state->user_stack_ready != 0U)) ? 1U : 0U;
+
+    x86_64_serial_write_line("Liam_OS x86_64 init exited");
+    for (;;) {
+        __asm__ volatile ("hlt");
+    }
 }
 
 void x86_64_user_mode_report(const struct x86_64_user_mode_state *state)
