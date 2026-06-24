@@ -46,9 +46,4 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
                                  u32 current_pid);
 void x86_64_user_mode_report(const struct x86_64_user_mode_state *state);
 
-#define x86_64_user_mode_smoke_state x86_64_user_mode_state
-#define x86_64_user_smoke_kernel_rsp x86_64_user_mode_kernel_rsp
-#define x86_64_user_smoke_enter x86_64_user_mode_enter_init
-#define x86_64_user_mode_run_smoke x86_64_user_mode_start_init
-
 #endif
