@@ -80,6 +80,10 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
                              result != X86_64_SYSCALL_RET_EINVAL) ? 1U : 0U;
         break;
 
+    case X86_64_SYSCALL_SERVICE_EXEC:
+        state->exec_ok = (result == X86_64_SYSCALL_RET_ENOSYS) ? 1U : 0U;
+        break;
+
     case X86_64_SYSCALL_SERVICE_YIELD:
         state->yield_ok = ((result == X86_64_SYSCALL_RET_OK) &&
                            (active_dispatcher.yield_count >= 1U)) ? 1U : 0U;
@@ -165,6 +169,7 @@ void x86_64_user_mode_report(const struct x86_64_user_mode_smoke_state *state)
     x86_64_serial_write_u32("User mode read ok: ", state->read_ok);
     x86_64_serial_write_u32("User mode get_arg ok: ", state->get_arg_ok);
     x86_64_serial_write_u32("User mode yield ok: ", state->yield_ok);
+    x86_64_serial_write_u32("User mode exec ok: ", state->exec_ok);
     x86_64_serial_write_u32("User mode exit ok: ", state->exit_ok);
     x86_64_serial_write_u32("User mode unexpected syscall: ", state->unexpected_syscall);
     x86_64_serial_write_u32("User mode live dispatcher initialized: ", state->live_dispatcher_initialized);
