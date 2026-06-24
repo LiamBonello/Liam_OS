@@ -300,13 +300,22 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->last_result = x86_64_syscall_copy_string_arg((char *)arg1, arg2, "interactive");
         return state->last_result;
 
-    case X86_64_SYSCALL_SERVICE_EXEC:
-        if (x86_64_syscall_user_range_ok(arg0, 1ULL) == 0U) {
+    case X86_64_SYSCALL_SERVICE_EXEC: {
+        if (x86_64_syscall_user_path_ok(arg0) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
+
+        u64 file_size = 0ULL;
+        u64 stat_result = x86_64_vfs_stat(&state->vfs, (const char *)arg0, &file_size);
+        if (stat_result != X86_64_VFS_RET_OK) {
+            state->last_result = stat_result;
+            return state->last_result;
+        }
+
         state->last_result = X86_64_SYSCALL_RET_ENOSYS;
         return state->last_result;
+    }
 
     case X86_64_SYSCALL_SERVICE_GETPID:
         state->last_result = (u64)state->current_pid;
