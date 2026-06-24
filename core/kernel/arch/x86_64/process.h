@@ -5,6 +5,7 @@
 
 #define X86_64_PROCESS_MAX_PROCESSES 8U
 #define X86_64_PROCESS_NAME_LEN 24U
+#define X86_64_PROCESS_IMAGE_PATH_LEN 64U
 #define X86_64_PROCESS_KERNEL_STACK_BYTES 4096ULL
 #define X86_64_PROCESS_ADDRESS_SPACE_PAGES 3U
 
@@ -18,10 +19,19 @@ enum x86_64_process_state_code {
     X86_64_PROCESS_FAILED = 4
 };
 
+enum x86_64_process_mode_code {
+    X86_64_PROCESS_MODE_NONE = 0,
+    X86_64_PROCESS_MODE_KERNEL = 1,
+    X86_64_PROCESS_MODE_USER = 2
+};
+
 struct x86_64_process {
     u32 pid;
     u32 state;
+    u32 mode;
+    u32 image_bytes;
     char name[X86_64_PROCESS_NAME_LEN];
+    char image_path[X86_64_PROCESS_IMAGE_PATH_LEN];
     x86_64_process_entry_t entry;
     void *arg;
     u64 kernel_stack_base;
@@ -32,6 +42,7 @@ struct x86_64_process {
     u64 user_stack_page;
     u64 user_code_virtual;
     u64 user_stack_virtual;
+    u64 user_entry;
     u32 address_space_owned;
     u32 exit_code;
 };
@@ -53,7 +64,12 @@ struct x86_64_process_smoke_state {
     u32 address_space_pages_allocated;
     u32 address_spaces_distinct;
     u32 address_space_ok;
+    u32 user_processes_created;
+    u32 user_image_bytes;
+    u32 user_image_copied;
+    u32 user_process_ready;
     u32 last_created_pid;
+    u32 last_user_pid;
     u32 last_run_pid;
     u32 worker_a_count;
     u32 worker_b_count;
@@ -73,6 +89,10 @@ struct x86_64_process_smoke_state {
     u64 second_user_code_page;
     u64 first_user_stack_page;
     u64 second_user_stack_page;
+    u64 last_user_entry;
+    u64 last_user_cr3;
+    u64 last_user_code_page;
+    u64 last_user_stack_page;
     u64 worker_a_stack_sample;
     u64 worker_b_stack_sample;
 };
@@ -81,6 +101,10 @@ void x86_64_process_initialize(struct x86_64_process_smoke_state *state);
 u32 x86_64_process_create(const char *name,
                           x86_64_process_entry_t entry,
                           void *arg);
+u32 x86_64_process_create_user_image(const char *path,
+                                      const u8 *loaded_code_page,
+                                      u64 code_bytes,
+                                      u64 entry);
 u32 x86_64_process_run_next_ready(void);
 u32 x86_64_process_run_all_ready(u32 max_runs);
 void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state);
