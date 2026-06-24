@@ -7,7 +7,7 @@
 #define X86_64_PROCESS_NAME_LEN 24U
 #define X86_64_PROCESS_IMAGE_PATH_LEN 64U
 #define X86_64_PROCESS_KERNEL_STACK_BYTES 4096ULL
-#define X86_64_PROCESS_ADDRESS_SPACE_PAGES 3U
+#define X86_64_PROCESS_ADDRESS_SPACE_PAGES 7U
 
 typedef void (*x86_64_process_entry_t)(void *arg);
 
@@ -38,12 +38,17 @@ struct x86_64_process {
     u64 kernel_stack_top;
     u64 address_space_id;
     u64 cr3;
+    u64 user_pdpt_page;
+    u64 user_pd_page;
+    u64 user_code_pt_page;
+    u64 user_stack_pt_page;
     u64 user_code_page;
     u64 user_stack_page;
     u64 user_code_virtual;
     u64 user_stack_virtual;
     u64 user_entry;
     u32 address_space_owned;
+    u32 user_page_tables_ready;
     u32 exit_code;
 };
 
@@ -58,6 +63,7 @@ struct x86_64_user_schedule_state {
     u32 cr3_valid;
     u32 code_page_valid;
     u32 stack_page_valid;
+    u32 page_tables_valid;
     u32 transition_ready;
     u32 scheduler_ok;
     u64 address_space_id;
@@ -86,6 +92,8 @@ struct x86_64_process_smoke_state {
     u32 address_space_pages_allocated;
     u32 address_spaces_distinct;
     u32 address_space_ok;
+    u32 user_page_tables_ready;
+    u32 user_page_table_entries_ok;
     u32 user_processes_created;
     u32 user_image_bytes;
     u32 user_image_copied;
@@ -115,6 +123,10 @@ struct x86_64_process_smoke_state {
     u64 second_user_stack_page;
     u64 last_user_entry;
     u64 last_user_cr3;
+    u64 last_user_pdpt_page;
+    u64 last_user_pd_page;
+    u64 last_user_code_pt_page;
+    u64 last_user_stack_pt_page;
     u64 last_user_code_page;
     u64 last_user_stack_page;
     u64 scheduled_user_rsp;
