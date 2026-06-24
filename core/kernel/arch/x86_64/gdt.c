@@ -1,4 +1,3 @@
-#include "console.h"
 #include "gdt.h"
 #include "tss.h"
 
@@ -144,17 +143,6 @@ static void capture_state(struct x86_64_gdt_state *state)
     state->tss_loaded = state->current_tr == state->tss_selector;
 }
 
-static void report_user_selectors(const struct x86_64_gdt_state *state)
-{
-    x86_64_serial_write_line("x86_64 user GDT selectors online");
-    x86_64_serial_write_u32("GDT user data selector: ", state->user_data_selector);
-    x86_64_serial_write_u32("GDT user code selector: ", state->user_code_selector);
-    x86_64_serial_write_u32("GDT syscall user base: ", state->syscall_user_selector_base);
-    x86_64_serial_write_hex64("GDT user data descriptor: 0x", state->user_data_descriptor);
-    x86_64_serial_write_hex64("GDT user code descriptor: 0x", state->user_code_descriptor);
-    x86_64_serial_write_u32("GDT user selectors ok: ", state->user_selectors_ok);
-}
-
 void x86_64_gdt_state_init(struct x86_64_gdt_state *state)
 {
     capture_state(state);
@@ -166,5 +154,4 @@ void x86_64_gdt_load_tss(const struct x86_64_tss_state *tss_state, struct x86_64
     load_gdt_and_segments();
     load_task_register();
     capture_state(state);
-    report_user_selectors(state);
 }
