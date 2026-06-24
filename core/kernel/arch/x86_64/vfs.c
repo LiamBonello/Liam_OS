@@ -1,8 +1,11 @@
 #include "vfs.h"
 
+extern const u8 x86_64_user_hello_image_start[];
+extern const u8 x86_64_user_hello_image_end[];
+
 struct x86_64_vfs_node {
     const char *path;
-    const char *data;
+    const u8 *data;
     u64 size;
     u32 type;
 };
@@ -14,7 +17,7 @@ static const char x86_64_vfs_dir_root[] =
     "sbin\n"
     "usr\n";
 
-static const char x86_64_vfs_dir_bin[] = "";
+static const char x86_64_vfs_dir_bin[] = "hello\n";
 static const char x86_64_vfs_dir_sbin[] = "";
 
 static const char x86_64_vfs_dir_etc[] =
@@ -49,6 +52,7 @@ static const char x86_64_vfs_file_help[] =
 static const char x86_64_vfs_file_files[] =
     "/\n"
     "/bin\n"
+    "/bin/hello\n"
     "/etc\n"
     "/etc/motd\n"
     "/etc/os-release\n"
@@ -61,21 +65,31 @@ static const char x86_64_vfs_file_files[] =
     "/usr/share/help.txt\n";
 
 static const struct x86_64_vfs_node x86_64_vfs_nodes[] = {
-    {"/", x86_64_vfs_dir_root, sizeof(x86_64_vfs_dir_root) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
-    {"/bin", x86_64_vfs_dir_bin, sizeof(x86_64_vfs_dir_bin) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
-    {"/etc", x86_64_vfs_dir_etc, sizeof(x86_64_vfs_dir_etc) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
-    {"/proc", x86_64_vfs_dir_proc, sizeof(x86_64_vfs_dir_proc) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
-    {"/sbin", x86_64_vfs_dir_sbin, sizeof(x86_64_vfs_dir_sbin) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
-    {"/usr", x86_64_vfs_dir_usr, sizeof(x86_64_vfs_dir_usr) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
-    {"/usr/share", x86_64_vfs_dir_usr_share, sizeof(x86_64_vfs_dir_usr_share) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
-    {"/etc/motd", x86_64_vfs_file_motd, sizeof(x86_64_vfs_file_motd) - 1ULL, X86_64_VFS_NODE_FILE},
-    {"/etc/os-release", x86_64_vfs_file_os_release, sizeof(x86_64_vfs_file_os_release) - 1ULL, X86_64_VFS_NODE_FILE},
-    {"/proc/version", x86_64_vfs_file_version, sizeof(x86_64_vfs_file_version) - 1ULL, X86_64_VFS_NODE_FILE},
-    {"/usr/share/files.txt", x86_64_vfs_file_files, sizeof(x86_64_vfs_file_files) - 1ULL, X86_64_VFS_NODE_FILE},
-    {"/usr/share/help.txt", x86_64_vfs_file_help, sizeof(x86_64_vfs_file_help) - 1ULL, X86_64_VFS_NODE_FILE},
+    {"/", (const u8 *)x86_64_vfs_dir_root, sizeof(x86_64_vfs_dir_root) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/bin", (const u8 *)x86_64_vfs_dir_bin, sizeof(x86_64_vfs_dir_bin) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/etc", (const u8 *)x86_64_vfs_dir_etc, sizeof(x86_64_vfs_dir_etc) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/proc", (const u8 *)x86_64_vfs_dir_proc, sizeof(x86_64_vfs_dir_proc) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/sbin", (const u8 *)x86_64_vfs_dir_sbin, sizeof(x86_64_vfs_dir_sbin) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/usr", (const u8 *)x86_64_vfs_dir_usr, sizeof(x86_64_vfs_dir_usr) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/usr/share", (const u8 *)x86_64_vfs_dir_usr_share, sizeof(x86_64_vfs_dir_usr_share) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/bin/hello", x86_64_user_hello_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/etc/motd", (const u8 *)x86_64_vfs_file_motd, sizeof(x86_64_vfs_file_motd) - 1ULL, X86_64_VFS_NODE_FILE},
+    {"/etc/os-release", (const u8 *)x86_64_vfs_file_os_release, sizeof(x86_64_vfs_file_os_release) - 1ULL, X86_64_VFS_NODE_FILE},
+    {"/proc/version", (const u8 *)x86_64_vfs_file_version, sizeof(x86_64_vfs_file_version) - 1ULL, X86_64_VFS_NODE_FILE},
+    {"/usr/share/files.txt", (const u8 *)x86_64_vfs_file_files, sizeof(x86_64_vfs_file_files) - 1ULL, X86_64_VFS_NODE_FILE},
+    {"/usr/share/help.txt", (const u8 *)x86_64_vfs_file_help, sizeof(x86_64_vfs_file_help) - 1ULL, X86_64_VFS_NODE_FILE},
 };
 
 #define X86_64_VFS_NODE_COUNT ((u32)(sizeof(x86_64_vfs_nodes) / sizeof(x86_64_vfs_nodes[0])))
+
+static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
+{
+    if (node->data == x86_64_user_hello_image_start) {
+        return (u64)(x86_64_user_hello_image_end - x86_64_user_hello_image_start);
+    }
+
+    return node->size;
+}
 
 static u32 x86_64_vfs_path_equals(const char *path, const char *kernel_path)
 {
@@ -137,7 +151,7 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
     }
 
     struct x86_64_vfs_state probe;
-    char buffer[5];
+    char buffer[6];
     u64 size = 0ULL;
     u64 type = 0ULL;
 
@@ -160,13 +174,33 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
+    u64 bin_fd = x86_64_vfs_open(&probe, "/bin", 0ULL);
+    if (bin_fd != X86_64_VFS_FD_BASE) {
+        return 0U;
+    }
+
+    u64 bin_bytes = x86_64_vfs_read(&probe, bin_fd, buffer, sizeof(buffer));
+    if (bin_bytes != sizeof(buffer) ||
+        buffer[0] != 'h' ||
+        buffer[1] != 'e' ||
+        buffer[2] != 'l' ||
+        buffer[3] != 'l' ||
+        buffer[4] != 'o' ||
+        buffer[5] != '\n') {
+        return 0U;
+    }
+
+    if (x86_64_vfs_close(&probe, bin_fd) != X86_64_VFS_RET_OK) {
+        return 0U;
+    }
+
     u64 fd = x86_64_vfs_open(&probe, "/etc/os-release", 0ULL);
     if (fd != X86_64_VFS_FD_BASE) {
         return 0U;
     }
 
-    u64 bytes = x86_64_vfs_read(&probe, fd, buffer, sizeof(buffer));
-    if (bytes != sizeof(buffer) ||
+    u64 bytes = x86_64_vfs_read(&probe, fd, buffer, 5ULL);
+    if (bytes != 5ULL ||
         buffer[0] != 'N' ||
         buffer[1] != 'A' ||
         buffer[2] != 'M' ||
@@ -187,6 +221,15 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
 
     if (x86_64_vfs_type(&probe, "/usr/share", &type) != X86_64_VFS_RET_OK ||
         type != X86_64_VFS_NODE_DIRECTORY) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/bin/hello", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/bin/hello", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
         return 0U;
     }
 
@@ -259,15 +302,16 @@ u64 x86_64_vfs_read(struct x86_64_vfs_state *state, u64 fd, char *buffer, u64 si
     }
 
     const struct x86_64_vfs_node *node = &x86_64_vfs_nodes[node_index];
+    u64 node_size = x86_64_vfs_node_size(node);
     u64 offset = state->fd_offset[slot];
-    if (offset >= node->size || size == 0ULL) {
+    if (offset >= node_size || size == 0ULL) {
         return 0ULL;
     }
 
-    u64 remaining = node->size - offset;
+    u64 remaining = node_size - offset;
     u64 bytes = (size < remaining) ? size : remaining;
     for (u64 i = 0ULL; i < bytes; ++i) {
-        buffer[i] = node->data[offset + i];
+        buffer[i] = (char)node->data[offset + i];
     }
 
     state->fd_offset[slot] = offset + bytes;
@@ -304,7 +348,7 @@ u64 x86_64_vfs_stat(const struct x86_64_vfs_state *state, const char *path, u64 
         return X86_64_VFS_RET_ENOENT;
     }
 
-    *size_out = x86_64_vfs_nodes[node_index].size;
+    *size_out = x86_64_vfs_node_size(&x86_64_vfs_nodes[node_index]);
     return X86_64_VFS_RET_OK;
 }
 
@@ -322,5 +366,29 @@ u64 x86_64_vfs_type(const struct x86_64_vfs_state *state, const char *path, u64 
     }
 
     *type_out = (u64)x86_64_vfs_nodes[node_index].type;
+    return X86_64_VFS_RET_OK;
+}
+
+u64 x86_64_vfs_resolve(const struct x86_64_vfs_state *state, const char *path,
+                       const u8 **data_out, u64 *size_out, u64 *type_out)
+{
+    if (state == (const struct x86_64_vfs_state *)0 ||
+        state->initialized == 0U ||
+        path == (const char *)0 ||
+        data_out == (const u8 **)0 ||
+        size_out == (u64 *)0 ||
+        type_out == (u64 *)0) {
+        return X86_64_VFS_RET_EINVAL;
+    }
+
+    u32 node_index = x86_64_vfs_find_node(path);
+    if (node_index == X86_64_VFS_NO_NODE) {
+        return X86_64_VFS_RET_ENOENT;
+    }
+
+    const struct x86_64_vfs_node *node = &x86_64_vfs_nodes[node_index];
+    *data_out = node->data;
+    *size_out = x86_64_vfs_node_size(node);
+    *type_out = (u64)node->type;
     return X86_64_VFS_RET_OK;
 }
