@@ -134,9 +134,25 @@ trim_trailing_spaces:
     test r15, r15
     jz line_terminated
     cmp byte [r12 + r15 - 1], ' '
-    jne line_terminated
+    jne trim_leading_spaces
     dec r15
     jmp trim_trailing_spaces
+
+trim_leading_spaces:
+    test r15, r15
+    jz line_terminated
+    cmp byte [r12], ' '
+    jne line_terminated
+    dec r15
+    xor r11d, r11d
+
+shift_line_left:
+    cmp r11, r15
+    jae trim_leading_spaces
+    mov al, [r12 + r11 + 1]
+    mov [r12 + r11], al
+    inc r11
+    jmp shift_line_left
 
 line_terminated:
     mov byte [r12 + r15], 0
