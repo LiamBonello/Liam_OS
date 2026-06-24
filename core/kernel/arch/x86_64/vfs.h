@@ -15,6 +15,7 @@
 #define X86_64_VFS_NO_FILE X86_64_VFS_NO_NODE
 #define X86_64_VFS_NODE_FILE 1U
 #define X86_64_VFS_NODE_DIRECTORY 2U
+#define X86_64_VFS_NODE_EXECUTABLE 3U
 
 struct x86_64_vfs_state {
     u32 initialized;
@@ -32,5 +33,7 @@ u64 x86_64_vfs_read(struct x86_64_vfs_state *state, u64 fd, char *buffer, u64 si
 u64 x86_64_vfs_close(struct x86_64_vfs_state *state, u64 fd);
 u64 x86_64_vfs_stat(const struct x86_64_vfs_state *state, const char *path, u64 *size_out);
 u64 x86_64_vfs_type(const struct x86_64_vfs_state *state, const char *path, u64 *type_out);
+u64 x86_64_vfs_resolve(const struct x86_64_vfs_state *state, const char *path,
+                       const u8 **data_out, u64 *size_out, u64 *type_out);
 
 #endif
