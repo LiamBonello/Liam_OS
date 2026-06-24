@@ -56,6 +56,11 @@ x86_64_syscall_entry_stub:
     cmp dword [rsp + 80], 1
     je .exit_to_kernel
 
+    mov rcx, [rsp + 56]
+    mov [rsp + 104], rcx
+    mov r11, [rsp + 64]
+    mov [rsp + 96], r11
+
     add rsp, 96
     pop r11
     pop rcx
