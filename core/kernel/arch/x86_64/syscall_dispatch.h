@@ -4,6 +4,7 @@
 #include "boot_info.h"
 #include "console.h"
 #include "idt.h"
+#include "process.h"
 #include "syscall.h"
 #include "types.h"
 #include "userland.h"
@@ -60,6 +61,8 @@ struct x86_64_syscall_dispatch_state {
     u32 exec_path_found;
     u32 exec_type_ok;
     u32 exec_loaded;
+    u32 exec_process_created;
+    u32 exec_spawned_pid;
     u32 unknown_rejected;
     u32 dispatcher_ok;
     u32 exit_code;
@@ -301,6 +304,8 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->exec_path_found = 0U;
     state->exec_type_ok = 0U;
     state->exec_loaded = 0U;
+    state->exec_process_created = 0U;
+    state->exec_spawned_pid = 0U;
     state->unknown_rejected = 0U;
     state->dispatcher_ok = 0U;
     state->exit_code = 0U;
@@ -417,6 +422,8 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
     case X86_64_SYSCALL_SERVICE_EXEC: {
         state->exec_loaded = 0U;
         state->exec_entry = 0ULL;
+        state->exec_process_created = 0U;
+        state->exec_spawned_pid = 0U;
         if (x86_64_syscall_user_path_ok(arg0) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
@@ -444,6 +451,17 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
             return state->last_result;
         }
 
+        state->exec_spawned_pid = x86_64_process_create_user_image((const char *)arg0,
+                                                                   (const u8 *)state->exec_user_code_page,
+                                                                   X86_64_USER_PAGE_BYTES,
+                                                                   state->exec_entry);
+        if (state->exec_spawned_pid == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+            return state->last_result;
+        }
+
+        state->exec_process_created = 1U;
+        x86_64_serial_write_u32("Syscall exec spawned pid: ", state->exec_spawned_pid);
         state->last_result = X86_64_SYSCALL_RET_OK;
         return state->last_result;
     }
@@ -598,6 +616,8 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall exec path found: ", state->exec_path_found);
     x86_64_serial_write_u32("Syscall exec type ok: ", state->exec_type_ok);
     x86_64_serial_write_u32("Syscall exec loaded: ", state->exec_loaded);
+    x86_64_serial_write_u32("Syscall exec process created: ", state->exec_process_created);
+    x86_64_serial_write_u32("Syscall exec spawned pid: ", state->exec_spawned_pid);
     x86_64_serial_write_hex64("Syscall exec entry: 0x", state->exec_entry);
     x86_64_serial_write_u32("Syscall unknown rejected: ", state->unknown_rejected);
     x86_64_serial_write_u32("Syscall exit dispatch ok: ", state->exit_ok);
