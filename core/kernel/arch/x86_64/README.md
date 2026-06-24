@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, reports CPU capability diagnostics, loads a maintained GDT/TSS, installs exception and IRQ gates, remaps the legacy PIC, runs bounded PIT and keyboard diagnostics, parses Multiboot2 boot data, initializes an architecture-owned boot context, brings up an isolated PMM, builds PMM-backed page tables, switches CR3 to the C-owned tables, validates identity/direct-map/higher-half aliases, initializes a direct-map early heap, programs the fast-syscall MSRs, enters ring 3, dispatches live user syscalls, loads an embedded ELF64 init image, and boots a minimal x86_64 user shell.
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, loads a maintained GDT/TSS, installs exception and IRQ gates, remaps the legacy PIC, parses Multiboot2 boot data, initializes an architecture-owned boot context, brings up an isolated PMM, builds PMM-backed page tables, switches CR3 to the C-owned tables, validates identity/direct-map/higher-half aliases, initializes a direct-map early heap, programs the fast-syscall MSRs, enters ring 3, dispatches live user syscalls, loads an embedded ELF64 init image, and boots a minimal x86_64 user shell.
 
 ```sh
 cd core
@@ -39,22 +39,11 @@ make x86_64-run-gui
 
 ## Expected normal boot markers
 
-The normal x86_64 run should report key serial markers including:
+The normal x86_64 run should reach the interactive shell without printing the old subsystem smoke-test banner wall:
 
 ```txt
-Syscall ABI ok: 1
-Syscall MSR ok: 1
-User mode ok: 1
-IRQ gates ok: 1
-PIT timer ok: 1
-Keyboard ready ok: 1
-Paging builder ok: 1
-Paging activation ok: 1
-Paging probes ok: 1
-Runtime entry ok: 1
-Heap smoke ok: 1
-Desc/IST ok: 1
 Liam_OS x86_64 shell online
+$
 ```
 
 The interactive shell currently supports:
