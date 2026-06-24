@@ -320,19 +320,20 @@ check_cat:
     jmp command_unknown
 
 command_help:
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rel help_text]
-    mov edx, help_text_len
-    syscall
-    jmp command_done
+    lea rdi, [rel help_path]
+    call print_file
+    jmp command_done_fresh
 
 command_pid:
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
-    lea rsi, [rel pid_text]
-    mov edx, pid_text_len
+    lea rsi, [rel pid_label]
+    mov edx, pid_label_len
     syscall
+
+    mov eax, LIAM_SYSCALL_GETPID
+    syscall
+    call write_rax_decimal_newline
     jmp command_done
 
 command_clear:
@@ -344,20 +345,14 @@ command_clear:
     jmp command_done
 
 command_about:
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rel about_text]
-    mov edx, about_text_len
-    syscall
-    jmp command_done
+    lea rdi, [rel about_path]
+    call print_file
+    jmp command_done_fresh
 
 command_version:
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rel version_text]
-    mov edx, version_text_len
-    syscall
-    jmp command_done
+    lea rdi, [rel version_path]
+    call print_file
+    jmp command_done_fresh
 
 command_echo:
     mov rdx, r15
@@ -413,38 +408,7 @@ command_stat:
     syscall
 
     mov rax, [rsp + LIAM_STAT_SIZE_OFFSET]
-    lea rdi, [rsp + LIAM_DEC_BUFFER_OFFSET + LIAM_DEC_BUFFER_LEN]
-    xor ecx, ecx
-    cmp rax, 0
-    jne stat_convert_loop
-    dec rdi
-    mov byte [rdi], '0'
-    mov ecx, 1
-    jmp stat_write_number
-
-stat_convert_loop:
-    xor edx, edx
-    mov r8, 10
-    div r8
-    add dl, '0'
-    dec rdi
-    mov [rdi], dl
-    inc ecx
-    test rax, rax
-    jne stat_convert_loop
-
-stat_write_number:
-    mov eax, LIAM_SYSCALL_WRITE
-    mov rsi, rdi
-    mov edi, LIAM_STDOUT
-    mov edx, ecx
-    syscall
-
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rel newline_text]
-    mov edx, newline_text_len
-    syscall
+    call write_rax_decimal_newline
     jmp command_done
 
 stat_failed:
@@ -585,6 +549,88 @@ command_done_fresh:
     syscall
     jmp shell_loop
 
+print_file:
+    mov eax, LIAM_SYSCALL_OPEN
+    xor esi, esi
+    syscall
+    cmp rax, 3
+    jb print_file_failed
+    cmp rax, 6
+    ja print_file_failed
+    mov r14, rax
+
+print_file_read_loop:
+    mov eax, LIAM_SYSCALL_READ
+    mov rdi, r14
+    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    mov edx, LIAM_READ_BUFFER_LEN
+    syscall
+    test rax, rax
+    jz print_file_close
+    cmp rax, LIAM_READ_BUFFER_LEN
+    ja print_file_close_failed
+
+    mov rdx, rax
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    syscall
+    jmp print_file_read_loop
+
+print_file_close:
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+    ret
+
+print_file_close_failed:
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+
+print_file_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel file_error_text]
+    mov edx, file_error_text_len
+    syscall
+    ret
+
+write_rax_decimal_newline:
+    lea rdi, [rsp + LIAM_DEC_BUFFER_OFFSET + LIAM_DEC_BUFFER_LEN]
+    xor ecx, ecx
+    cmp rax, 0
+    jne decimal_convert_loop
+    dec rdi
+    mov byte [rdi], '0'
+    mov ecx, 1
+    jmp decimal_write_number
+
+decimal_convert_loop:
+    xor edx, edx
+    mov r8, 10
+    div r8
+    add dl, '0'
+    dec rdi
+    mov [rdi], dl
+    inc ecx
+    test rax, rax
+    jne decimal_convert_loop
+
+decimal_write_number:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov rsi, rdi
+    mov edi, LIAM_STDOUT
+    mov edx, ecx
+    syscall
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel newline_text]
+    mov edx, newline_text_len
+    syscall
+    ret
+
 section .rodata
 shell_banner:
     db "Liam_OS x86_64 shell online", 10
@@ -592,18 +638,15 @@ shell_banner_len equ $ - shell_banner
 shell_prompt:
     db "$ "
 shell_prompt_len equ $ - shell_prompt
-help_text:
-    db "commands: help, about, version, pid, echo, ls, cat, stat, exec, clear, exit", 10
-help_text_len equ $ - help_text
-pid_text:
-    db "pid: 1", 10
-pid_text_len equ $ - pid_text
-about_text:
-    db "Liam_OS Core x86_64 user shell", 10
-about_text_len equ $ - about_text
-version_text:
-    db "Liam_OS Core x86_64 dev", 10
-version_text_len equ $ - version_text
+help_path:
+    db "/usr/share/help.txt", 0
+about_path:
+    db "/etc/motd", 0
+version_path:
+    db "/proc/version", 0
+pid_label:
+    db "pid: "
+pid_label_len equ $ - pid_label
 clear_text:
     db 27, "[2J", 27, "[H"
 clear_text_len equ $ - clear_text
@@ -634,6 +677,9 @@ exec_error_text_len equ $ - exec_error_text
 exec_not_found_text:
     db "exec: not found", 10
 exec_not_found_text_len equ $ - exec_not_found_text
+file_error_text:
+    db "file: not found", 10
+file_error_text_len equ $ - file_error_text
 bye_text:
     db "bye", 10
 bye_text_len equ $ - bye_text
