@@ -314,7 +314,7 @@ static void report_runtime_entry(const struct x86_64_runtime_entry_state *state)
     x86_64_serial_write_u32("Runtime entry ok: ", state->runtime_ok);
 }
 
-static void report_user_mode(const struct x86_64_user_mode_smoke_state *state)
+static void report_user_mode(const struct x86_64_user_mode_state *state)
 {
     x86_64_user_mode_report(state);
 }
@@ -415,7 +415,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_paging_probe_state paging_probe;
     struct x86_64_runtime_entry_state runtime_entry;
     struct x86_64_tss_state tss_state;
-    struct x86_64_user_mode_smoke_state user_mode_smoke;
+    struct x86_64_user_mode_state user_mode_state;
 
     x86_64_console_init();
     x86_64_serial_init();
@@ -440,7 +440,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
                                  &context.memory_layout, &paging_plan);
     x86_64_runtime_enter_higher_half(&runtime_entry, &paging_activation,
                                      &context.memory_layout, &paging_plan);
-    x86_64_user_mode_run_smoke(&user_mode_smoke, &paging_builder, 1U);
+    x86_64_user_mode_start_init(&user_mode_state, &paging_builder, 1U);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
     x86_64_console_write_at("Stage: x86_64 ring3 smoke", 1, 0);
@@ -461,7 +461,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_paging_probes(&paging_probe);
     report_higher_half_probe(&higher_half_probe);
     report_runtime_entry(&runtime_entry);
-    report_user_mode(&user_mode_smoke);
+    report_user_mode(&user_mode_state);
     report_heap_state(&heap_state);
     report_gdt_state(&gdt_state);
     report_tss_state(&tss_state, &gdt_state);
