@@ -1,6 +1,7 @@
 #include "process.h"
 
 #include "console.h"
+#include "gdt.h"
 #include "heap.h"
 #include "pmm.h"
 #include "syscall_dispatch.h"
@@ -9,6 +10,8 @@
 
 #define X86_64_PROCESS_INVALID_PID 0U
 #define X86_64_PROCESS_FIRST_PID 1U
+#define X86_64_PROCESS_USER_RFLAGS 0x0000000000000202ULL
+#define X86_64_PROCESS_USER_STACK_ALIGNMENT 16ULL
 
 __attribute__((naked)) static void x86_64_process_enter_stack(
     u64 stack_top __attribute__((unused)),
@@ -131,6 +134,19 @@ static struct x86_64_process *find_next_ready_process(void)
         if (process_table[i].state == X86_64_PROCESS_READY &&
             process_table[i].mode == X86_64_PROCESS_MODE_KERNEL &&
             process_table[i].entry != (x86_64_process_entry_t)0) {
+            return &process_table[i];
+        }
+    }
+
+    return (struct x86_64_process *)0;
+}
+
+static struct x86_64_process *find_next_ready_user_process(void)
+{
+    for (u32 i = 0; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
+        if (process_table[i].state == X86_64_PROCESS_READY &&
+            process_table[i].mode == X86_64_PROCESS_MODE_USER &&
+            process_table[i].user_entry != 0ULL) {
             return &process_table[i];
         }
     }
@@ -360,6 +376,69 @@ u32 x86_64_process_create_user_image(const char *path,
     return process->pid;
 }
 
+u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state)
+{
+    if (state == (struct x86_64_user_schedule_state *)0) {
+        return 0U;
+    }
+
+    clear_bytes(state, sizeof(*state));
+    state->initialized = 1U;
+
+    if (process_state.initialized == 0U) {
+        return 0U;
+    }
+
+    struct x86_64_process *process = find_next_ready_user_process();
+    if (process == (struct x86_64_process *)0) {
+        return 0U;
+    }
+
+    state->candidate_found = 1U;
+    state->selected_pid = process->pid;
+    state->selected_state = process->state;
+    state->selected_mode = process->mode;
+    state->address_space_id = process->address_space_id;
+    state->cr3 = process->cr3;
+    state->user_entry = process->user_entry;
+    state->user_rsp = X86_64_USER_STACK_TOP - X86_64_PROCESS_USER_STACK_ALIGNMENT;
+    state->user_rflags = X86_64_PROCESS_USER_RFLAGS;
+    state->user_code_page = process->user_code_page;
+    state->user_stack_page = process->user_stack_page;
+    state->entry_valid =
+        ((state->user_entry >= X86_64_USER_CODE_BASE) &&
+         (state->user_entry < (X86_64_USER_CODE_BASE + X86_64_USER_PAGE_BYTES))) ? 1U : 0U;
+    state->stack_valid =
+        ((state->user_rsp >= process->user_stack_virtual) &&
+         (state->user_rsp < X86_64_USER_STACK_TOP) &&
+         (is_aligned_u64(state->user_rsp, X86_64_PROCESS_USER_STACK_ALIGNMENT) != 0U)) ? 1U : 0U;
+    state->cr3_valid =
+        ((state->cr3 != 0ULL) &&
+         (is_aligned_u64(state->cr3, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
+    state->code_page_valid =
+        ((state->user_code_page != 0ULL) &&
+         (is_aligned_u64(state->user_code_page, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
+    state->stack_page_valid =
+        ((state->user_stack_page != 0ULL) &&
+         (is_aligned_u64(state->user_stack_page, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
+    state->transition_ready =
+        ((state->candidate_found != 0U) &&
+         (state->entry_valid != 0U) &&
+         (state->stack_valid != 0U) &&
+         (state->cr3_valid != 0U) &&
+         (state->code_page_valid != 0U) &&
+         (state->stack_page_valid != 0U) &&
+         (process->address_space_owned != 0U)) ? 1U : 0U;
+    state->scheduler_ok = state->transition_ready;
+
+    process_state.user_scheduler_ready = state->scheduler_ok;
+    process_state.last_scheduled_user_pid = state->selected_pid;
+    process_state.scheduled_user_rsp = state->user_rsp;
+    process_state.scheduled_user_rflags = state->user_rflags;
+
+    return state->scheduler_ok;
+}
+
 u32 x86_64_process_run_next_ready(void)
 {
     struct x86_64_process *process = find_next_ready_process();
@@ -422,6 +501,7 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     struct x86_64_userland_foundation_state userland_state;
     struct x86_64_syscall_dispatch_state syscall_dispatch_state;
     struct x86_64_user_context_state user_context_state;
+    struct x86_64_user_schedule_state user_schedule_state;
 
     x86_64_process_initialize(&process_state);
 
@@ -444,6 +524,7 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
                                                     16ULL,
                                                     X86_64_USER_CODE_BASE);
     }
+    (void)x86_64_process_prepare_next_user(&user_schedule_state);
     refresh_counts();
 
     x86_64_userland_foundation_init(&userland_state);
@@ -516,6 +597,7 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.user_image_bytes == 16U) &&
          (process_state.user_image_copied != 0U) &&
          (process_state.user_process_ready != 0U) &&
+         (process_state.user_scheduler_ready != 0U) &&
          (process_state.worker_a_count == 1U) &&
          (process_state.worker_b_count == 1U) &&
          (process_state.userland_foundation_ok != 0U) &&
@@ -545,8 +627,10 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process user image bytes: ", process_state.user_image_bytes);
     x86_64_serial_write_u32("Process user image copied: ", process_state.user_image_copied);
     x86_64_serial_write_u32("Process user ready: ", process_state.user_process_ready);
+    x86_64_serial_write_u32("Process user scheduler ready: ", process_state.user_scheduler_ready);
     x86_64_serial_write_u32("Process last created pid: ", process_state.last_created_pid);
     x86_64_serial_write_u32("Process last user pid: ", process_state.last_user_pid);
+    x86_64_serial_write_u32("Process last scheduled user pid: ", process_state.last_scheduled_user_pid);
     x86_64_serial_write_u32("Process last run pid: ", process_state.last_run_pid);
     x86_64_serial_write_hex64("Process first stack base: 0x", process_state.first_stack_base);
     x86_64_serial_write_hex64("Process first stack top: 0x", process_state.first_stack_top);
@@ -564,6 +648,8 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_hex64("Process last user CR3: 0x", process_state.last_user_cr3);
     x86_64_serial_write_hex64("Process last user code page: 0x", process_state.last_user_code_page);
     x86_64_serial_write_hex64("Process last user stack page: 0x", process_state.last_user_stack_page);
+    x86_64_serial_write_hex64("Process scheduled user RSP: 0x", process_state.scheduled_user_rsp);
+    x86_64_serial_write_hex64("Process scheduled user RFLAGS: 0x", process_state.scheduled_user_rflags);
     x86_64_serial_write_hex64("Process worker A stack sample: 0x", process_state.worker_a_stack_sample);
     x86_64_serial_write_hex64("Process worker B stack sample: 0x", process_state.worker_b_stack_sample);
     x86_64_serial_write_u32("Process worker A count: ", process_state.worker_a_count);
