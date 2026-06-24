@@ -284,17 +284,27 @@ check_exec:
 
 check_stat:
     cmp r15, 6
-    jb check_cat
+    jb check_ls
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 's'
-    jne check_cat
+    jne check_ls
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 't'
-    jne check_cat
+    jne check_ls
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'a'
-    jne check_cat
+    jne check_ls
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 't'
-    jne check_cat
+    jne check_ls
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], ' '
     je command_stat
+
+check_ls:
+    cmp r15, 3
+    jb check_cat
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'l'
+    jne check_cat
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 's'
+    jne check_cat
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], ' '
+    je command_ls
 
 check_cat:
     cmp r15, 5
@@ -445,6 +455,54 @@ stat_failed:
     syscall
     jmp command_done
 
+command_ls:
+    mov eax, LIAM_SYSCALL_OPEN
+    lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET + 3]
+    xor esi, esi
+    syscall
+    cmp rax, 3
+    jb ls_failed
+    cmp rax, 6
+    ja ls_failed
+    mov r14, rax
+
+ls_read_loop:
+    mov eax, LIAM_SYSCALL_READ
+    mov rdi, r14
+    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    mov edx, LIAM_READ_BUFFER_LEN
+    syscall
+    test rax, rax
+    jz ls_close
+    cmp rax, LIAM_READ_BUFFER_LEN
+    ja ls_close_failed
+
+    mov rdx, rax
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    syscall
+    jmp ls_read_loop
+
+ls_close:
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+    jmp command_done_fresh
+
+ls_close_failed:
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+
+ls_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel ls_error_text]
+    mov edx, ls_error_text_len
+    syscall
+    jmp command_done_fresh
+
 command_cat:
     mov eax, LIAM_SYSCALL_OPEN
     lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET + 4]
@@ -535,7 +593,7 @@ shell_prompt:
     db "$ "
 shell_prompt_len equ $ - shell_prompt
 help_text:
-    db "commands: help, about, version, pid, echo, cat, stat, exec, clear, exit", 10
+    db "commands: help, about, version, pid, echo, ls, cat, stat, exec, clear, exit", 10
 help_text_len equ $ - help_text
 pid_text:
     db "pid: 1", 10
@@ -558,6 +616,9 @@ newline_text_len equ $ - newline_text
 unknown_text:
     db "unknown command", 10
 unknown_text_len equ $ - unknown_text
+ls_error_text:
+    db "ls: not found", 10
+ls_error_text_len equ $ - ls_error_text
 cat_error_text:
     db "cat: not found", 10
 cat_error_text_len equ $ - cat_error_text
