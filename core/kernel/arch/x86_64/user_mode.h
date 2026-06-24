@@ -7,7 +7,7 @@
 
 #define X86_64_USER_MODE_SYSCALL_EXIT_SENTINEL 0xFFFFFFFFFFFFFFFFULL
 
-struct x86_64_user_mode_smoke_state {
+struct x86_64_user_mode_state {
     u32 initialized;
     u32 attempted;
     u32 entered;
@@ -37,13 +37,18 @@ struct x86_64_user_mode_smoke_state {
     u64 last_user_rflags;
 };
 
-extern u64 x86_64_user_smoke_kernel_rsp;
+extern u64 x86_64_user_mode_kernel_rsp;
 
-void x86_64_user_smoke_enter(u64 entry_rip, u64 entry_rsp);
+void x86_64_user_mode_enter_init(u64 entry_rip, u64 entry_rsp);
 u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame);
-void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
-                                const struct x86_64_paging_builder_state *paging_builder,
-                                u32 current_pid);
-void x86_64_user_mode_report(const struct x86_64_user_mode_smoke_state *state);
+void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
+                                 const struct x86_64_paging_builder_state *paging_builder,
+                                 u32 current_pid);
+void x86_64_user_mode_report(const struct x86_64_user_mode_state *state);
+
+#define x86_64_user_mode_smoke_state x86_64_user_mode_state
+#define x86_64_user_smoke_kernel_rsp x86_64_user_mode_kernel_rsp
+#define x86_64_user_smoke_enter x86_64_user_mode_enter_init
+#define x86_64_user_mode_run_smoke x86_64_user_mode_start_init
 
 #endif
