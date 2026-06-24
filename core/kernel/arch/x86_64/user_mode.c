@@ -81,7 +81,8 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
         break;
 
     case X86_64_SYSCALL_SERVICE_EXEC:
-        state->exec_ok = (result == X86_64_SYSCALL_RET_ENOSYS ||
+        state->exec_ok = (result == X86_64_SYSCALL_RET_OK ||
+                          result == X86_64_SYSCALL_RET_ENOSYS ||
                           result == X86_64_VFS_RET_ENOENT) ? 1U : 0U;
         break;
 
@@ -127,6 +128,7 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
     }
 
     x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
+    active_dispatcher.exec_user_code_page = paging_builder->user_code_page;
     active_dispatcher.write_output_enabled = 1U;
     active_dispatcher.blocking_read_enabled = 1U;
     active_state = state;
@@ -147,6 +149,7 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
          (state->read_ok != 0U) &&
          (state->get_arg_ok != 0U) &&
          (state->yield_ok != 0U) &&
+         (state->exec_ok != 0U) &&
          (state->exit_ok != 0U) &&
          (state->unexpected_syscall == 0U) &&
          (state->live_dispatcher_initialized != 0U) &&
