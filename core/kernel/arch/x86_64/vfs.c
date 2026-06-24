@@ -81,9 +81,47 @@ void x86_64_vfs_init(struct x86_64_vfs_state *state)
 
 u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
 {
-    return ((state != (const struct x86_64_vfs_state *)0) &&
-            (state->initialized != 0U) &&
-            (X86_64_VFS_FILE_COUNT > 0U)) ? 1U : 0U;
+    if (state == (const struct x86_64_vfs_state *)0 ||
+        state->initialized == 0U ||
+        X86_64_VFS_FILE_COUNT == 0U) {
+        return 0U;
+    }
+
+    struct x86_64_vfs_state probe;
+    char buffer[5];
+    u64 size = 0ULL;
+
+    x86_64_vfs_init(&probe);
+    u64 fd = x86_64_vfs_open(&probe, "/etc/os-release", 0ULL);
+    if (fd != X86_64_VFS_FD_BASE) {
+        return 0U;
+    }
+
+    u64 bytes = x86_64_vfs_read(&probe, fd, buffer, sizeof(buffer));
+    if (bytes != sizeof(buffer) ||
+        buffer[0] != 'N' ||
+        buffer[1] != 'A' ||
+        buffer[2] != 'M' ||
+        buffer[3] != 'E' ||
+        buffer[4] != '=') {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/etc/os-release", &size) != X86_64_VFS_RET_OK ||
+        size != (sizeof(x86_64_vfs_file_os_release) - 1ULL)) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/missing", &size) != X86_64_VFS_RET_ENOENT) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_close(&probe, fd) != X86_64_VFS_RET_OK ||
+        x86_64_vfs_open_count(&probe) != 0U) {
+        return 0U;
+    }
+
+    return 1U;
 }
 
 u32 x86_64_vfs_file_count(void)
