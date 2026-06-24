@@ -7,6 +7,7 @@ bits 64
 %define LIAM_SYSCALL_CLOSE 5
 %define LIAM_SYSCALL_STAT 6
 %define LIAM_SYSCALL_GET_ARG 7
+%define LIAM_SYSCALL_EXEC 8
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
 
@@ -254,17 +255,31 @@ check_version:
 
 check_echo:
     cmp r15, 5
+    jb check_exec
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'e'
+    jne check_exec
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'c'
+    jne check_exec
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'h'
+    jne check_exec
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'o'
+    jne check_exec
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], ' '
+    je command_echo
+
+check_exec:
+    cmp r15, 6
     jb check_stat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'e'
     jne check_stat
-    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'c'
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'x'
     jne check_stat
-    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'h'
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'e'
     jne check_stat
-    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'o'
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'c'
     jne check_stat
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], ' '
-    je command_echo
+    je command_exec
 
 check_stat:
     cmp r15, 6
@@ -345,6 +360,20 @@ command_echo:
     mov edi, LIAM_STDOUT
     lea rsi, [rel newline_text]
     mov edx, newline_text_len
+    syscall
+    jmp command_done
+
+command_exec:
+    mov eax, LIAM_SYSCALL_EXEC
+    lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET + 5]
+    syscall
+    test rax, rax
+    jns command_done
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel exec_error_text]
+    mov edx, exec_error_text_len
     syscall
     jmp command_done
 
@@ -495,7 +524,7 @@ shell_prompt:
     db "$ "
 shell_prompt_len equ $ - shell_prompt
 help_text:
-    db "commands: help, about, version, pid, echo, cat, stat, clear, exit", 10
+    db "commands: help, about, version, pid, echo, cat, stat, exec, clear, exit", 10
 help_text_len equ $ - help_text
 pid_text:
     db "pid: 1", 10
@@ -527,6 +556,9 @@ stat_size_text_len equ $ - stat_size_text
 stat_error_text:
     db "stat: not found", 10
 stat_error_text_len equ $ - stat_error_text
+exec_error_text:
+    db "exec: not implemented", 10
+exec_error_text_len equ $ - exec_error_text
 bye_text:
     db "bye", 10
 bye_text_len equ $ - bye_text
