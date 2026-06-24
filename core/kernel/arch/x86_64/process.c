@@ -2,6 +2,7 @@
 
 #include "console.h"
 #include "heap.h"
+#include "pmm.h"
 #include "syscall_dispatch.h"
 #include "user_context.h"
 #include "userland.h"
@@ -30,6 +31,7 @@ __attribute__((naked)) static void x86_64_process_enter_stack(
 static struct x86_64_process process_table[X86_64_PROCESS_MAX_PROCESSES];
 static struct x86_64_process_smoke_state process_state;
 static u32 next_pid = X86_64_PROCESS_FIRST_PID;
+static u64 next_address_space_id = 1ULL;
 static u32 worker_a_runs;
 static u32 worker_b_runs;
 static u64 worker_a_stack_sample;
@@ -43,17 +45,15 @@ static void clear_bytes(void *ptr, usize size)
     }
 }
 
+static void clear_page(u64 page)
+{
+    clear_bytes((void *)page, X86_64_USER_PAGE_BYTES);
+}
+
 static u64 read_rsp(void)
 {
     u64 value;
     __asm__ volatile ("mov %%rsp, %0" : "=r"(value));
-    return value;
-}
-
-static u64 read_cr3(void)
-{
-    u64 value;
-    __asm__ volatile ("mov %%cr3, %0" : "=r"(value) :: "memory");
     return value;
 }
 
@@ -91,6 +91,17 @@ static struct x86_64_process *find_unused_process(void)
     return (struct x86_64_process *)0;
 }
 
+static struct x86_64_process *find_process_by_pid(u32 pid)
+{
+    for (u32 i = 0; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
+        if (process_table[i].state != X86_64_PROCESS_UNUSED && process_table[i].pid == pid) {
+            return &process_table[i];
+        }
+    }
+
+    return (struct x86_64_process *)0;
+}
+
 static struct x86_64_process *find_next_ready_process(void)
 {
     for (u32 i = 0; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
@@ -114,6 +125,55 @@ static u32 count_processes_with_state(u32 state)
     return count;
 }
 
+static void release_address_space(struct x86_64_process *process)
+{
+    if (process == (struct x86_64_process *)0) {
+        return;
+    }
+
+    if (process->cr3 != 0ULL) {
+        (void)x86_64_pmm_free_page(process->cr3);
+    }
+    if (process->user_code_page != 0ULL) {
+        (void)x86_64_pmm_free_page(process->user_code_page);
+    }
+    if (process->user_stack_page != 0ULL) {
+        (void)x86_64_pmm_free_page(process->user_stack_page);
+    }
+
+    process->address_space_id = 0ULL;
+    process->cr3 = 0ULL;
+    process->user_code_page = 0ULL;
+    process->user_stack_page = 0ULL;
+    process->user_code_virtual = 0ULL;
+    process->user_stack_virtual = 0ULL;
+    process->address_space_owned = 0U;
+}
+
+static u32 allocate_address_space(struct x86_64_process *process)
+{
+    process->cr3 = x86_64_pmm_alloc_page();
+    process->user_code_page = x86_64_pmm_alloc_page();
+    process->user_stack_page = x86_64_pmm_alloc_page();
+
+    if (process->cr3 == 0ULL || process->user_code_page == 0ULL || process->user_stack_page == 0ULL) {
+        release_address_space(process);
+        return 0U;
+    }
+
+    clear_page(process->cr3);
+    clear_page(process->user_code_page);
+    clear_page(process->user_stack_page);
+
+    process->address_space_id = next_address_space_id;
+    next_address_space_id += 1ULL;
+    process->user_code_virtual = X86_64_USER_CODE_BASE;
+    process->user_stack_virtual = X86_64_USER_STACK_TOP - X86_64_USER_PAGE_BYTES;
+    process->address_space_owned = 1U;
+
+    return 1U;
+}
+
 static void refresh_counts(void)
 {
     process_state.exited_processes = count_processes_with_state(X86_64_PROCESS_EXITED);
@@ -129,6 +189,7 @@ void x86_64_process_initialize(struct x86_64_process_smoke_state *state)
     clear_bytes(process_table, sizeof(process_table));
     clear_bytes(&process_state, sizeof(process_state));
     next_pid = X86_64_PROCESS_FIRST_PID;
+    next_address_space_id = 1ULL;
     worker_a_runs = 0U;
     worker_b_runs = 0U;
     worker_a_stack_sample = 0ULL;
@@ -155,9 +216,14 @@ u32 x86_64_process_create(const char *name,
         return X86_64_PROCESS_INVALID_PID;
     }
 
+    if (allocate_address_space(process) == 0U) {
+        return X86_64_PROCESS_INVALID_PID;
+    }
+
     void *stack = x86_64_heap_alloc((usize)X86_64_PROCESS_KERNEL_STACK_BYTES,
                                     (usize)X86_64_PROCESS_KERNEL_STACK_BYTES);
     if (stack == (void *)0) {
+        release_address_space(process);
         return X86_64_PROCESS_INVALID_PID;
     }
 
@@ -173,14 +239,24 @@ u32 x86_64_process_create(const char *name,
 
     process_state.created_processes += 1U;
     process_state.stack_allocations += 1U;
+    process_state.address_space_allocations += 1U;
+    process_state.address_space_pages_allocated += X86_64_PROCESS_ADDRESS_SPACE_PAGES;
     process_state.last_created_pid = process->pid;
 
     if (process_state.first_stack_base == 0ULL) {
         process_state.first_stack_base = process->kernel_stack_base;
         process_state.first_stack_top = process->kernel_stack_top;
+        process_state.first_address_space_id = process->address_space_id;
+        process_state.first_cr3 = process->cr3;
+        process_state.first_user_code_page = process->user_code_page;
+        process_state.first_user_stack_page = process->user_stack_page;
     } else if (process_state.second_stack_base == 0ULL) {
         process_state.second_stack_base = process->kernel_stack_base;
         process_state.second_stack_top = process->kernel_stack_top;
+        process_state.second_address_space_id = process->address_space_id;
+        process_state.second_cr3 = process->cr3;
+        process_state.second_user_code_page = process->user_code_page;
+        process_state.second_user_stack_page = process->user_stack_page;
     }
 
     process_state.stack_alignment_ok =
@@ -202,7 +278,10 @@ u32 x86_64_process_run_next_ready(void)
     process_state.last_run_pid = process->pid;
     process->state = X86_64_PROCESS_RUNNING;
 
-    if (process->entry == (x86_64_process_entry_t)0 || process->kernel_stack_top == 0ULL) {
+    if (process->entry == (x86_64_process_entry_t)0 ||
+        process->kernel_stack_top == 0ULL ||
+        process->address_space_owned == 0U ||
+        process->cr3 == 0ULL) {
         process->state = X86_64_PROCESS_FAILED;
         refresh_counts();
         return 0U;
@@ -260,10 +339,15 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     (void)x86_64_process_run_all_ready(X86_64_PROCESS_MAX_PROCESSES);
     refresh_counts();
 
-    u64 active_cr3 = read_cr3();
+    struct x86_64_process *first_process = find_process_by_pid(first_pid);
+    u64 context_address_space_id = (first_process != (struct x86_64_process *)0) ?
+        first_process->address_space_id : (u64)first_pid;
+    u64 context_cr3 = (first_process != (struct x86_64_process *)0) ? first_process->cr3 : 0ULL;
+
     x86_64_userland_foundation_init(&userland_state);
     x86_64_syscall_dispatch_run_smoke(&syscall_dispatch_state, first_pid);
-    x86_64_user_context_init(&user_context_state, &userland_state, (u64)first_pid, active_cr3);
+    x86_64_user_context_init(&user_context_state, &userland_state,
+                             context_address_space_id, context_cr3);
     process_state.userland_foundation_ok = userland_state.foundation_ok;
     process_state.syscall_dispatcher_ok = syscall_dispatch_state.dispatcher_ok;
     process_state.user_context_ok = user_context_state.context_ok;
@@ -288,6 +372,24 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (worker_a_stack_ok != 0U) &&
          (worker_b_stack_ok != 0U)) ? 1U : 0U;
 
+    process_state.address_spaces_distinct =
+        ((process_state.first_address_space_id != 0ULL) &&
+         (process_state.second_address_space_id != 0ULL) &&
+         (process_state.first_address_space_id != process_state.second_address_space_id) &&
+         (process_state.first_cr3 != 0ULL) &&
+         (process_state.second_cr3 != 0ULL) &&
+         (process_state.first_cr3 != process_state.second_cr3) &&
+         (process_state.first_user_code_page != process_state.second_user_code_page) &&
+         (process_state.first_user_stack_page != process_state.second_user_stack_page)) ? 1U : 0U;
+
+    process_state.address_space_ok =
+        ((process_state.address_space_allocations == process_state.created_processes) &&
+         (process_state.address_space_pages_allocated ==
+          (process_state.created_processes * X86_64_PROCESS_ADDRESS_SPACE_PAGES)) &&
+         (process_state.address_spaces_distinct != 0U) &&
+         (is_aligned_u64(process_state.first_cr3, X86_64_USER_PAGE_BYTES) != 0U) &&
+         (is_aligned_u64(process_state.second_cr3, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
+
     process_state.smoke_ok =
         ((process_state.initialized != 0U) &&
          (first_pid != X86_64_PROCESS_INVALID_PID) &&
@@ -300,6 +402,7 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.stack_allocations == 2U) &&
          (process_state.stack_alignment_ok != 0U) &&
          (process_state.stack_execution_ok != 0U) &&
+         (process_state.address_space_ok != 0U) &&
          (process_state.worker_a_count == 1U) &&
          (process_state.worker_b_count == 1U) &&
          (process_state.userland_foundation_ok != 0U) &&
@@ -321,12 +424,24 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process stack alignment ok: ", process_state.stack_alignment_ok);
     x86_64_serial_write_u32("Process stack switches: ", process_state.stack_switches);
     x86_64_serial_write_u32("Process stack execution ok: ", process_state.stack_execution_ok);
+    x86_64_serial_write_u32("Process address spaces: ", process_state.address_space_allocations);
+    x86_64_serial_write_u32("Process address-space pages: ", process_state.address_space_pages_allocated);
+    x86_64_serial_write_u32("Process address spaces distinct: ", process_state.address_spaces_distinct);
+    x86_64_serial_write_u32("Process address space ok: ", process_state.address_space_ok);
     x86_64_serial_write_u32("Process last created pid: ", process_state.last_created_pid);
     x86_64_serial_write_u32("Process last run pid: ", process_state.last_run_pid);
     x86_64_serial_write_hex64("Process first stack base: 0x", process_state.first_stack_base);
     x86_64_serial_write_hex64("Process first stack top: 0x", process_state.first_stack_top);
     x86_64_serial_write_hex64("Process second stack base: 0x", process_state.second_stack_base);
     x86_64_serial_write_hex64("Process second stack top: 0x", process_state.second_stack_top);
+    x86_64_serial_write_hex64("Process first address space id: 0x", process_state.first_address_space_id);
+    x86_64_serial_write_hex64("Process second address space id: 0x", process_state.second_address_space_id);
+    x86_64_serial_write_hex64("Process first CR3: 0x", process_state.first_cr3);
+    x86_64_serial_write_hex64("Process second CR3: 0x", process_state.second_cr3);
+    x86_64_serial_write_hex64("Process first user code page: 0x", process_state.first_user_code_page);
+    x86_64_serial_write_hex64("Process second user code page: 0x", process_state.second_user_code_page);
+    x86_64_serial_write_hex64("Process first user stack page: 0x", process_state.first_user_stack_page);
+    x86_64_serial_write_hex64("Process second user stack page: 0x", process_state.second_user_stack_page);
     x86_64_serial_write_hex64("Process worker A stack sample: 0x", process_state.worker_a_stack_sample);
     x86_64_serial_write_hex64("Process worker B stack sample: 0x", process_state.worker_b_stack_sample);
     x86_64_serial_write_u32("Process worker A count: ", process_state.worker_a_count);
