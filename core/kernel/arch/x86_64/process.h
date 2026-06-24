@@ -6,6 +6,7 @@
 #define X86_64_PROCESS_MAX_PROCESSES 8U
 #define X86_64_PROCESS_NAME_LEN 24U
 #define X86_64_PROCESS_KERNEL_STACK_BYTES 4096ULL
+#define X86_64_PROCESS_ADDRESS_SPACE_PAGES 3U
 
 typedef void (*x86_64_process_entry_t)(void *arg);
 
@@ -25,6 +26,13 @@ struct x86_64_process {
     void *arg;
     u64 kernel_stack_base;
     u64 kernel_stack_top;
+    u64 address_space_id;
+    u64 cr3;
+    u64 user_code_page;
+    u64 user_stack_page;
+    u64 user_code_virtual;
+    u64 user_stack_virtual;
+    u32 address_space_owned;
     u32 exit_code;
 };
 
@@ -41,6 +49,10 @@ struct x86_64_process_smoke_state {
     u32 stack_alignment_ok;
     u32 stack_switches;
     u32 stack_execution_ok;
+    u32 address_space_allocations;
+    u32 address_space_pages_allocated;
+    u32 address_spaces_distinct;
+    u32 address_space_ok;
     u32 last_created_pid;
     u32 last_run_pid;
     u32 worker_a_count;
@@ -53,6 +65,14 @@ struct x86_64_process_smoke_state {
     u64 first_stack_top;
     u64 second_stack_base;
     u64 second_stack_top;
+    u64 first_address_space_id;
+    u64 second_address_space_id;
+    u64 first_cr3;
+    u64 second_cr3;
+    u64 first_user_code_page;
+    u64 second_user_code_page;
+    u64 first_user_stack_page;
+    u64 second_user_stack_page;
     u64 worker_a_stack_sample;
     u64 worker_b_stack_sample;
 };
