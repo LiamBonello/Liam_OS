@@ -128,7 +128,18 @@ line_ready:
     mov edx, newline_text_len
     syscall
 
-    mov byte [rsp + LIAM_LINE_BUFFER_OFFSET + r15], 0
+    lea r12, [rsp + LIAM_LINE_BUFFER_OFFSET]
+
+trim_trailing_spaces:
+    test r15, r15
+    jz line_terminated
+    cmp byte [r12 + r15 - 1], ' '
+    jne line_terminated
+    dec r15
+    jmp trim_trailing_spaces
+
+line_terminated:
+    mov byte [r12 + r15], 0
     jmp handle_line
 
 exit_success:
