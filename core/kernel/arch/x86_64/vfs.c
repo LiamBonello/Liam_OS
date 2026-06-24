@@ -91,6 +91,76 @@ static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
     return node->size;
 }
 
+static u32 x86_64_vfs_normalize_path(const char *path, char *normalized)
+{
+    if (path == (const char *)0 || normalized == (char *)0 || path[0] != '/') {
+        return 0U;
+    }
+
+    u64 in = 0ULL;
+    u64 out = 0ULL;
+    normalized[out++] = '/';
+
+    while (in < X86_64_VFS_PATH_MAX_BYTES && path[in] != '\0') {
+        while (in < X86_64_VFS_PATH_MAX_BYTES && path[in] == '/') {
+            ++in;
+        }
+
+        if (in >= X86_64_VFS_PATH_MAX_BYTES || path[in] == '\0') {
+            break;
+        }
+
+        u64 segment_start = in;
+        u64 segment_len = 0ULL;
+        while (in < X86_64_VFS_PATH_MAX_BYTES && path[in] != '\0' && path[in] != '/') {
+            ++in;
+            ++segment_len;
+        }
+
+        if (in >= X86_64_VFS_PATH_MAX_BYTES) {
+            return 0U;
+        }
+
+        if (segment_len == 1ULL && path[segment_start] == '.') {
+            continue;
+        }
+
+        if (segment_len == 2ULL && path[segment_start] == '.' && path[segment_start + 1ULL] == '.') {
+            if (out > 1ULL) {
+                --out;
+                while (out > 1ULL && normalized[out - 1ULL] != '/') {
+                    --out;
+                }
+                normalized[out] = '\0';
+            }
+            continue;
+        }
+
+        if (out > 1ULL) {
+            if (out + 1ULL >= X86_64_VFS_PATH_MAX_BYTES) {
+                return 0U;
+            }
+            normalized[out++] = '/';
+        }
+
+        if (out + segment_len >= X86_64_VFS_PATH_MAX_BYTES) {
+            return 0U;
+        }
+
+        for (u64 i = 0ULL; i < segment_len; ++i) {
+            normalized[out++] = path[segment_start + i];
+        }
+        normalized[out] = '\0';
+    }
+
+    if (in >= X86_64_VFS_PATH_MAX_BYTES) {
+        return 0U;
+    }
+
+    normalized[out] = '\0';
+    return 1U;
+}
+
 static u32 x86_64_vfs_path_equals(const char *path, const char *kernel_path)
 {
     for (u64 i = 0ULL; i < X86_64_VFS_PATH_MAX_BYTES; ++i) {
@@ -109,8 +179,13 @@ static u32 x86_64_vfs_path_equals(const char *path, const char *kernel_path)
 
 static u32 x86_64_vfs_find_node(const char *path)
 {
+    char normalized[X86_64_VFS_PATH_MAX_BYTES];
+    if (x86_64_vfs_normalize_path(path, normalized) == 0U) {
+        return X86_64_VFS_NO_NODE;
+    }
+
     for (u32 i = 0U; i < X86_64_VFS_NODE_COUNT; ++i) {
-        if (x86_64_vfs_path_equals(path, x86_64_vfs_nodes[i].path) != 0U) {
+        if (x86_64_vfs_path_equals(normalized, x86_64_vfs_nodes[i].path) != 0U) {
             return i;
         }
     }
@@ -174,7 +249,7 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
-    u64 bin_fd = x86_64_vfs_open(&probe, "/bin", 0ULL);
+    u64 bin_fd = x86_64_vfs_open(&probe, "///usr/../bin/./", 0ULL);
     if (bin_fd != X86_64_VFS_FD_BASE) {
         return 0U;
     }
@@ -194,7 +269,7 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
-    u64 fd = x86_64_vfs_open(&probe, "/etc/os-release", 0ULL);
+    u64 fd = x86_64_vfs_open(&probe, "/etc/./os-release", 0ULL);
     if (fd != X86_64_VFS_FD_BASE) {
         return 0U;
     }
@@ -209,7 +284,7 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
-    if (x86_64_vfs_stat(&probe, "/etc/os-release", &size) != X86_64_VFS_RET_OK ||
+    if (x86_64_vfs_stat(&probe, "/etc/../etc/os-release", &size) != X86_64_VFS_RET_OK ||
         size != (sizeof(x86_64_vfs_file_os_release) - 1ULL)) {
         return 0U;
     }
@@ -224,12 +299,12 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
-    if (x86_64_vfs_type(&probe, "/bin/hello", &type) != X86_64_VFS_RET_OK ||
+    if (x86_64_vfs_type(&probe, "/etc/../bin//hello", &type) != X86_64_VFS_RET_OK ||
         type != X86_64_VFS_NODE_EXECUTABLE) {
         return 0U;
     }
 
-    if (x86_64_vfs_stat(&probe, "/bin/hello", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+    if (x86_64_vfs_stat(&probe, "/bin/./hello", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
         return 0U;
     }
 
