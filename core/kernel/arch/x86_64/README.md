@@ -17,7 +17,7 @@ The artifact is written to:
 core/build/x86_64/kernel.elf
 ```
 
-It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, reports CPU capability diagnostics, loads a maintained GDT/TSS, installs exception and IRQ gates, remaps the legacy PIC, runs bounded PIT and keyboard diagnostics, parses Multiboot2 boot data, initializes an architecture-owned boot context, brings up an isolated PMM, builds PMM-backed page tables, switches CR3 to the C-owned tables, validates identity/direct-map/higher-half aliases, initializes a direct-map early heap, runs an architecture-local process scheduler smoke check, programs the fast-syscall MSRs, enters ring 3, dispatches live user syscalls, loads an embedded ELF64 init image, and boots a minimal x86_64 user shell.
+It can also build and run an experimental Multiboot2 ISO that enters long mode, calls a freestanding x86_64 C entry, reports CPU capability diagnostics, loads a maintained GDT/TSS, installs exception and IRQ gates, remaps the legacy PIC, runs bounded PIT and keyboard diagnostics, parses Multiboot2 boot data, initializes an architecture-owned boot context, brings up an isolated PMM, builds PMM-backed page tables, switches CR3 to the C-owned tables, validates identity/direct-map/higher-half aliases, initializes a direct-map early heap, programs the fast-syscall MSRs, enters ring 3, dispatches live user syscalls, loads an embedded ELF64 init image, and boots a minimal x86_64 user shell.
 
 ```sh
 cd core
@@ -44,10 +44,6 @@ The normal x86_64 run should report key serial markers including:
 ```txt
 Syscall ABI ok: 1
 Syscall MSR ok: 1
-Process smoke ok: 1
-Userland foundation ok: 1
-Syscall dispatcher ok: 1
-User context ok: 1
 User mode ok: 1
 IRQ gates ok: 1
 PIT timer ok: 1
@@ -58,6 +54,7 @@ Paging probes ok: 1
 Runtime entry ok: 1
 Heap smoke ok: 1
 Desc/IST ok: 1
+Liam_OS x86_64 shell online
 ```
 
 The interactive shell currently supports:
@@ -138,4 +135,3 @@ Panic halt mode: cli; hlt
 - Do not copy i386 files and rename them as if that made them 64-bit safe.
 - Keep i386 bootable until x86_64 has verified parity.
 - Keep architecture-specific code under architecture-specific directories.
-- Promote shared abstractions only after both i386 and x86_64 need the same contract.
