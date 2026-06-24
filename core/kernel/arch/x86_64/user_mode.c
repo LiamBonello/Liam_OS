@@ -1,6 +1,7 @@
 #include "user_mode.h"
 
 #include "console.h"
+#include "process.h"
 #include "syscall.h"
 #include "userland.h"
 
@@ -115,6 +116,8 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
                                  const struct x86_64_paging_builder_state *paging_builder,
                                  u32 current_pid)
 {
+    struct x86_64_process_smoke_state process_state;
+
     clear_state(state);
     state->initialized = 1U;
     state->current_pid = current_pid;
@@ -126,6 +129,8 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
     if (state->user_entry_ready == 0U || state->user_stack_ready == 0U) {
         return;
     }
+
+    x86_64_process_run_smoke(&process_state);
 
     x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
     active_dispatcher.exec_user_code_page = paging_builder->user_code_page;
