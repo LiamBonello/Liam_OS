@@ -7,7 +7,7 @@
 #define X86_64_PROCESS_NAME_LEN 24U
 #define X86_64_PROCESS_IMAGE_PATH_LEN 64U
 #define X86_64_PROCESS_KERNEL_STACK_BYTES 4096ULL
-#define X86_64_PROCESS_ADDRESS_SPACE_PAGES 7U
+#define X86_64_PROCESS_ADDRESS_SPACE_PAGES 8U
 
 typedef void (*x86_64_process_entry_t)(void *arg);
 
@@ -39,7 +39,8 @@ struct x86_64_process {
     u64 address_space_id;
     u64 cr3;
     u64 user_pdpt_page;
-    u64 user_pd_page;
+    u64 user_code_pd_page;
+    u64 user_stack_pd_page;
     u64 user_code_pt_page;
     u64 user_stack_pt_page;
     u64 user_code_page;
@@ -124,7 +125,8 @@ struct x86_64_process_smoke_state {
     u64 last_user_entry;
     u64 last_user_cr3;
     u64 last_user_pdpt_page;
-    u64 last_user_pd_page;
+    u64 last_user_code_pd_page;
+    u64 last_user_stack_pd_page;
     u64 last_user_code_pt_page;
     u64 last_user_stack_pt_page;
     u64 last_user_code_page;
