@@ -54,9 +54,15 @@ about
 version
 pid
 echo <text>
+ls <path>
+cat <path>
+stat <path>
+exec <path>
 clear
 exit
 ```
+
+`help`, `about`, and `version` are read through the VFS. `pid` and `/bin/sysinfo` report the live `getpid` syscall result.
 
 ## Manual validation
 
@@ -79,6 +85,10 @@ about
 version
 pid
 echo hello from x86_64
+ls /
+cat /usr/share/help.txt
+stat /bin/sysinfo
+exec /bin/sysinfo
 clear
 exit
 ```
