@@ -12,6 +12,15 @@
 #define X86_64_PROCESS_FIRST_PID 1U
 #define X86_64_PROCESS_USER_RFLAGS 0x0000000000000202ULL
 #define X86_64_PROCESS_USER_STACK_ALIGNMENT 16ULL
+#define X86_64_PROCESS_PAGE_PRESENT 0x001ULL
+#define X86_64_PROCESS_PAGE_WRITABLE 0x002ULL
+#define X86_64_PROCESS_PAGE_USER 0x004ULL
+#define X86_64_PROCESS_USER_TABLE_FLAGS \
+    (X86_64_PROCESS_PAGE_PRESENT | X86_64_PROCESS_PAGE_WRITABLE | X86_64_PROCESS_PAGE_USER)
+#define X86_64_PROCESS_USER_CODE_FLAGS \
+    (X86_64_PROCESS_PAGE_PRESENT | X86_64_PROCESS_PAGE_USER)
+#define X86_64_PROCESS_USER_STACK_FLAGS \
+    (X86_64_PROCESS_PAGE_PRESENT | X86_64_PROCESS_PAGE_WRITABLE | X86_64_PROCESS_PAGE_USER)
 
 __attribute__((naked)) static void x86_64_process_enter_stack(
     u64 stack_top __attribute__((unused)),
@@ -72,6 +81,41 @@ static u64 read_rsp(void)
 static u32 is_aligned_u64(u64 value, u64 alignment)
 {
     return ((value & (alignment - 1ULL)) == 0ULL) ? 1U : 0U;
+}
+
+static u32 pml4_index_for(u64 address)
+{
+    return (u32)((address >> 39) & 0x1FFULL);
+}
+
+static u32 pdpt_index_for(u64 address)
+{
+    return (u32)((address >> 30) & 0x1FFULL);
+}
+
+static u32 pd_index_for(u64 address)
+{
+    return (u32)((address >> 21) & 0x1FFULL);
+}
+
+static u32 pt_index_for(u64 address)
+{
+    return (u32)((address >> 12) & 0x1FFULL);
+}
+
+static u32 entry_present(u64 entry)
+{
+    return ((entry & X86_64_PROCESS_PAGE_PRESENT) != 0ULL) ? 1U : 0U;
+}
+
+static u32 entry_user_accessible(u64 entry)
+{
+    return ((entry & X86_64_PROCESS_PAGE_USER) != 0ULL) ? 1U : 0U;
+}
+
+static u32 entry_points_to(u64 entry, u64 page)
+{
+    return ((entry & ~(X86_64_USER_PAGE_BYTES - 1ULL)) == page) ? 1U : 0U;
 }
 
 static u32 is_inside_stack(u64 value, u64 stack_base, u64 stack_top)
@@ -175,6 +219,18 @@ static void release_address_space(struct x86_64_process *process)
     if (process->cr3 != 0ULL) {
         (void)x86_64_pmm_free_page(process->cr3);
     }
+    if (process->user_pdpt_page != 0ULL) {
+        (void)x86_64_pmm_free_page(process->user_pdpt_page);
+    }
+    if (process->user_pd_page != 0ULL) {
+        (void)x86_64_pmm_free_page(process->user_pd_page);
+    }
+    if (process->user_code_pt_page != 0ULL) {
+        (void)x86_64_pmm_free_page(process->user_code_pt_page);
+    }
+    if (process->user_stack_pt_page != 0ULL) {
+        (void)x86_64_pmm_free_page(process->user_stack_pt_page);
+    }
     if (process->user_code_page != 0ULL) {
         (void)x86_64_pmm_free_page(process->user_code_page);
     }
@@ -184,25 +240,103 @@ static void release_address_space(struct x86_64_process *process)
 
     process->address_space_id = 0ULL;
     process->cr3 = 0ULL;
+    process->user_pdpt_page = 0ULL;
+    process->user_pd_page = 0ULL;
+    process->user_code_pt_page = 0ULL;
+    process->user_stack_pt_page = 0ULL;
     process->user_code_page = 0ULL;
     process->user_stack_page = 0ULL;
     process->user_code_virtual = 0ULL;
     process->user_stack_virtual = 0ULL;
     process->address_space_owned = 0U;
+    process->user_page_tables_ready = 0U;
+}
+
+static u32 validate_user_page_tables(const struct x86_64_process *process)
+{
+    const u64 *pml4 = (const u64 *)process->cr3;
+    const u64 *pdpt = (const u64 *)process->user_pdpt_page;
+    const u64 *pd = (const u64 *)process->user_pd_page;
+    const u64 *code_pt = (const u64 *)process->user_code_pt_page;
+    const u64 *stack_pt = (const u64 *)process->user_stack_pt_page;
+    u32 pml4_index = pml4_index_for(process->user_code_virtual);
+    u32 pdpt_index = pdpt_index_for(process->user_code_virtual);
+    u32 code_pd_index = pd_index_for(process->user_code_virtual);
+    u32 code_pt_index = pt_index_for(process->user_code_virtual);
+    u32 stack_pd_index = pd_index_for(process->user_stack_virtual);
+    u32 stack_pt_index = pt_index_for(process->user_stack_virtual);
+
+    return ((pml4_index == pml4_index_for(process->user_stack_virtual)) &&
+            (pdpt_index == pdpt_index_for(process->user_stack_virtual)) &&
+            (entry_present(pml4[pml4_index]) != 0U) &&
+            (entry_user_accessible(pml4[pml4_index]) != 0U) &&
+            (entry_points_to(pml4[pml4_index], process->user_pdpt_page) != 0U) &&
+            (entry_present(pdpt[pdpt_index]) != 0U) &&
+            (entry_user_accessible(pdpt[pdpt_index]) != 0U) &&
+            (entry_points_to(pdpt[pdpt_index], process->user_pd_page) != 0U) &&
+            (entry_present(pd[code_pd_index]) != 0U) &&
+            (entry_user_accessible(pd[code_pd_index]) != 0U) &&
+            (entry_points_to(pd[code_pd_index], process->user_code_pt_page) != 0U) &&
+            (entry_present(pd[stack_pd_index]) != 0U) &&
+            (entry_user_accessible(pd[stack_pd_index]) != 0U) &&
+            (entry_points_to(pd[stack_pd_index], process->user_stack_pt_page) != 0U) &&
+            (entry_present(code_pt[code_pt_index]) != 0U) &&
+            (entry_user_accessible(code_pt[code_pt_index]) != 0U) &&
+            (entry_points_to(code_pt[code_pt_index], process->user_code_page) != 0U) &&
+            (entry_present(stack_pt[stack_pt_index]) != 0U) &&
+            (entry_user_accessible(stack_pt[stack_pt_index]) != 0U) &&
+            (entry_points_to(stack_pt[stack_pt_index], process->user_stack_page) != 0U)) ? 1U : 0U;
+}
+
+static void build_user_page_tables(struct x86_64_process *process)
+{
+    u64 *pml4 = (u64 *)process->cr3;
+    u64 *pdpt = (u64 *)process->user_pdpt_page;
+    u64 *pd = (u64 *)process->user_pd_page;
+    u64 *code_pt = (u64 *)process->user_code_pt_page;
+    u64 *stack_pt = (u64 *)process->user_stack_pt_page;
+    u32 pml4_index = pml4_index_for(process->user_code_virtual);
+    u32 pdpt_index = pdpt_index_for(process->user_code_virtual);
+    u32 code_pd_index = pd_index_for(process->user_code_virtual);
+    u32 code_pt_index = pt_index_for(process->user_code_virtual);
+    u32 stack_pd_index = pd_index_for(process->user_stack_virtual);
+    u32 stack_pt_index = pt_index_for(process->user_stack_virtual);
+
+    pml4[pml4_index] = process->user_pdpt_page | X86_64_PROCESS_USER_TABLE_FLAGS;
+    pdpt[pdpt_index] = process->user_pd_page | X86_64_PROCESS_USER_TABLE_FLAGS;
+    pd[code_pd_index] = process->user_code_pt_page | X86_64_PROCESS_USER_TABLE_FLAGS;
+    pd[stack_pd_index] = process->user_stack_pt_page | X86_64_PROCESS_USER_TABLE_FLAGS;
+    code_pt[code_pt_index] = process->user_code_page | X86_64_PROCESS_USER_CODE_FLAGS;
+    stack_pt[stack_pt_index] = process->user_stack_page | X86_64_PROCESS_USER_STACK_FLAGS;
+    process->user_page_tables_ready = validate_user_page_tables(process);
 }
 
 static u32 allocate_address_space(struct x86_64_process *process)
 {
     process->cr3 = x86_64_pmm_alloc_page();
+    process->user_pdpt_page = x86_64_pmm_alloc_page();
+    process->user_pd_page = x86_64_pmm_alloc_page();
+    process->user_code_pt_page = x86_64_pmm_alloc_page();
+    process->user_stack_pt_page = x86_64_pmm_alloc_page();
     process->user_code_page = x86_64_pmm_alloc_page();
     process->user_stack_page = x86_64_pmm_alloc_page();
 
-    if (process->cr3 == 0ULL || process->user_code_page == 0ULL || process->user_stack_page == 0ULL) {
+    if (process->cr3 == 0ULL ||
+        process->user_pdpt_page == 0ULL ||
+        process->user_pd_page == 0ULL ||
+        process->user_code_pt_page == 0ULL ||
+        process->user_stack_pt_page == 0ULL ||
+        process->user_code_page == 0ULL ||
+        process->user_stack_page == 0ULL) {
         release_address_space(process);
         return 0U;
     }
 
     clear_page(process->cr3);
+    clear_page(process->user_pdpt_page);
+    clear_page(process->user_pd_page);
+    clear_page(process->user_code_pt_page);
+    clear_page(process->user_stack_pt_page);
     clear_page(process->user_code_page);
     clear_page(process->user_stack_page);
 
@@ -211,8 +345,9 @@ static u32 allocate_address_space(struct x86_64_process *process)
     process->user_code_virtual = X86_64_USER_CODE_BASE;
     process->user_stack_virtual = X86_64_USER_STACK_TOP - X86_64_USER_PAGE_BYTES;
     process->address_space_owned = 1U;
+    build_user_page_tables(process);
 
-    return 1U;
+    return process->user_page_tables_ready;
 }
 
 static void record_created_process(struct x86_64_process *process)
@@ -222,6 +357,9 @@ static void record_created_process(struct x86_64_process *process)
     process_state.address_space_allocations += 1U;
     process_state.address_space_pages_allocated += X86_64_PROCESS_ADDRESS_SPACE_PAGES;
     process_state.last_created_pid = process->pid;
+    if (process->user_page_tables_ready != 0U) {
+        process_state.user_page_tables_ready += 1U;
+    }
 
     if (process_state.first_stack_base == 0ULL) {
         process_state.first_stack_base = process->kernel_stack_base;
@@ -370,8 +508,13 @@ u32 x86_64_process_create_user_image(const char *path,
     process_state.last_user_pid = process->pid;
     process_state.last_user_entry = process->user_entry;
     process_state.last_user_cr3 = process->cr3;
+    process_state.last_user_pdpt_page = process->user_pdpt_page;
+    process_state.last_user_pd_page = process->user_pd_page;
+    process_state.last_user_code_pt_page = process->user_code_pt_page;
+    process_state.last_user_stack_pt_page = process->user_stack_pt_page;
     process_state.last_user_code_page = process->user_code_page;
     process_state.last_user_stack_page = process->user_stack_page;
+    process_state.user_page_table_entries_ok = validate_user_page_tables(process);
 
     return process->pid;
 }
@@ -421,6 +564,7 @@ u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state)
     state->stack_page_valid =
         ((state->user_stack_page != 0ULL) &&
          (is_aligned_u64(state->user_stack_page, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
+    state->page_tables_valid = process->user_page_tables_ready;
     state->transition_ready =
         ((state->candidate_found != 0U) &&
          (state->entry_valid != 0U) &&
@@ -428,6 +572,7 @@ u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state)
          (state->cr3_valid != 0U) &&
          (state->code_page_valid != 0U) &&
          (state->stack_page_valid != 0U) &&
+         (state->page_tables_valid != 0U) &&
          (process->address_space_owned != 0U)) ? 1U : 0U;
     state->scheduler_ok = state->transition_ready;
 
@@ -567,6 +712,10 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.last_user_cr3 != 0ULL) &&
          (process_state.last_user_cr3 != process_state.first_cr3) &&
          (process_state.last_user_cr3 != process_state.second_cr3) &&
+         (process_state.last_user_pdpt_page != 0ULL) &&
+         (process_state.last_user_pd_page != 0ULL) &&
+         (process_state.last_user_code_pt_page != 0ULL) &&
+         (process_state.last_user_stack_pt_page != 0ULL) &&
          (process_state.last_user_code_page != process_state.first_user_code_page) &&
          (process_state.last_user_stack_page != process_state.first_user_stack_page)) ? 1U : 0U;
 
@@ -575,6 +724,8 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.address_space_pages_allocated ==
           (process_state.created_processes * X86_64_PROCESS_ADDRESS_SPACE_PAGES)) &&
          (process_state.address_spaces_distinct != 0U) &&
+         (process_state.user_page_tables_ready == process_state.created_processes) &&
+         (process_state.user_page_table_entries_ok != 0U) &&
          (is_aligned_u64(process_state.first_cr3, X86_64_USER_PAGE_BYTES) != 0U) &&
          (is_aligned_u64(process_state.second_cr3, X86_64_USER_PAGE_BYTES) != 0U) &&
          (is_aligned_u64(process_state.last_user_cr3, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
@@ -623,6 +774,8 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process address-space pages: ", process_state.address_space_pages_allocated);
     x86_64_serial_write_u32("Process address spaces distinct: ", process_state.address_spaces_distinct);
     x86_64_serial_write_u32("Process address space ok: ", process_state.address_space_ok);
+    x86_64_serial_write_u32("Process page tables ready: ", process_state.user_page_tables_ready);
+    x86_64_serial_write_u32("Process page table entries ok: ", process_state.user_page_table_entries_ok);
     x86_64_serial_write_u32("Process user creates: ", process_state.user_processes_created);
     x86_64_serial_write_u32("Process user image bytes: ", process_state.user_image_bytes);
     x86_64_serial_write_u32("Process user image copied: ", process_state.user_image_copied);
@@ -646,6 +799,10 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_hex64("Process second user stack page: 0x", process_state.second_user_stack_page);
     x86_64_serial_write_hex64("Process last user entry: 0x", process_state.last_user_entry);
     x86_64_serial_write_hex64("Process last user CR3: 0x", process_state.last_user_cr3);
+    x86_64_serial_write_hex64("Process last user PDPT: 0x", process_state.last_user_pdpt_page);
+    x86_64_serial_write_hex64("Process last user PD: 0x", process_state.last_user_pd_page);
+    x86_64_serial_write_hex64("Process last user code PT: 0x", process_state.last_user_code_pt_page);
+    x86_64_serial_write_hex64("Process last user stack PT: 0x", process_state.last_user_stack_pt_page);
     x86_64_serial_write_hex64("Process last user code page: 0x", process_state.last_user_code_page);
     x86_64_serial_write_hex64("Process last user stack page: 0x", process_state.last_user_stack_page);
     x86_64_serial_write_hex64("Process scheduled user RSP: 0x", process_state.scheduled_user_rsp);
