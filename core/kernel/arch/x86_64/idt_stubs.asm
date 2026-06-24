@@ -3,10 +3,12 @@ bits 64
 global x86_64_idt_load
 global x86_64_isr_stub_table
 global x86_64_irq_stub_table
+global x86_64_isr_table
+global x86_64_irq_table
 global x86_64_syscall_entry_stub
 
-extern x86_64_isr_dispatch
-extern x86_64_irq_dispatch
+extern x86_64_exception_handler
+extern x86_64_irq_handler
 extern x86_64_user_mode_exit_to_kernel
 extern x86_64_user_mode_syscall_entry
 
@@ -79,8 +81,9 @@ x86_64_isr_common:
     push r14
     push r15
 
-    mov rdi, rsp
-    call x86_64_isr_dispatch
+    mov rdi, [rsp + 120]
+    mov rsi, [rsp + 128]
+    call x86_64_exception_handler
 
     pop r15
     pop r14
@@ -143,8 +146,8 @@ x86_64_irq_common:
     push r14
     push r15
 
-    mov rdi, rsp
-    call x86_64_irq_dispatch
+    mov rdi, [rsp + 120]
+    call x86_64_irq_handler
 
     pop r15
     pop r14
@@ -220,6 +223,7 @@ x86_64_syscall_entry_stub:
 section .rodata
 align 8
 x86_64_isr_stub_table:
+x86_64_isr_table:
 %assign i 0
 %rep 32
     dq x86_64_isr_stub_%+i
@@ -228,6 +232,7 @@ x86_64_isr_stub_table:
 
 align 8
 x86_64_irq_stub_table:
+x86_64_irq_table:
 %assign i 0
 %rep 16
     dq x86_64_irq_stub_%+i
