@@ -45,6 +45,15 @@ static void clear_bytes(void *ptr, usize size)
     }
 }
 
+static void copy_bytes(void *dest, const void *src, usize size)
+{
+    u8 *out = (u8 *)dest;
+    const u8 *in = (const u8 *)src;
+    for (usize i = 0; i < size; ++i) {
+        out[i] = in[i];
+    }
+}
+
 static void clear_page(u64 page)
 {
     clear_bytes((void *)page, X86_64_USER_PAGE_BYTES);
@@ -67,17 +76,31 @@ static u32 is_inside_stack(u64 value, u64 stack_base, u64 stack_top)
     return ((value >= stack_base) && (value < stack_top)) ? 1U : 0U;
 }
 
-static void copy_name(char *dest, const char *src)
+static void copy_limited(char *dest, u32 dest_size, const char *src)
 {
     u32 i = 0U;
+    if (dest_size == 0U) {
+        return;
+    }
+
     if (src != (const char *)0) {
-        while (i + 1U < X86_64_PROCESS_NAME_LEN && src[i] != '\0') {
+        while (i + 1U < dest_size && src[i] != '\0') {
             dest[i] = src[i];
             i += 1U;
         }
     }
 
     dest[i] = '\0';
+}
+
+static void copy_name(char *dest, const char *src)
+{
+    copy_limited(dest, X86_64_PROCESS_NAME_LEN, src);
+}
+
+static void copy_image_path(char *dest, const char *src)
+{
+    copy_limited(dest, X86_64_PROCESS_IMAGE_PATH_LEN, src);
 }
 
 static struct x86_64_process *find_unused_process(void)
@@ -105,7 +128,9 @@ static struct x86_64_process *find_process_by_pid(u32 pid)
 static struct x86_64_process *find_next_ready_process(void)
 {
     for (u32 i = 0; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
-        if (process_table[i].state == X86_64_PROCESS_READY) {
+        if (process_table[i].state == X86_64_PROCESS_READY &&
+            process_table[i].mode == X86_64_PROCESS_MODE_KERNEL &&
+            process_table[i].entry != (x86_64_process_entry_t)0) {
             return &process_table[i];
         }
     }
@@ -174,6 +199,31 @@ static u32 allocate_address_space(struct x86_64_process *process)
     return 1U;
 }
 
+static void record_created_process(struct x86_64_process *process)
+{
+    process_state.created_processes += 1U;
+    process_state.stack_allocations += 1U;
+    process_state.address_space_allocations += 1U;
+    process_state.address_space_pages_allocated += X86_64_PROCESS_ADDRESS_SPACE_PAGES;
+    process_state.last_created_pid = process->pid;
+
+    if (process_state.first_stack_base == 0ULL) {
+        process_state.first_stack_base = process->kernel_stack_base;
+        process_state.first_stack_top = process->kernel_stack_top;
+        process_state.first_address_space_id = process->address_space_id;
+        process_state.first_cr3 = process->cr3;
+        process_state.first_user_code_page = process->user_code_page;
+        process_state.first_user_stack_page = process->user_stack_page;
+    } else if (process_state.second_stack_base == 0ULL) {
+        process_state.second_stack_base = process->kernel_stack_base;
+        process_state.second_stack_top = process->kernel_stack_top;
+        process_state.second_address_space_id = process->address_space_id;
+        process_state.second_cr3 = process->cr3;
+        process_state.second_user_code_page = process->user_code_page;
+        process_state.second_user_stack_page = process->user_stack_page;
+    }
+}
+
 static void refresh_counts(void)
 {
     process_state.exited_processes = count_processes_with_state(X86_64_PROCESS_EXITED);
@@ -230,39 +280,82 @@ u32 x86_64_process_create(const char *name,
     process->pid = next_pid;
     next_pid += 1U;
     process->state = X86_64_PROCESS_READY;
+    process->mode = X86_64_PROCESS_MODE_KERNEL;
     copy_name(process->name, name);
+    copy_image_path(process->image_path, "");
     process->entry = entry;
     process->arg = arg;
     process->kernel_stack_base = (u64)stack;
     process->kernel_stack_top = process->kernel_stack_base + X86_64_PROCESS_KERNEL_STACK_BYTES;
+    process->user_entry = 0ULL;
+    process->image_bytes = 0U;
     process->exit_code = 0U;
 
-    process_state.created_processes += 1U;
-    process_state.stack_allocations += 1U;
-    process_state.address_space_allocations += 1U;
-    process_state.address_space_pages_allocated += X86_64_PROCESS_ADDRESS_SPACE_PAGES;
-    process_state.last_created_pid = process->pid;
-
-    if (process_state.first_stack_base == 0ULL) {
-        process_state.first_stack_base = process->kernel_stack_base;
-        process_state.first_stack_top = process->kernel_stack_top;
-        process_state.first_address_space_id = process->address_space_id;
-        process_state.first_cr3 = process->cr3;
-        process_state.first_user_code_page = process->user_code_page;
-        process_state.first_user_stack_page = process->user_stack_page;
-    } else if (process_state.second_stack_base == 0ULL) {
-        process_state.second_stack_base = process->kernel_stack_base;
-        process_state.second_stack_top = process->kernel_stack_top;
-        process_state.second_address_space_id = process->address_space_id;
-        process_state.second_cr3 = process->cr3;
-        process_state.second_user_code_page = process->user_code_page;
-        process_state.second_user_stack_page = process->user_stack_page;
-    }
+    record_created_process(process);
 
     process_state.stack_alignment_ok =
         ((process->kernel_stack_base != 0ULL) &&
          (is_aligned_u64(process->kernel_stack_base, 16ULL) != 0U) &&
          (is_aligned_u64(process->kernel_stack_top, 16ULL) != 0U)) ? 1U : 0U;
+
+    return process->pid;
+}
+
+u32 x86_64_process_create_user_image(const char *path,
+                                      const u8 *loaded_code_page,
+                                      u64 code_bytes,
+                                      u64 entry)
+{
+    if (process_state.initialized == 0U ||
+        loaded_code_page == (const u8 *)0 ||
+        code_bytes == 0ULL ||
+        code_bytes > X86_64_USER_PAGE_BYTES ||
+        entry < X86_64_USER_CODE_BASE ||
+        entry >= (X86_64_USER_CODE_BASE + X86_64_USER_PAGE_BYTES)) {
+        return X86_64_PROCESS_INVALID_PID;
+    }
+
+    struct x86_64_process *process = find_unused_process();
+    if (process == (struct x86_64_process *)0) {
+        return X86_64_PROCESS_INVALID_PID;
+    }
+
+    if (allocate_address_space(process) == 0U) {
+        return X86_64_PROCESS_INVALID_PID;
+    }
+
+    void *stack = x86_64_heap_alloc((usize)X86_64_PROCESS_KERNEL_STACK_BYTES,
+                                    (usize)X86_64_PROCESS_KERNEL_STACK_BYTES);
+    if (stack == (void *)0) {
+        release_address_space(process);
+        return X86_64_PROCESS_INVALID_PID;
+    }
+
+    process->pid = next_pid;
+    next_pid += 1U;
+    process->state = X86_64_PROCESS_READY;
+    process->mode = X86_64_PROCESS_MODE_USER;
+    copy_name(process->name, "user-process");
+    copy_image_path(process->image_path, path);
+    process->entry = (x86_64_process_entry_t)0;
+    process->arg = (void *)0;
+    process->kernel_stack_base = (u64)stack;
+    process->kernel_stack_top = process->kernel_stack_base + X86_64_PROCESS_KERNEL_STACK_BYTES;
+    process->user_entry = entry;
+    process->image_bytes = (u32)code_bytes;
+    process->exit_code = 0U;
+    copy_bytes((void *)process->user_code_page, loaded_code_page, (usize)code_bytes);
+
+    record_created_process(process);
+    process_state.user_processes_created += 1U;
+    process_state.user_image_bytes = process->image_bytes;
+    process_state.user_image_copied = 1U;
+    process_state.user_process_ready = 1U;
+    process_state.last_user_pid = process->pid;
+    process_state.last_user_entry = process->user_entry;
+    process_state.last_user_cr3 = process->cr3;
+    process_state.last_user_code_page = process->user_code_page;
+    process_state.last_user_stack_page = process->user_stack_page;
 
     return process->pid;
 }
@@ -344,6 +437,15 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
         first_process->address_space_id : (u64)first_pid;
     u64 context_cr3 = (first_process != (struct x86_64_process *)0) ? first_process->cr3 : 0ULL;
 
+    u32 user_pid = X86_64_PROCESS_INVALID_PID;
+    if (first_process != (struct x86_64_process *)0) {
+        user_pid = x86_64_process_create_user_image("/bin/smoke",
+                                                    (const u8 *)first_process->user_code_page,
+                                                    16ULL,
+                                                    X86_64_USER_CODE_BASE);
+    }
+    refresh_counts();
+
     x86_64_userland_foundation_init(&userland_state);
     x86_64_syscall_dispatch_run_smoke(&syscall_dispatch_state, first_pid);
     x86_64_user_context_init(&user_context_state, &userland_state,
@@ -380,7 +482,12 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.second_cr3 != 0ULL) &&
          (process_state.first_cr3 != process_state.second_cr3) &&
          (process_state.first_user_code_page != process_state.second_user_code_page) &&
-         (process_state.first_user_stack_page != process_state.second_user_stack_page)) ? 1U : 0U;
+         (process_state.first_user_stack_page != process_state.second_user_stack_page) &&
+         (process_state.last_user_cr3 != 0ULL) &&
+         (process_state.last_user_cr3 != process_state.first_cr3) &&
+         (process_state.last_user_cr3 != process_state.second_cr3) &&
+         (process_state.last_user_code_page != process_state.first_user_code_page) &&
+         (process_state.last_user_stack_page != process_state.first_user_stack_page)) ? 1U : 0U;
 
     process_state.address_space_ok =
         ((process_state.address_space_allocations == process_state.created_processes) &&
@@ -388,21 +495,27 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
           (process_state.created_processes * X86_64_PROCESS_ADDRESS_SPACE_PAGES)) &&
          (process_state.address_spaces_distinct != 0U) &&
          (is_aligned_u64(process_state.first_cr3, X86_64_USER_PAGE_BYTES) != 0U) &&
-         (is_aligned_u64(process_state.second_cr3, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
+         (is_aligned_u64(process_state.second_cr3, X86_64_USER_PAGE_BYTES) != 0U) &&
+         (is_aligned_u64(process_state.last_user_cr3, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
 
     process_state.smoke_ok =
         ((process_state.initialized != 0U) &&
          (first_pid != X86_64_PROCESS_INVALID_PID) &&
          (second_pid != X86_64_PROCESS_INVALID_PID) &&
-         (process_state.created_processes == 2U) &&
+         (user_pid != X86_64_PROCESS_INVALID_PID) &&
+         (process_state.created_processes == 3U) &&
          (process_state.ready_before_run == 2U) &&
          (process_state.run_count == 2U) &&
          (process_state.exited_processes == 2U) &&
          (process_state.failed_processes == 0U) &&
-         (process_state.stack_allocations == 2U) &&
+         (process_state.stack_allocations == 3U) &&
          (process_state.stack_alignment_ok != 0U) &&
          (process_state.stack_execution_ok != 0U) &&
          (process_state.address_space_ok != 0U) &&
+         (process_state.user_processes_created == 1U) &&
+         (process_state.user_image_bytes == 16U) &&
+         (process_state.user_image_copied != 0U) &&
+         (process_state.user_process_ready != 0U) &&
          (process_state.worker_a_count == 1U) &&
          (process_state.worker_b_count == 1U) &&
          (process_state.userland_foundation_ok != 0U) &&
@@ -428,7 +541,12 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process address-space pages: ", process_state.address_space_pages_allocated);
     x86_64_serial_write_u32("Process address spaces distinct: ", process_state.address_spaces_distinct);
     x86_64_serial_write_u32("Process address space ok: ", process_state.address_space_ok);
+    x86_64_serial_write_u32("Process user creates: ", process_state.user_processes_created);
+    x86_64_serial_write_u32("Process user image bytes: ", process_state.user_image_bytes);
+    x86_64_serial_write_u32("Process user image copied: ", process_state.user_image_copied);
+    x86_64_serial_write_u32("Process user ready: ", process_state.user_process_ready);
     x86_64_serial_write_u32("Process last created pid: ", process_state.last_created_pid);
+    x86_64_serial_write_u32("Process last user pid: ", process_state.last_user_pid);
     x86_64_serial_write_u32("Process last run pid: ", process_state.last_run_pid);
     x86_64_serial_write_hex64("Process first stack base: 0x", process_state.first_stack_base);
     x86_64_serial_write_hex64("Process first stack top: 0x", process_state.first_stack_top);
@@ -442,6 +560,10 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_hex64("Process second user code page: 0x", process_state.second_user_code_page);
     x86_64_serial_write_hex64("Process first user stack page: 0x", process_state.first_user_stack_page);
     x86_64_serial_write_hex64("Process second user stack page: 0x", process_state.second_user_stack_page);
+    x86_64_serial_write_hex64("Process last user entry: 0x", process_state.last_user_entry);
+    x86_64_serial_write_hex64("Process last user CR3: 0x", process_state.last_user_cr3);
+    x86_64_serial_write_hex64("Process last user code page: 0x", process_state.last_user_code_page);
+    x86_64_serial_write_hex64("Process last user stack page: 0x", process_state.last_user_stack_page);
     x86_64_serial_write_hex64("Process worker A stack sample: 0x", process_state.worker_a_stack_sample);
     x86_64_serial_write_hex64("Process worker B stack sample: 0x", process_state.worker_b_stack_sample);
     x86_64_serial_write_u32("Process worker A count: ", process_state.worker_a_count);
