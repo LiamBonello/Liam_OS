@@ -43,7 +43,7 @@ _start:
     jmp .halt
 
 write_rax_decimal_newline:
-    lea rdi, [rsp + LIAM_DEC_BUFFER_LEN]
+    lea rdi, [rsp + 8 + LIAM_DEC_BUFFER_LEN]
     xor ecx, ecx
     cmp rax, 0
     jne .convert_loop
