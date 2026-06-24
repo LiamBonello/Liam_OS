@@ -81,7 +81,8 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
         break;
 
     case X86_64_SYSCALL_SERVICE_EXEC:
-        state->exec_ok = (result == X86_64_SYSCALL_RET_ENOSYS) ? 1U : 0U;
+        state->exec_ok = (result == X86_64_SYSCALL_RET_ENOSYS ||
+                          result == X86_64_VFS_RET_ENOENT) ? 1U : 0U;
         break;
 
     case X86_64_SYSCALL_SERVICE_YIELD:
