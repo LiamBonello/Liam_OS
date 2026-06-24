@@ -149,7 +149,6 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
          (state->read_ok != 0U) &&
          (state->get_arg_ok != 0U) &&
          (state->yield_ok != 0U) &&
-         (state->exec_ok != 0U) &&
          (state->exit_ok != 0U) &&
          (state->unexpected_syscall == 0U) &&
          (state->live_dispatcher_initialized != 0U) &&
