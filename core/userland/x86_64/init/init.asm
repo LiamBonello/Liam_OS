@@ -10,6 +10,7 @@ bits 64
 %define LIAM_SYSCALL_EXEC 8
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
+%define LIAM_RET_ENOENT 0xfffffffffffffffe
 
 %define LIAM_STDIN 0
 %define LIAM_STDOUT 1
@@ -369,11 +370,21 @@ command_exec:
     syscall
     test rax, rax
     jns command_done
+    cmp rax, LIAM_RET_ENOENT
+    je exec_not_found
 
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
     lea rsi, [rel exec_error_text]
     mov edx, exec_error_text_len
+    syscall
+    jmp command_done
+
+exec_not_found:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel exec_not_found_text]
+    mov edx, exec_not_found_text_len
     syscall
     jmp command_done
 
@@ -559,6 +570,9 @@ stat_error_text_len equ $ - stat_error_text
 exec_error_text:
     db "exec: not implemented", 10
 exec_error_text_len equ $ - exec_error_text
+exec_not_found_text:
+    db "exec: not found", 10
+exec_not_found_text_len equ $ - exec_not_found_text
 bye_text:
     db "bye", 10
 bye_text_len equ $ - bye_text
