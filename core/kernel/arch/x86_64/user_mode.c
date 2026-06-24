@@ -4,12 +4,12 @@
 #include "syscall.h"
 #include "userland.h"
 
-u64 x86_64_user_smoke_kernel_rsp;
+u64 x86_64_user_mode_kernel_rsp;
 
-static struct x86_64_user_mode_smoke_state *active_state;
+static struct x86_64_user_mode_state *active_state;
 static struct x86_64_syscall_dispatch_state active_dispatcher;
 
-static void clear_state(struct x86_64_user_mode_smoke_state *state)
+static void clear_state(struct x86_64_user_mode_state *state)
 {
     u8 *bytes = (u8 *)state;
     for (usize i = 0; i < sizeof(*state); ++i) {
@@ -36,8 +36,8 @@ static u32 is_user_stack_ready(const struct x86_64_paging_builder_state *paging_
 
 u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
 {
-    struct x86_64_user_mode_smoke_state *state = active_state;
-    if (state == (struct x86_64_user_mode_smoke_state *)0 ||
+    struct x86_64_user_mode_state *state = active_state;
+    if (state == (struct x86_64_user_mode_state *)0 ||
         frame == (struct x86_64_syscall_frame *)0) {
         return X86_64_SYSCALL_RET_ENOSYS;
     }
@@ -111,9 +111,9 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
     return result;
 }
 
-void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
-                                const struct x86_64_paging_builder_state *paging_builder,
-                                u32 current_pid)
+void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
+                                 const struct x86_64_paging_builder_state *paging_builder,
+                                 u32 current_pid)
 {
     clear_state(state);
     state->initialized = 1U;
@@ -134,9 +134,9 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
     active_state = state;
     state->attempted = 1U;
     state->entered = 1U;
-    x86_64_user_smoke_enter(state->entry_rip, state->entry_rsp);
+    x86_64_user_mode_enter_init(state->entry_rip, state->entry_rsp);
     state->returned_to_kernel = 1U;
-    active_state = (struct x86_64_user_mode_smoke_state *)0;
+    active_state = (struct x86_64_user_mode_state *)0;
 
     state->user_mode_ok =
         ((state->initialized != 0U) &&
@@ -159,9 +159,9 @@ void x86_64_user_mode_run_smoke(struct x86_64_user_mode_smoke_state *state,
          (state->user_stack_ready != 0U)) ? 1U : 0U;
 }
 
-void x86_64_user_mode_report(const struct x86_64_user_mode_smoke_state *state)
+void x86_64_user_mode_report(const struct x86_64_user_mode_state *state)
 {
-    x86_64_serial_write_line("x86_64 ring3 user smoke online");
+    x86_64_serial_write_line("x86_64 ring3 user mode online");
     x86_64_serial_write_u32("User mode initialized: ", state->initialized);
     x86_64_serial_write_u32("User mode attempted: ", state->attempted);
     x86_64_serial_write_u32("User mode entered: ", state->entered);
