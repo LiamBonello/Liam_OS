@@ -38,6 +38,7 @@ struct x86_64_user_mode_state {
 };
 
 extern u64 x86_64_user_mode_kernel_rsp;
+extern u64 x86_64_user_mode_kernel_cr3;
 
 void x86_64_user_mode_enter_init(u64 entry_rip, u64 entry_rsp);
 u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame);
