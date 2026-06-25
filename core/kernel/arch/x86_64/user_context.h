@@ -3,6 +3,7 @@
 
 #include "console.h"
 #include "gdt.h"
+#include "process.h"
 #include "types.h"
 #include "userland.h"
 
@@ -45,6 +46,8 @@ struct x86_64_user_context_state {
     u32 user_stack_mapped_planned;
     u32 user_code_mapped_planned;
     u32 transition_frame_ok;
+    u32 cr3_probe_user_process_selected;
+    u32 cr3_probe_user_pid;
     u32 cr3_probe_attempted;
     u32 cr3_probe_switched;
     u32 cr3_probe_restored;
@@ -112,10 +115,21 @@ static inline void x86_64_user_context_init(struct x86_64_user_context_state *st
                                             u64 address_space_id,
                                             u64 planned_cr3)
 {
+    const struct x86_64_process_smoke_state *process_smoke = x86_64_process_get_smoke_state();
+    u64 effective_cr3 = planned_cr3;
+
+    if (process_smoke != (const struct x86_64_process_smoke_state *)0 &&
+        process_smoke->user_scheduler_ready != 0U &&
+        process_smoke->last_user_cr3 != 0ULL) {
+        effective_cr3 = process_smoke->last_user_cr3;
+        state->cr3_probe_user_process_selected = 1U;
+        state->cr3_probe_user_pid = process_smoke->last_scheduled_user_pid;
+    }
+
     state->initialized = 1U;
     state->state = X86_64_USER_CONTEXT_READY;
     state->address_space_id = address_space_id;
-    state->cr3_planned = planned_cr3;
+    state->cr3_planned = effective_cr3;
     state->frame.rip = foundation->sample_elf_entry;
     state->frame.rsp = foundation->user_stack_top - X86_64_USER_ENTRY_STACK_ALIGNMENT;
     state->frame.rflags = X86_64_USER_RFLAGS_BASE;
@@ -201,6 +215,8 @@ static inline void x86_64_user_context_report(const struct x86_64_user_context_s
     x86_64_serial_write_u32("User code mapping planned: ", state->user_code_mapped_planned);
     x86_64_serial_write_u32("User stack mapping planned: ", state->user_stack_mapped_planned);
     x86_64_serial_write_u32("User transition frame ok: ", state->transition_frame_ok);
+    x86_64_serial_write_u32("User CR3 probe user process selected: ", state->cr3_probe_user_process_selected);
+    x86_64_serial_write_u32("User CR3 probe user pid: ", state->cr3_probe_user_pid);
     x86_64_serial_write_u32("User CR3 probe attempted: ", state->cr3_probe_attempted);
     x86_64_serial_write_hex64("User CR3 probe previous: 0x", state->cr3_probe_previous);
     x86_64_serial_write_hex64("User CR3 probe active: 0x", state->cr3_probe_active);
