@@ -32,7 +32,8 @@ struct x86_64_syscall_frame {
     u64 user_rflags;
     u64 result;
     u32 exit_requested;
-    u32 reserved;
+    u32 cr3_switch_requested;
+    u64 target_cr3;
 };
 
 struct x86_64_syscall_dispatch_state {
@@ -62,6 +63,7 @@ struct x86_64_syscall_dispatch_state {
     u32 exec_type_ok;
     u32 exec_loaded;
     u32 exec_process_created;
+    u32 exec_cr3_switch_requested;
     u32 exec_spawned_pid;
     u32 unknown_rejected;
     u32 dispatcher_ok;
@@ -70,6 +72,7 @@ struct x86_64_syscall_dispatch_state {
     struct x86_64_vfs_state vfs;
     u64 exec_user_code_page;
     u64 exec_entry;
+    u64 exec_target_cr3;
     u64 last_syscall;
     u64 last_result;
     u64 sample_user_buffer;
@@ -305,6 +308,7 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->exec_type_ok = 0U;
     state->exec_loaded = 0U;
     state->exec_process_created = 0U;
+    state->exec_cr3_switch_requested = 0U;
     state->exec_spawned_pid = 0U;
     state->unknown_rejected = 0U;
     state->dispatcher_ok = 0U;
@@ -312,6 +316,7 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->yield_count = 0U;
     state->exec_user_code_page = 0ULL;
     state->exec_entry = 0ULL;
+    state->exec_target_cr3 = 0ULL;
     state->last_syscall = 0ULL;
     state->last_result = 0ULL;
     state->sample_user_buffer = X86_64_USER_CODE_BASE;
@@ -423,7 +428,9 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->exec_loaded = 0U;
         state->exec_entry = 0ULL;
         state->exec_process_created = 0U;
+        state->exec_cr3_switch_requested = 0U;
         state->exec_spawned_pid = 0U;
+        state->exec_target_cr3 = 0ULL;
         if (x86_64_syscall_user_path_ok(arg0) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
@@ -460,8 +467,15 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
             return state->last_result;
         }
 
+        const struct x86_64_process_smoke_state *process_state = x86_64_process_get_smoke_state();
+        if (process_state != (const struct x86_64_process_smoke_state *)0) {
+            state->exec_target_cr3 = process_state->last_user_cr3;
+            state->exec_cr3_switch_requested = (state->exec_target_cr3 != 0ULL) ? 1U : 0U;
+        }
+
         state->exec_process_created = 1U;
         x86_64_serial_write_u32("Syscall exec spawned pid: ", state->exec_spawned_pid);
+        x86_64_serial_write_hex64("Syscall exec target CR3: 0x", state->exec_target_cr3);
         state->last_result = X86_64_SYSCALL_RET_OK;
         return state->last_result;
     }
@@ -485,7 +499,8 @@ static inline u64 x86_64_syscall_dispatch_frame(struct x86_64_syscall_dispatch_s
                                                 struct x86_64_syscall_frame *frame)
 {
     frame->exit_requested = 0U;
-    frame->reserved = 0U;
+    frame->cr3_switch_requested = 0U;
+    frame->target_cr3 = 0ULL;
     frame->result = x86_64_syscall_dispatch(state,
                                             frame->number,
                                             frame->arg0,
@@ -499,6 +514,8 @@ static inline u64 x86_64_syscall_dispatch_frame(struct x86_64_syscall_dispatch_s
         frame->result == X86_64_SYSCALL_RET_OK &&
         state->exec_loaded != 0U) {
         frame->user_rip = state->exec_entry;
+        frame->cr3_switch_requested = state->exec_cr3_switch_requested;
+        frame->target_cr3 = state->exec_target_cr3;
     }
 
     if (frame->number == X86_64_SYSCALL_SERVICE_EXIT && frame->result == X86_64_SYSCALL_RET_OK) {
@@ -617,8 +634,10 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall exec type ok: ", state->exec_type_ok);
     x86_64_serial_write_u32("Syscall exec loaded: ", state->exec_loaded);
     x86_64_serial_write_u32("Syscall exec process created: ", state->exec_process_created);
+    x86_64_serial_write_u32("Syscall exec CR3 switch requested: ", state->exec_cr3_switch_requested);
     x86_64_serial_write_u32("Syscall exec spawned pid: ", state->exec_spawned_pid);
     x86_64_serial_write_hex64("Syscall exec entry: 0x", state->exec_entry);
+    x86_64_serial_write_hex64("Syscall exec target CR3: 0x", state->exec_target_cr3);
     x86_64_serial_write_u32("Syscall unknown rejected: ", state->unknown_rejected);
     x86_64_serial_write_u32("Syscall exit dispatch ok: ", state->exit_ok);
     x86_64_serial_write_u32("Syscall exit code: ", state->exit_code);
