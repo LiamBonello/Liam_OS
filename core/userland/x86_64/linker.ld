@@ -9,12 +9,12 @@ SECTIONS
 {
     . = 0x0000000000400000;
 
-    .text : ALIGN(16)
+    .text : ALIGN(4K)
     {
         *(.text .text.*)
     } :text
 
-    .rodata : ALIGN(16)
+    .rodata : ALIGN(4K)
     {
         *(.rodata .rodata.*)
     } :text
