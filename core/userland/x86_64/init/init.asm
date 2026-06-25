@@ -524,6 +524,33 @@ command_exit:
     jmp exit_success
 
 command_unknown:
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], '/'
+    je command_direct_exec
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel unknown_text]
+    mov edx, unknown_text_len
+    syscall
+    jmp command_done
+
+command_direct_exec:
+    mov eax, LIAM_SYSCALL_EXEC
+    lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET]
+    syscall
+    test rax, rax
+    jns command_done
+    cmp rax, LIAM_RET_ENOENT
+    je direct_exec_not_found
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel exec_error_text]
+    mov edx, exec_error_text_len
+    syscall
+    jmp command_done
+
+direct_exec_not_found:
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
     lea rsi, [rel unknown_text]
