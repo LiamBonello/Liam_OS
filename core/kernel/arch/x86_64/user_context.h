@@ -65,6 +65,14 @@ struct x86_64_user_context_state {
     struct x86_64_user_context_frame frame;
 };
 
+static inline void x86_64_user_context_clear(struct x86_64_user_context_state *state)
+{
+    u8 *bytes = (u8 *)state;
+    for (usize i = 0; i < sizeof(*state); ++i) {
+        bytes[i] = 0U;
+    }
+}
+
 static inline u64 x86_64_user_context_read_cr3(void)
 {
     u64 value;
@@ -115,6 +123,8 @@ static inline void x86_64_user_context_init(struct x86_64_user_context_state *st
                                             u64 address_space_id,
                                             u64 planned_cr3)
 {
+    x86_64_user_context_clear(state);
+
     const struct x86_64_process_smoke_state *process_smoke = x86_64_process_get_smoke_state();
     u64 effective_cr3 = planned_cr3;
 
