@@ -1,6 +1,7 @@
 #ifndef LIAM_OS_X86_64_PROCESS_H
 #define LIAM_OS_X86_64_PROCESS_H
 
+#include "paging_builder.h"
 #include "types.h"
 
 #define X86_64_PROCESS_MAX_PROCESSES 8U
@@ -50,6 +51,7 @@ struct x86_64_process {
     u64 user_entry;
     u32 address_space_owned;
     u32 user_page_tables_ready;
+    u32 kernel_mappings_ready;
     u32 exit_code;
 };
 
@@ -65,6 +67,7 @@ struct x86_64_user_schedule_state {
     u32 code_page_valid;
     u32 stack_page_valid;
     u32 page_tables_valid;
+    u32 kernel_mappings_valid;
     u32 transition_ready;
     u32 scheduler_ok;
     u64 address_space_id;
@@ -93,6 +96,8 @@ struct x86_64_process_smoke_state {
     u32 address_space_pages_allocated;
     u32 address_spaces_distinct;
     u32 address_space_ok;
+    u32 kernel_mapping_source_ready;
+    u32 kernel_mappings_ready;
     u32 user_page_tables_ready;
     u32 user_page_table_entries_ok;
     u32 user_processes_created;
@@ -137,6 +142,7 @@ struct x86_64_process_smoke_state {
     u64 worker_b_stack_sample;
 };
 
+void x86_64_process_set_paging_context(const struct x86_64_paging_builder_state *paging_builder);
 void x86_64_process_initialize(struct x86_64_process_smoke_state *state);
 u32 x86_64_process_create(const char *name,
                           x86_64_process_entry_t entry,
