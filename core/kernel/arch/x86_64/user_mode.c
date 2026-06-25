@@ -37,6 +37,14 @@ static u32 is_user_stack_ready(const struct x86_64_paging_builder_state *paging_
             (paging_builder->user_stack_virtual == (X86_64_USER_STACK_TOP - X86_64_USER_PAGE_BYTES))) ? 1U : 0U;
 }
 
+static void initialize_live_dispatcher(u32 current_pid)
+{
+    x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
+    active_dispatcher.exec_user_code_page = (u64)active_exec_user_code_page;
+    active_dispatcher.write_output_enabled = 1U;
+    active_dispatcher.blocking_read_enabled = 1U;
+}
+
 u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
 {
     struct x86_64_user_mode_state *state = active_state;
@@ -135,40 +143,16 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
     x86_64_process_set_paging_context(paging_builder);
     x86_64_process_run_smoke(&process_state);
 
-    x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
-    active_dispatcher.exec_user_code_page = (u64)active_exec_user_code_page;
-    active_dispatcher.write_output_enabled = 1U;
-    active_dispatcher.blocking_read_enabled = 1U;
+    initialize_live_dispatcher(current_pid);
     active_state = state;
     state->attempted = 1U;
-    state->entered = 1U;
-    x86_64_user_mode_enter_init(state->entry_rip, state->entry_rsp);
-    state->returned_to_kernel = 1U;
-    active_state = (struct x86_64_user_mode_state *)0;
 
-    state->user_mode_ok =
-        ((state->initialized != 0U) &&
-         (state->attempted != 0U) &&
-         (state->entered != 0U) &&
-         (state->returned_to_kernel != 0U) &&
-         (state->syscall_count >= 10U) &&
-         (state->getpid_ok != 0U) &&
-         (state->write_ok != 0U) &&
-         (state->read_ok != 0U) &&
-         (state->get_arg_ok != 0U) &&
-         (state->yield_ok != 0U) &&
-         (state->exit_ok != 0U) &&
-         (state->unexpected_syscall == 0U) &&
-         (state->live_dispatcher_initialized != 0U) &&
-         (state->live_dispatcher_ok != 0U) &&
-         (state->syscall_frame_ok != 0U) &&
-         (state->exit_code == 0U) &&
-         (state->user_entry_ready != 0U) &&
-         (state->user_stack_ready != 0U)) ? 1U : 0U;
-
-    x86_64_serial_write_line("Liam_OS x86_64 init exited");
     for (;;) {
-        __asm__ volatile ("hlt");
+        state->entered = 1U;
+        x86_64_user_mode_enter_init(state->entry_rip, state->entry_rsp);
+        state->returned_to_kernel = 1U;
+        x86_64_serial_write_line("Liam_OS x86_64 shell restarting");
+        initialize_live_dispatcher(current_pid);
     }
 }
 
