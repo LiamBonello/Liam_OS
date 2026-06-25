@@ -162,9 +162,12 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
         state->entered = 1U;
         x86_64_user_mode_enter_init(state->entry_rip, state->entry_rsp);
         u32 returned_pid = active_dispatcher.current_pid;
+        u32 returned_from_child =
+            ((active_dispatcher.exec_spawned_pid != 0U) &&
+             (returned_pid == active_dispatcher.exec_spawned_pid)) ? 1U : 0U;
         state->returned_to_kernel = 1U;
 
-        if (returned_pid == current_pid) {
+        if (returned_pid == current_pid && returned_from_child == 0U) {
             x86_64_serial_write_line("Liam_OS x86_64 shell exited");
             halt_after_shell_exit();
         }
