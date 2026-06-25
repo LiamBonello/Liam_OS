@@ -13,6 +13,10 @@ extern x86_64_user_mode_exit_to_kernel
 extern x86_64_user_mode_kernel_cr3
 extern x86_64_user_mode_syscall_entry
 
+%define X86_64_SYSCALL_SAVE_BYTES 48
+%define X86_64_SYSCALL_FRAME_BASE X86_64_SYSCALL_SAVE_BYTES
+%define X86_64_SYSCALL_STACK_BYTES 144
+
 %macro ISR_NOERR 1
 global x86_64_isr_stub_%1
 x86_64_isr_stub_%1:
@@ -172,52 +176,66 @@ x86_64_irq_common:
 x86_64_syscall_entry_stub:
     push rcx
     push r11
-    sub rsp, 96
+    sub rsp, X86_64_SYSCALL_STACK_BYTES
 
-    mov [rsp + 0], rax
-    mov [rsp + 8], rdi
-    mov [rsp + 16], rsi
-    mov [rsp + 24], rdx
-    mov [rsp + 32], r10
-    mov [rsp + 40], r8
-    mov [rsp + 48], r9
-    mov rax, [rsp + 104]
-    mov [rsp + 56], rax
-    mov rax, [rsp + 96]
-    mov [rsp + 64], rax
-    mov qword [rsp + 72], 0
-    mov dword [rsp + 80], 0
-    mov dword [rsp + 84], 0
-    mov qword [rsp + 88], 0
+    mov [rsp + 0], rbx
+    mov [rsp + 8], rbp
+    mov [rsp + 16], r12
+    mov [rsp + 24], r13
+    mov [rsp + 32], r14
+    mov [rsp + 40], r15
 
-    mov rdi, rsp
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 0], rax
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 8], rdi
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 16], rsi
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 24], rdx
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 32], r10
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 40], r8
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 48], r9
+    mov rax, [rsp + X86_64_SYSCALL_STACK_BYTES + 8]
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 56], rax
+    mov rax, [rsp + X86_64_SYSCALL_STACK_BYTES]
+    mov [rsp + X86_64_SYSCALL_FRAME_BASE + 64], rax
+    mov qword [rsp + X86_64_SYSCALL_FRAME_BASE + 72], 0
+    mov dword [rsp + X86_64_SYSCALL_FRAME_BASE + 80], 0
+    mov dword [rsp + X86_64_SYSCALL_FRAME_BASE + 84], 0
+    mov qword [rsp + X86_64_SYSCALL_FRAME_BASE + 88], 0
+
+    lea rdi, [rsp + X86_64_SYSCALL_FRAME_BASE]
     call x86_64_user_mode_syscall_entry
-    cmp dword [rsp + 80], 1
+    cmp dword [rsp + X86_64_SYSCALL_FRAME_BASE + 80], 1
     je .exit_to_kernel
 
     xor r10d, r10d
     xor r9d, r9d
-    mov r8, [rsp + 88]
-    cmp dword [rsp + 84], 1
+    mov r8, [rsp + X86_64_SYSCALL_FRAME_BASE + 88]
+    cmp dword [rsp + X86_64_SYSCALL_FRAME_BASE + 84], 1
     jne .check_exec_stack_reset
     cmp r8, 0
     je .check_exec_stack_reset
     mov r9d, 1
 
 .check_exec_stack_reset:
-    cmp qword [rsp + 0], 8
+    cmp qword [rsp + X86_64_SYSCALL_FRAME_BASE + 0], 8
     jne .restore_user_return
-    cmp qword [rsp + 72], 0
+    cmp qword [rsp + X86_64_SYSCALL_FRAME_BASE + 72], 0
     jne .restore_user_return
     mov r10d, 1
 
 .restore_user_return:
-    mov rcx, [rsp + 56]
-    mov [rsp + 104], rcx
-    mov r11, [rsp + 64]
-    mov [rsp + 96], r11
+    mov rcx, [rsp + X86_64_SYSCALL_FRAME_BASE + 56]
+    mov [rsp + X86_64_SYSCALL_STACK_BYTES + 8], rcx
+    mov r11, [rsp + X86_64_SYSCALL_FRAME_BASE + 64]
+    mov [rsp + X86_64_SYSCALL_STACK_BYTES], r11
 
-    add rsp, 96
+    mov rbx, [rsp + 0]
+    mov rbp, [rsp + 8]
+    mov r12, [rsp + 16]
+    mov r13, [rsp + 24]
+    mov r14, [rsp + 32]
+    mov r15, [rsp + 40]
+
+    add rsp, X86_64_SYSCALL_STACK_BYTES
     pop r11
     pop rcx
     cmp r10d, 1
@@ -235,7 +253,13 @@ x86_64_syscall_entry_stub:
     o64 sysret
 
 .exit_to_kernel:
-    add rsp, 96
+    mov rbx, [rsp + 0]
+    mov rbp, [rsp + 8]
+    mov r12, [rsp + 16]
+    mov r13, [rsp + 24]
+    mov r14, [rsp + 32]
+    mov r15, [rsp + 40]
+    add rsp, X86_64_SYSCALL_STACK_BYTES
     add rsp, 16
     jmp x86_64_user_mode_exit_to_kernel
 
