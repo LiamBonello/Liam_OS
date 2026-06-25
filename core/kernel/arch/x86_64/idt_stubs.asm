@@ -10,6 +10,7 @@ global x86_64_syscall_entry_stub
 extern x86_64_exception_handler
 extern x86_64_irq_handler
 extern x86_64_user_mode_exit_to_kernel
+extern x86_64_user_mode_kernel_cr3
 extern x86_64_user_mode_syscall_entry
 
 %macro ISR_NOERR 1
@@ -187,6 +188,7 @@ x86_64_syscall_entry_stub:
     mov qword [rsp + 72], 0
     mov dword [rsp + 80], 0
     mov dword [rsp + 84], 0
+    mov qword [rsp + 88], 0
 
     mov rdi, rsp
     call x86_64_user_mode_syscall_entry
@@ -194,6 +196,15 @@ x86_64_syscall_entry_stub:
     je .exit_to_kernel
 
     xor r10d, r10d
+    xor r9d, r9d
+    mov r8, [rsp + 88]
+    cmp dword [rsp + 84], 1
+    jne .check_exec_stack_reset
+    cmp r8, 0
+    je .check_exec_stack_reset
+    mov r9d, 1
+
+.check_exec_stack_reset:
     cmp qword [rsp + 0], 8
     jne .restore_user_return
     cmp qword [rsp + 72], 0
@@ -210,8 +221,16 @@ x86_64_syscall_entry_stub:
     pop r11
     pop rcx
     cmp r10d, 1
-    jne .sysret_to_user
+    jne .maybe_switch_cr3
     mov rsp, 0x000000007FFFFFF0
+
+.maybe_switch_cr3:
+    cmp r9d, 1
+    jne .sysret_to_user
+    mov rax, cr3
+    mov [rel x86_64_user_mode_kernel_cr3], rax
+    mov cr3, r8
+
 .sysret_to_user:
     o64 sysret
 
