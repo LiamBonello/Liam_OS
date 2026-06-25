@@ -6,6 +6,7 @@
 #include "userland.h"
 
 u64 x86_64_user_mode_kernel_rsp;
+u64 x86_64_user_mode_kernel_cr3;
 
 static struct x86_64_user_mode_state *active_state;
 static struct x86_64_syscall_dispatch_state active_dispatcher;
