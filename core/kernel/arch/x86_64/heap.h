@@ -4,7 +4,7 @@
 #include "paging_plan.h"
 #include "types.h"
 
-#define X86_64_EARLY_HEAP_PAGES 4U
+#define X86_64_EARLY_HEAP_PAGES 16U
 
 struct x86_64_heap_state {
     u32 initialized;
