@@ -474,8 +474,6 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         }
 
         state->exec_process_created = 1U;
-        x86_64_serial_write_u32("Syscall exec spawned pid: ", state->exec_spawned_pid);
-        x86_64_serial_write_hex64("Syscall exec target CR3: 0x", state->exec_target_cr3);
         state->last_result = X86_64_SYSCALL_RET_OK;
         return state->last_result;
     }
