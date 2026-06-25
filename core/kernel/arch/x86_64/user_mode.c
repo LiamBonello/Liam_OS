@@ -95,6 +95,10 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
         state->exec_ok = (result == X86_64_SYSCALL_RET_OK ||
                           result == X86_64_SYSCALL_RET_ENOSYS ||
                           result == X86_64_VFS_RET_ENOENT) ? 1U : 0U;
+        if (result == X86_64_SYSCALL_RET_OK && active_dispatcher.exec_spawned_pid != 0U) {
+            state->current_pid = active_dispatcher.exec_spawned_pid;
+            active_dispatcher.current_pid = active_dispatcher.exec_spawned_pid;
+        }
         break;
 
     case X86_64_SYSCALL_SERVICE_YIELD:
@@ -152,6 +156,7 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
         x86_64_user_mode_enter_init(state->entry_rip, state->entry_rsp);
         state->returned_to_kernel = 1U;
         x86_64_serial_write_line("Liam_OS x86_64 shell restarting");
+        state->current_pid = current_pid;
         initialize_live_dispatcher(current_pid);
     }
 }
