@@ -45,6 +45,11 @@ static void initialize_live_dispatcher(u32 current_pid)
     active_dispatcher.blocking_read_enabled = 1U;
 }
 
+static void reserve_shell_pid(void *arg)
+{
+    (void)arg;
+}
+
 static void halt_after_shell_exit(void)
 {
     for (;;) {
@@ -153,6 +158,9 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
 
     x86_64_process_set_paging_context(paging_builder);
     x86_64_process_initialize(&process_state);
+    if (current_pid == 1U) {
+        (void)x86_64_process_create("shell", reserve_shell_pid, (void *)0);
+    }
 
     initialize_live_dispatcher(current_pid);
     active_state = state;
