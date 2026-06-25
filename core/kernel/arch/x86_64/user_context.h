@@ -45,11 +45,67 @@ struct x86_64_user_context_state {
     u32 user_stack_mapped_planned;
     u32 user_code_mapped_planned;
     u32 transition_frame_ok;
+    u32 cr3_probe_attempted;
+    u32 cr3_probe_switched;
+    u32 cr3_probe_restored;
+    u32 cr3_probe_entry_read_ok;
+    u32 cr3_probe_stack_read_ok;
+    u32 cr3_probe_ok;
     u32 context_ok;
     u64 address_space_id;
     u64 cr3_planned;
+    u64 cr3_probe_previous;
+    u64 cr3_probe_active;
+    u64 cr3_probe_restored_value;
+    u32 cr3_probe_entry_value;
+    u32 cr3_probe_stack_value;
     struct x86_64_user_context_frame frame;
 };
+
+static inline u64 x86_64_user_context_read_cr3(void)
+{
+    u64 value;
+    __asm__ volatile ("movq %%cr3, %0" : "=r"(value));
+    return value;
+}
+
+static inline void x86_64_user_context_write_cr3(u64 value)
+{
+    __asm__ volatile ("movq %0, %%cr3" :: "r"(value) : "memory");
+}
+
+static inline u32 x86_64_user_context_read_u8(u64 address)
+{
+    volatile const u8 *ptr = (volatile const u8 *)address;
+    return (u32)(*ptr);
+}
+
+static inline void x86_64_user_context_probe_cr3(struct x86_64_user_context_state *state)
+{
+    state->cr3_probe_attempted = 1U;
+    state->cr3_probe_previous = x86_64_user_context_read_cr3();
+
+    x86_64_user_context_write_cr3(state->cr3_planned);
+    state->cr3_probe_active = x86_64_user_context_read_cr3();
+    state->cr3_probe_switched = (state->cr3_probe_active == state->cr3_planned) ? 1U : 0U;
+
+    if (state->cr3_probe_switched != 0U) {
+        state->cr3_probe_entry_value = x86_64_user_context_read_u8(state->frame.rip);
+        state->cr3_probe_stack_value = x86_64_user_context_read_u8(state->frame.rsp);
+        state->cr3_probe_entry_read_ok = 1U;
+        state->cr3_probe_stack_read_ok = 1U;
+    }
+
+    x86_64_user_context_write_cr3(state->cr3_probe_previous);
+    state->cr3_probe_restored_value = x86_64_user_context_read_cr3();
+    state->cr3_probe_restored =
+        (state->cr3_probe_restored_value == state->cr3_probe_previous) ? 1U : 0U;
+    state->cr3_probe_ok =
+        ((state->cr3_probe_switched != 0U) &&
+         (state->cr3_probe_entry_read_ok != 0U) &&
+         (state->cr3_probe_stack_read_ok != 0U) &&
+         (state->cr3_probe_restored != 0U)) ? 1U : 0U;
+}
 
 static inline void x86_64_user_context_init(struct x86_64_user_context_state *state,
                                             const struct x86_64_userland_foundation_state *foundation,
@@ -101,6 +157,14 @@ static inline void x86_64_user_context_init(struct x86_64_user_context_state *st
          (state->stack_aligned != 0U) &&
          (state->selectors_ok != 0U) &&
          (state->rflags_ok != 0U)) ? 1U : 0U;
+
+    if ((state->address_space_ready != 0U) &&
+        (state->transition_frame_ok != 0U) &&
+        (state->user_code_mapped_planned != 0U) &&
+        (state->user_stack_mapped_planned != 0U)) {
+        x86_64_user_context_probe_cr3(state);
+    }
+
     state->context_ok =
         ((state->initialized != 0U) &&
          (state->state == X86_64_USER_CONTEXT_READY) &&
@@ -108,7 +172,8 @@ static inline void x86_64_user_context_init(struct x86_64_user_context_state *st
          (state->elf_entry_bound != 0U) &&
          (state->user_stack_mapped_planned != 0U) &&
          (state->user_code_mapped_planned != 0U) &&
-         (state->transition_frame_ok != 0U)) ? 1U : 0U;
+         (state->transition_frame_ok != 0U) &&
+         (state->cr3_probe_ok != 0U)) ? 1U : 0U;
 }
 
 static inline void x86_64_user_context_report(const struct x86_64_user_context_state *state)
@@ -136,6 +201,17 @@ static inline void x86_64_user_context_report(const struct x86_64_user_context_s
     x86_64_serial_write_u32("User code mapping planned: ", state->user_code_mapped_planned);
     x86_64_serial_write_u32("User stack mapping planned: ", state->user_stack_mapped_planned);
     x86_64_serial_write_u32("User transition frame ok: ", state->transition_frame_ok);
+    x86_64_serial_write_u32("User CR3 probe attempted: ", state->cr3_probe_attempted);
+    x86_64_serial_write_hex64("User CR3 probe previous: 0x", state->cr3_probe_previous);
+    x86_64_serial_write_hex64("User CR3 probe active: 0x", state->cr3_probe_active);
+    x86_64_serial_write_hex64("User CR3 probe restored: 0x", state->cr3_probe_restored_value);
+    x86_64_serial_write_u32("User CR3 probe switched: ", state->cr3_probe_switched);
+    x86_64_serial_write_u32("User CR3 probe restored ok: ", state->cr3_probe_restored);
+    x86_64_serial_write_hex32("User CR3 probe entry byte: 0x", state->cr3_probe_entry_value);
+    x86_64_serial_write_hex32("User CR3 probe stack byte: 0x", state->cr3_probe_stack_value);
+    x86_64_serial_write_u32("User CR3 probe entry read ok: ", state->cr3_probe_entry_read_ok);
+    x86_64_serial_write_u32("User CR3 probe stack read ok: ", state->cr3_probe_stack_read_ok);
+    x86_64_serial_write_u32("User CR3 probe ok: ", state->cr3_probe_ok);
     x86_64_serial_write_u32("User context ok: ", state->context_ok);
 }
 
