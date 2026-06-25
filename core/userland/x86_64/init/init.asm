@@ -174,6 +174,58 @@ handle_line:
     cmp r15, 0
     je command_done
 
+check_direct_hello:
+    cmp r15, 10
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], '/'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'b'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'i'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'n'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], '/'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 5], 'h'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 6], 'e'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 7], 'l'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 8], 'l'
+    jne check_direct_sysinfo
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 9], 'o'
+    je command_direct_hello
+
+check_direct_sysinfo:
+    cmp r15, 12
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], '/'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'b'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'i'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'n'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], '/'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 5], 's'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 6], 'y'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 7], 's'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 8], 'i'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 9], 'n'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 10], 'f'
+    jne check_help
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 11], 'o'
+    je command_direct_sysinfo
+
 check_help:
     cmp r15, 4
     jne check_pid
@@ -369,9 +421,20 @@ command_echo:
     syscall
     jmp command_done
 
+command_direct_hello:
+    lea rdi, [rel hello_exec_path]
+    jmp exec_path_pointer
+
+command_direct_sysinfo:
+    lea rdi, [rel sysinfo_exec_path]
+    jmp exec_path_pointer
+
 command_exec:
-    mov eax, LIAM_SYSCALL_EXEC
     lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET + 5]
+    jmp exec_path_pointer
+
+exec_path_pointer:
+    mov eax, LIAM_SYSCALL_EXEC
     syscall
     test rax, rax
     jns command_done
@@ -535,28 +598,8 @@ command_unknown:
     jmp command_done
 
 command_direct_exec:
-    mov eax, LIAM_SYSCALL_EXEC
     lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET]
-    syscall
-    test rax, rax
-    jns command_done
-    cmp rax, LIAM_RET_ENOENT
-    je direct_exec_not_found
-
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rel exec_error_text]
-    mov edx, exec_error_text_len
-    syscall
-    jmp command_done
-
-direct_exec_not_found:
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rel unknown_text]
-    mov edx, unknown_text_len
-    syscall
-    jmp command_done
+    jmp exec_path_pointer
 
 command_done:
     xor r15d, r15d
@@ -671,6 +714,10 @@ about_path:
     db "/etc/motd", 0
 version_path:
     db "/proc/version", 0
+hello_exec_path:
+    db "/bin/hello", 0
+sysinfo_exec_path:
+    db "/bin/sysinfo", 0
 pid_label:
     db "pid: "
 pid_label_len equ $ - pid_label
