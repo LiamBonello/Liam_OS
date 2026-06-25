@@ -45,6 +45,13 @@ static void initialize_live_dispatcher(u32 current_pid)
     active_dispatcher.blocking_read_enabled = 1U;
 }
 
+static void halt_after_shell_exit(void)
+{
+    for (;;) {
+        __asm__ volatile ("hlt");
+    }
+}
+
 u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
 {
     struct x86_64_user_mode_state *state = active_state;
@@ -154,7 +161,14 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
     for (;;) {
         state->entered = 1U;
         x86_64_user_mode_enter_init(state->entry_rip, state->entry_rsp);
+        u32 returned_pid = active_dispatcher.current_pid;
         state->returned_to_kernel = 1U;
+
+        if (returned_pid == current_pid) {
+            x86_64_serial_write_line("Liam_OS x86_64 shell exited");
+            halt_after_shell_exit();
+        }
+
         x86_64_serial_write_line("Liam_OS x86_64 shell restarting");
         state->current_pid = current_pid;
         initialize_live_dispatcher(current_pid);
