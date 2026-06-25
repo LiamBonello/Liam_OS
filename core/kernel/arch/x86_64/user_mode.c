@@ -169,7 +169,6 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
             halt_after_shell_exit();
         }
 
-        x86_64_serial_write_line("Liam_OS x86_64 shell restarting");
         state->current_pid = current_pid;
         initialize_live_dispatcher(current_pid);
     }
