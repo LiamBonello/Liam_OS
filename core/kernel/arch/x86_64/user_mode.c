@@ -130,6 +130,7 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
         return;
     }
 
+    x86_64_process_set_paging_context(paging_builder);
     x86_64_process_run_smoke(&process_state);
 
     x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
