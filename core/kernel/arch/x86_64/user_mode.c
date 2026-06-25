@@ -10,6 +10,7 @@ u64 x86_64_user_mode_kernel_cr3;
 
 static struct x86_64_user_mode_state *active_state;
 static struct x86_64_syscall_dispatch_state active_dispatcher;
+static u8 active_exec_user_code_page[X86_64_USER_PAGE_BYTES] __attribute__((aligned(4096)));
 
 static void clear_state(struct x86_64_user_mode_state *state)
 {
@@ -135,7 +136,7 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
     x86_64_process_run_smoke(&process_state);
 
     x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
-    active_dispatcher.exec_user_code_page = paging_builder->user_code_page;
+    active_dispatcher.exec_user_code_page = (u64)active_exec_user_code_page;
     active_dispatcher.write_output_enabled = 1U;
     active_dispatcher.blocking_read_enabled = 1U;
     active_state = state;
