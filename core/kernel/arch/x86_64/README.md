@@ -98,6 +98,22 @@ clear
 exit
 ```
 
+The same boot/shell path can be checked automatically from the repository root:
+
+```sh
+make check-x86_64
+```
+
+or from this `core/` directory:
+
+```sh
+make x86_64-smoke
+```
+
+The smoke check builds the x86_64 ISO, boots it in QEMU with serial I/O, runs
+`version`, `pid`, `ps`, and `exit`, and verifies the expected shell/process
+markers.
+
 Use this separate opt-in path for the x86_64 IRQ and exception self-test:
 
 ```sh
@@ -124,15 +140,41 @@ x86_64 panic halt
 Panic halt mode: cli; hlt
 ```
 
-## Remaining milestones before x86_64 can become default
+## Kernel readiness before desktop work
 
-1. Replace the smoke scheduler with real x86_64 context switching.
-2. Add process-owned address spaces instead of the current shared early mapping.
-3. Grow the syscall table from guarded basics into real kernel services.
-4. Add filesystem-backed ELF64 program loading instead of only the embedded init image.
-5. Build out the shell and userland commands against real `open/read/stat/exec` services.
+The x86_64 path is the right base for desktop work, but it is not ready to be
+treated as the finished product kernel yet.
+
+Already in place:
+
+1. Multiboot2 long-mode boot into a freestanding x86_64 C kernel.
+2. Architecture-owned boot info, memory map parsing, PMM, page-table builder,
+   higher-half/direct-map validation, and early heap.
+3. Maintained GDT/TSS, IDT, guarded exception/IRQ path, and fast-syscall MSR
+   setup.
+4. Ring-3 entry with live syscall dispatch.
+5. Minimal VFS-backed x86_64 user shell with `open/read/stat/exec`, `pid`,
+   `ps`, and `wait` coverage.
+6. Per-process user address-space records with process-owned CR3/page-table
+   pages for spawned ELF64 user images.
+7. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
+
+Still blocking a desktop handoff:
+
+1. Replace cooperative/shell-driven user execution with a real x86_64 scheduler
+   that can keep multiple user processes alive and switch between them.
+2. Add blocking waits, process sleep/wake, and timer-driven scheduling instead
+   of only command-driven child reaping.
+3. Expand process-owned address spaces beyond one code page and one stack page:
+   mapped heap, guard pages, multi-segment ELF64 loads, and safe teardown.
+4. Add a real persistent filesystem/storage path. The current VFS is useful for
+   early userland, but a desktop needs storage-backed files, directories, and
+   executable loading.
+5. Add framebuffer/graphics discovery and input plumbing after the scheduler and
+   process model can support long-running services.
 6. Run an i386-vs-x86_64 parity pass before changing the default build.
-7. Remove i386 only after x86_64 can do what the current i386 path does.
+7. Keep i386 only until x86_64 can do what the current i386 path does, then
+   retire it deliberately.
 
 ## Guardrails
 

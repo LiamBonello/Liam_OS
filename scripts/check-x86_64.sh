@@ -1,0 +1,52 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CORE="$ROOT/core"
+LOG="${TMPDIR:-/tmp}/liam_os_x86_64_smoke.log"
+
+cd "$CORE"
+make x86_64-iso
+
+rm -f "$LOG"
+
+set +e
+timeout 20s sh -c '
+  {
+    sleep 4
+    printf "version\n"
+    sleep 1
+    printf "pid\n"
+    sleep 1
+    printf "ps\n"
+    sleep 1
+    printf "exit\n"
+    sleep 1
+  } | qemu-system-x86_64 -display none -monitor none -serial stdio -boot d -cdrom build/x86_64/liam_os_x86_64.iso
+' >"$LOG" 2>&1
+status=$?
+set -e
+
+if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
+  cat "$LOG"
+  exit "$status"
+fi
+
+require_marker() {
+  marker="$1"
+  if ! grep -F "$marker" "$LOG" >/dev/null 2>&1; then
+    printf 'Missing x86_64 smoke marker: %s\n' "$marker"
+    printf '%s\n' '--- serial log ---'
+    cat "$LOG"
+    exit 1
+  fi
+}
+
+require_marker "Liam_OS x86_64 shell online"
+require_marker "Liam_OS Core x86_64 dev"
+require_marker "pid: 1"
+require_marker "PID STATE MODE NAME"
+require_marker "created 1 user-created 0 user-exited 0 user-reaped 0"
+require_marker "Liam_OS x86_64 shell exited"
+
+printf 'x86_64 smoke log: %s\n' "$LOG"

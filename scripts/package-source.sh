@@ -5,7 +5,13 @@ OUT="$ROOT/dist"
 mkdir -p "$OUT"
 cd "$ROOT"
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git archive --format=zip --output="$OUT/Liam_OS_source.zip" HEAD
+  TMP="$(mktemp -d)"
+  trap 'rm -rf "$TMP"' EXIT
+  mkdir -p "$TMP/Liam_OS"
+  { git ls-files -z; git ls-files --others --exclude-standard -z; } |
+    tar --null -T - -cf - |
+    (cd "$TMP/Liam_OS" && tar -xf -)
+  (cd "$TMP" && zip -qr "$OUT/Liam_OS_source.zip" Liam_OS)
 else
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT

@@ -1,4 +1,4 @@
-.PHONY: all core core-debug run run-debug check-tools clean dist structure
+.PHONY: all core core-debug run run-debug check-tools check-x86_64 clean dist structure
 
 all: core
 
@@ -16,6 +16,9 @@ run-debug:
 
 check-tools:
 	$(MAKE) -C core check-tools
+
+check-x86_64:
+	./scripts/check-x86_64.sh
 
 clean:
 	$(MAKE) -C core clean
