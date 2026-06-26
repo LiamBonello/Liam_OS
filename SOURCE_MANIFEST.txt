@@ -86,16 +86,5 @@
 ./core/kernel/memory/vmm.h
 ./core/linker.ld
 ./desktop/README.md
-./desktop/apps/README.md
-./desktop/iso/README.md
-./desktop/profiles/creator.profile.md
-./desktop/profiles/developer.profile.md
-./desktop/profiles/gamer.profile.md
-./desktop/themes/README.md
-./docs/commercial/LICENSING_NOTES.md
-./docs/core/NEXT_KERNEL_STEPS.md
-./docs/product/MVP.md
-./docs/product/ROADMAP.md
-./docs/product/VISION.md
 ./scripts/check-core.sh
 ./scripts/package-source.sh
