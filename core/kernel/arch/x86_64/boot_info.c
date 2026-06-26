@@ -6,6 +6,7 @@
 #define MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME 2U
 #define MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO 4U
 #define MULTIBOOT2_TAG_TYPE_MMAP 6U
+#define MULTIBOOT2_TAG_TYPE_FRAMEBUFFER 8U
 
 #define X86_64_EXCEPTION_TEST_FLAG "liam.x86_64.exception_test=ud2"
 #define X86_64_IRQ_TEST_FLAG "liam.x86_64.irq_test=32"
@@ -44,6 +45,18 @@ struct multiboot2_mmap_entry {
     u64 length;
     u32 type;
     u32 reserved;
+};
+
+struct multiboot2_framebuffer_tag {
+    u32 type;
+    u32 size;
+    u64 framebuffer_addr;
+    u32 framebuffer_pitch;
+    u32 framebuffer_width;
+    u32 framebuffer_height;
+    u8 framebuffer_bpp;
+    u8 framebuffer_type;
+    u16 reserved;
 };
 
 static u32 align8(u32 value)
@@ -125,6 +138,43 @@ static void parse_mmap_tag(const struct multiboot2_mmap_tag *tag, struct x86_64_
     }
 }
 
+static void parse_framebuffer_tag(const struct multiboot2_framebuffer_tag *tag,
+                                  struct x86_64_boot_summary *summary)
+{
+    if (tag->size < sizeof(*tag)) {
+        return;
+    }
+
+    summary->framebuffer_found = 1U;
+    summary->framebuffer_addr = tag->framebuffer_addr;
+    summary->framebuffer_pitch = tag->framebuffer_pitch;
+    summary->framebuffer_width = tag->framebuffer_width;
+    summary->framebuffer_height = tag->framebuffer_height;
+    summary->framebuffer_bpp = tag->framebuffer_bpp;
+    summary->framebuffer_type = tag->framebuffer_type;
+    summary->framebuffer_rgb_format_ok = 0U;
+
+    if (tag->framebuffer_type == X86_64_FRAMEBUFFER_TYPE_RGB &&
+        tag->size >= sizeof(*tag) + 6U) {
+        const u8 *color_info = ((const u8 *)tag) + sizeof(*tag);
+        summary->framebuffer_red_field_position = color_info[0];
+        summary->framebuffer_red_mask_size = color_info[1];
+        summary->framebuffer_green_field_position = color_info[2];
+        summary->framebuffer_green_mask_size = color_info[3];
+        summary->framebuffer_blue_field_position = color_info[4];
+        summary->framebuffer_blue_mask_size = color_info[5];
+        summary->framebuffer_rgb_format_ok =
+            ((summary->framebuffer_addr != 0ULL) &&
+             (summary->framebuffer_width != 0U) &&
+             (summary->framebuffer_height != 0U) &&
+             (summary->framebuffer_pitch != 0U) &&
+             (summary->framebuffer_bpp >= 24U) &&
+             (summary->framebuffer_red_mask_size != 0U) &&
+             (summary->framebuffer_green_mask_size != 0U) &&
+             (summary->framebuffer_blue_mask_size != 0U)) ? 1U : 0U;
+    }
+}
+
 void x86_64_boot_info_parse(u32 magic, u32 boot_info_addr, struct x86_64_boot_summary *summary)
 {
     x86_64_exception_self_test_requested = 0U;
@@ -196,6 +246,8 @@ void x86_64_boot_info_parse(u32 magic, u32 boot_info_addr, struct x86_64_boot_su
             }
         } else if (tag->type == MULTIBOOT2_TAG_TYPE_MMAP) {
             parse_mmap_tag((const struct multiboot2_mmap_tag *)tag, summary);
+        } else if (tag->type == MULTIBOOT2_TAG_TYPE_FRAMEBUFFER) {
+            parse_framebuffer_tag((const struct multiboot2_framebuffer_tag *)tag, summary);
         }
 
         offset += align8(tag->size);

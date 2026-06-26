@@ -32,6 +32,14 @@ multiboot2_header_start:
     dd MULTIBOOT2_HEADER_LENGTH
     dd MULTIBOOT2_CHECKSUM
 
+    dw 5
+    dw 0
+    dd 20
+    dd 1024
+    dd 768
+    dd 32
+
+align 8
     dw 0
     dw 0
     dd 8

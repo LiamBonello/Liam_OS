@@ -1,6 +1,7 @@
 #include "boot_context.h"
 #include "console.h"
 #include "cpuid.h"
+#include "framebuffer.h"
 #include "gdt.h"
 #include "heap.h"
 #include "higher_half_probe.h"
@@ -60,6 +61,63 @@ static void report_boot_summary(const struct x86_64_boot_summary *summary)
         x86_64_console_write_at("Memory map: missing", 8, 0);
         x86_64_serial_write_line("Memory map: missing");
     }
+
+    x86_64_serial_write_line("x86_64 framebuffer diagnostics");
+    x86_64_serial_write_u32("Framebuffer found: ", summary->framebuffer_found);
+    x86_64_serial_write_hex64("Framebuffer address: 0x", summary->framebuffer_addr);
+    x86_64_serial_write_u32("Framebuffer pitch: ", summary->framebuffer_pitch);
+    x86_64_serial_write_u32("Framebuffer width: ", summary->framebuffer_width);
+    x86_64_serial_write_u32("Framebuffer height: ", summary->framebuffer_height);
+    x86_64_serial_write_u32("Framebuffer bpp: ", (u32)summary->framebuffer_bpp);
+    x86_64_serial_write_u32("Framebuffer type: ", (u32)summary->framebuffer_type);
+    x86_64_serial_write_u32("Framebuffer RGB format ok: ", summary->framebuffer_rgb_format_ok);
+    x86_64_serial_write_u32("Framebuffer red shift: ", (u32)summary->framebuffer_red_field_position);
+    x86_64_serial_write_u32("Framebuffer red bits: ", (u32)summary->framebuffer_red_mask_size);
+    x86_64_serial_write_u32("Framebuffer green shift: ", (u32)summary->framebuffer_green_field_position);
+    x86_64_serial_write_u32("Framebuffer green bits: ", (u32)summary->framebuffer_green_mask_size);
+    x86_64_serial_write_u32("Framebuffer blue shift: ", (u32)summary->framebuffer_blue_field_position);
+    x86_64_serial_write_u32("Framebuffer blue bits: ", (u32)summary->framebuffer_blue_mask_size);
+}
+
+static void report_framebuffer_summary(const struct x86_64_boot_summary *summary)
+{
+    x86_64_serial_write_line("x86_64 framebuffer summary");
+    x86_64_serial_write_u32("Framebuffer found: ", summary->framebuffer_found);
+    x86_64_serial_write_hex64("Framebuffer address: 0x", summary->framebuffer_addr);
+    x86_64_serial_write_u32("Framebuffer pitch: ", summary->framebuffer_pitch);
+    x86_64_serial_write_u32("Framebuffer width: ", summary->framebuffer_width);
+    x86_64_serial_write_u32("Framebuffer height: ", summary->framebuffer_height);
+    x86_64_serial_write_u32("Framebuffer bpp: ", (u32)summary->framebuffer_bpp);
+    x86_64_serial_write_u32("Framebuffer type: ", (u32)summary->framebuffer_type);
+    x86_64_serial_write_u32("Framebuffer RGB format ok: ", summary->framebuffer_rgb_format_ok);
+}
+
+static void report_framebuffer_mapping_summary(const struct x86_64_paging_builder_state *state)
+{
+    x86_64_serial_write_line("x86_64 framebuffer mapping summary");
+    x86_64_serial_write_hex64("Framebuffer virtual address: 0x", state->framebuffer_virtual_address);
+    x86_64_serial_write_u32("Framebuffer huge pages: ", state->framebuffer_huge_pages);
+    x86_64_serial_write_u32("Framebuffer mapping ready: ", state->framebuffer_mapped);
+}
+
+static void report_framebuffer_surface(const struct x86_64_framebuffer_state *state)
+{
+    x86_64_serial_write_line("x86_64 framebuffer surface online");
+    x86_64_serial_write_hex64("Framebuffer surface address: 0x", state->address);
+    x86_64_serial_write_u32("Framebuffer surface width: ", state->width);
+    x86_64_serial_write_u32("Framebuffer surface height: ", state->height);
+    x86_64_serial_write_u32("Framebuffer surface pitch: ", state->pitch);
+    x86_64_serial_write_u32("Framebuffer surface bpp: ", state->bpp);
+    x86_64_serial_write_u32("Framebuffer surface bytes per pixel: ", state->bytes_per_pixel);
+    x86_64_serial_write_u32("Framebuffer surface boot info ready: ", state->boot_info_ready);
+    x86_64_serial_write_u32("Framebuffer surface mapping ready: ", state->mapping_ready);
+    x86_64_serial_write_u32("Framebuffer surface format ready: ", state->format_ready);
+    x86_64_serial_write_u32("Framebuffer surface ready: ", state->initialized);
+    x86_64_serial_write_u32("Framebuffer clear ok: ", state->clear_ok);
+    x86_64_serial_write_u32("Framebuffer fill ok: ", state->fill_ok);
+    x86_64_serial_write_u32("Framebuffer pixel ok: ", state->pixel_ok);
+    x86_64_serial_write_hex32("Framebuffer sampled color: 0x", state->sampled_color);
+    x86_64_serial_write_u32("Framebuffer smoke ok: ", state->smoke_ok);
 }
 
 static void report_cpu_state(const struct x86_64_cpuid_state *state)
@@ -202,6 +260,8 @@ static void report_paging_builder(const struct x86_64_paging_builder_state *stat
     x86_64_serial_write_hex64("Paging builder identity PD: 0x", state->identity_pd_table);
     x86_64_serial_write_hex64("Paging builder direct PDPT: 0x", state->direct_pdpt_table);
     x86_64_serial_write_hex64("Paging builder direct PD: 0x", state->direct_pd_table);
+    x86_64_serial_write_hex64("Paging builder framebuffer PDPT: 0x", state->framebuffer_pdpt_table);
+    x86_64_serial_write_hex64("Paging builder framebuffer PD: 0x", state->framebuffer_pd_table);
     x86_64_serial_write_hex64("Paging builder kernel PDPT: 0x", state->kernel_pdpt_table);
     x86_64_serial_write_hex64("Paging builder kernel PD: 0x", state->kernel_pd_table);
     x86_64_serial_write_hex64("Paging builder kernel PT: 0x", state->kernel_pt_table);
@@ -213,9 +273,16 @@ static void report_paging_builder(const struct x86_64_paging_builder_state *stat
     x86_64_serial_write_u32("Paging builder PML4 entries: ", state->pml4_present_entries);
     x86_64_serial_write_u32("Paging builder identity huge pages: ", state->identity_huge_pages);
     x86_64_serial_write_u32("Paging builder direct huge pages: ", state->direct_huge_pages);
+    x86_64_serial_write_hex64("Paging builder framebuffer physical: 0x", state->framebuffer_physical_base);
+    x86_64_serial_write_hex64("Paging builder framebuffer virtual: 0x", state->framebuffer_virtual_address);
+    x86_64_serial_write_hex64("Paging builder framebuffer bytes: 0x", state->framebuffer_bytes);
+    x86_64_serial_write_u32("Paging builder framebuffer huge pages: ", state->framebuffer_huge_pages);
     x86_64_serial_write_u32("Paging builder kernel pages: ", state->kernel_pages);
     x86_64_serial_write_u32("Paging builder identity ok: ", state->identity_entry_ok);
     x86_64_serial_write_u32("Paging builder direct map ok: ", state->direct_map_entry_ok);
+    x86_64_serial_write_u32("Paging builder framebuffer requested: ", state->framebuffer_requested);
+    x86_64_serial_write_u32("Paging builder framebuffer entry ok: ", state->framebuffer_entry_ok);
+    x86_64_serial_write_u32("Paging builder framebuffer mapped: ", state->framebuffer_mapped);
     x86_64_serial_write_u32("Paging builder kernel ok: ", state->kernel_entry_ok);
     x86_64_serial_write_u32("Paging builder tables aligned: ", state->tables_aligned);
     x86_64_serial_write_u32("Paging builder ok: ", state->builder_ok);
@@ -404,6 +471,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
     struct x86_64_cpuid_state cpuid_state;
+    struct x86_64_framebuffer_state framebuffer_state;
     struct x86_64_gdt_state gdt_state;
     struct x86_64_heap_state heap_state;
     struct x86_64_higher_half_probe_state higher_half_probe;
@@ -425,8 +493,10 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_paging_state_init(&paging_state);
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
     x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
-    x86_64_paging_builder_init(&paging_builder, &context.memory_layout, &paging_plan);
+    x86_64_paging_builder_init(&paging_builder, &context.memory_layout, &paging_plan, &context.boot_info);
     x86_64_paging_builder_activate(&paging_activation, &paging_builder);
+    x86_64_framebuffer_init(&framebuffer_state, &context.boot_info, &paging_builder);
+    x86_64_framebuffer_run_smoke(&framebuffer_state);
     x86_64_heap_init(&heap_state, &paging_plan);
     x86_64_heap_run_smoke(&heap_state);
     x86_64_tss_init(&tss_state);
@@ -440,6 +510,9 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
                                  &context.memory_layout, &paging_plan);
     x86_64_runtime_enter_higher_half(&runtime_entry, &paging_activation,
                                      &context.memory_layout, &paging_plan);
+    report_framebuffer_summary(&context.boot_info);
+    report_framebuffer_mapping_summary(&paging_builder);
+    report_framebuffer_surface(&framebuffer_state);
     x86_64_user_mode_start_init(&user_mode_state, &paging_builder, 1U);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);

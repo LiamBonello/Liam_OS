@@ -111,8 +111,21 @@ make x86_64-smoke
 ```
 
 The smoke check builds the x86_64 ISO, boots it in QEMU with serial I/O, runs
-`version`, `pid`, `ps`, and `exit`, and verifies the expected shell/process
-markers.
+`version`, `pid`, `ps`, and `exit`, and verifies the expected framebuffer,
+shell, and process markers. The expected graphics foundation markers are:
+
+```txt
+Framebuffer found: 1
+Framebuffer width: 1024
+Framebuffer height: 768
+Framebuffer bpp: 32
+Framebuffer type: 1
+Framebuffer RGB format ok: 1
+Framebuffer virtual address: 0xFFFF900000000000
+Framebuffer mapping ready: 1
+Framebuffer surface ready: 1
+Framebuffer smoke ok: 1
+```
 
 Use this separate opt-in path for the x86_64 IRQ and exception self-test:
 
@@ -157,7 +170,11 @@ Already in place:
    `ps`, and `wait` coverage.
 6. Per-process user address-space records with process-owned CR3/page-table
    pages for spawned ELF64 user images.
-7. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
+7. Multiboot2 framebuffer discovery for 1024x768x32 RGB mode and a stable
+   higher-half framebuffer mapping for future graphics code.
+8. Kernel framebuffer drawing surface with RGB packing, pixel writes,
+   rectangle fills, and smoke-draw/readback validation.
+9. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
 
 Still blocking a desktop handoff:
 
@@ -170,8 +187,8 @@ Still blocking a desktop handoff:
 4. Add a real persistent filesystem/storage path. The current VFS is useful for
    early userland, but a desktop needs storage-backed files, directories, and
    executable loading.
-5. Add framebuffer/graphics discovery and input plumbing after the scheduler and
-   process model can support long-running services.
+5. Add input plumbing and a userspace graphics/window service after the
+   scheduler and process model can support long-running services.
 6. Run an i386-vs-x86_64 parity pass before changing the default build.
 7. Keep i386 only until x86_64 can do what the current i386 path does, then
    retire it deliberately.

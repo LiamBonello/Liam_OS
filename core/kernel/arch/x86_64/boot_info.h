@@ -7,6 +7,9 @@
 #define X86_64_BOOT_COMMAND_LINE_MAX 128U
 #define X86_64_MEMORY_REGION_MAX 32U
 #define X86_64_MEMORY_REGION_AVAILABLE 1U
+#define X86_64_FRAMEBUFFER_TYPE_INDEXED 0U
+#define X86_64_FRAMEBUFFER_TYPE_RGB 1U
+#define X86_64_FRAMEBUFFER_TYPE_EGA_TEXT 2U
 
 extern u32 x86_64_exception_self_test_requested;
 extern u32 x86_64_irq_self_test_requested;
@@ -37,6 +40,20 @@ struct x86_64_boot_summary {
     u32 mmap_entry_count;
     u32 memory_region_count;
     u64 usable_memory_bytes;
+    u32 framebuffer_found;
+    u32 framebuffer_rgb_format_ok;
+    u64 framebuffer_addr;
+    u32 framebuffer_pitch;
+    u32 framebuffer_width;
+    u32 framebuffer_height;
+    u8 framebuffer_bpp;
+    u8 framebuffer_type;
+    u8 framebuffer_red_field_position;
+    u8 framebuffer_red_mask_size;
+    u8 framebuffer_green_field_position;
+    u8 framebuffer_green_mask_size;
+    u8 framebuffer_blue_field_position;
+    u8 framebuffer_blue_mask_size;
     struct x86_64_memory_region memory_regions[X86_64_MEMORY_REGION_MAX];
 };
 

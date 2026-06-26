@@ -6,6 +6,7 @@ CORE="$ROOT/core"
 LOG="${TMPDIR:-/tmp}/liam_os_x86_64_smoke.log"
 
 cd "$CORE"
+make clean
 make x86_64-iso
 
 rm -f "$LOG"
@@ -43,7 +44,18 @@ require_marker() {
 }
 
 require_marker "Liam_OS x86_64 shell online"
-require_marker "Liam_OS Core x86_64 dev"
+require_marker "Framebuffer found: 1"
+require_marker "Framebuffer width: 1024"
+require_marker "Framebuffer height: 768"
+require_marker "Framebuffer bpp: 32"
+require_marker "Framebuffer type: 1"
+require_marker "Framebuffer RGB format ok: 1"
+require_marker "Framebuffer virtual address: 0xFFFF900000000000"
+require_marker "Framebuffer huge pages: 2"
+require_marker "Framebuffer mapping ready: 1"
+require_marker "Framebuffer surface ready: 1"
+require_marker "Framebuffer smoke ok: 1"
+require_marker "Liam_OS Core x86_64 0.8.65-dev"
 require_marker "pid: 1"
 require_marker "PID STATE MODE NAME"
 require_marker "created 1 user-created 0 user-exited 0 user-reaped 0"

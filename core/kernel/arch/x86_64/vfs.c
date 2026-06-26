@@ -47,7 +47,7 @@ static const char x86_64_vfs_file_motd[] =
     "Liam_OS x86_64 read-only VFS mounted.\n";
 
 static const char x86_64_vfs_file_version[] =
-    "Liam_OS Core x86_64 dev\n";
+    "Liam_OS Core x86_64 0.8.65-dev\n";
 
 static const char x86_64_vfs_file_help[] =
     "Available commands:\n"

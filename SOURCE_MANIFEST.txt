@@ -38,6 +38,8 @@
 ./core/kernel/arch/x86_64/console.h
 ./core/kernel/arch/x86_64/cpuid.c
 ./core/kernel/arch/x86_64/cpuid.h
+./core/kernel/arch/x86_64/framebuffer.c
+./core/kernel/arch/x86_64/framebuffer.h
 ./core/kernel/arch/x86_64/gdt.c
 ./core/kernel/arch/x86_64/gdt.h
 ./core/kernel/arch/x86_64/heap.c

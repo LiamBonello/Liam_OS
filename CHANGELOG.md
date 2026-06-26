@@ -1,5 +1,39 @@
 # Liam_OS Changelog
 
+## Core 0.8.65-dev
+
+### Added
+
+- Added an x86_64 framebuffer drawing surface on top of the higher-half boot framebuffer mapping.
+- Added RGB color packing, pixel writes, rectangle fills, and a framebuffer smoke draw/readback check.
+- Extended the x86_64 QEMU smoke check to verify that the framebuffer surface initializes and can draw.
+
+### Changed
+
+- Updated the x86_64 `/proc/version` text and Liam_OS version to `0.8.65-dev`.
+
+### Notes
+
+- The kernel now has the first usable graphics primitive layer for desktop work. The next desktop-facing pieces are input event plumbing, timer-driven scheduling for long-running services, and a userspace graphics/window service.
+
+## Core 0.8.64-dev
+
+### Added
+
+- Added an x86_64 Multiboot2 framebuffer request for a 1024x768x32 RGB mode.
+- Parsed and reported Multiboot2 framebuffer metadata, including address, pitch, dimensions, bpp, type, and RGB channel layout.
+- Added a fixed higher-half framebuffer virtual mapping at `0xFFFF900000000000` backed by huge pages.
+- Extended the x86_64 QEMU smoke check to verify framebuffer discovery, RGB format readiness, virtual mapping readiness, and shell/process markers.
+
+### Changed
+
+- Made the x86_64 smoke check perform a clean build so header changes cannot be hidden by stale objects.
+- Updated the x86_64 `/proc/version` text and Liam_OS version to `0.8.64-dev`.
+
+### Notes
+
+- This is the first kernel-side desktop graphics foundation. It discovers and maps the boot framebuffer, but it does not yet provide a compositor, drawing API, GUI input stack, or userspace graphics service.
+
 ## Core 0.8.63-dev
 
 ### Added

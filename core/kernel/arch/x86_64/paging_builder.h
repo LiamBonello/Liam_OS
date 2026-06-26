@@ -1,12 +1,14 @@
 #ifndef LIAM_OS_X86_64_PAGING_BUILDER_H
 #define LIAM_OS_X86_64_PAGING_BUILDER_H
 
+#include "boot_info.h"
 #include "memory_layout.h"
 #include "paging_plan.h"
 #include "types.h"
 
 #define X86_64_PAGING_BUILDER_ENTRIES 512U
-#define X86_64_PAGING_BUILDER_TABLE_PAGES 11U
+#define X86_64_FRAMEBUFFER_VIRTUAL_BASE 0xFFFF900000000000ULL
+#define X86_64_PAGING_BUILDER_TABLE_PAGES 13U
 #define X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES 2U
 #define X86_64_PAGING_BUILDER_ALLOCATED_PAGES \
     (X86_64_PAGING_BUILDER_TABLE_PAGES + X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES)
@@ -17,6 +19,8 @@ struct x86_64_paging_builder_state {
     u64 identity_pd_table;
     u64 direct_pdpt_table;
     u64 direct_pd_table;
+    u64 framebuffer_pdpt_table;
+    u64 framebuffer_pd_table;
     u64 kernel_pdpt_table;
     u64 kernel_pd_table;
     u64 kernel_pt_table;
@@ -27,6 +31,11 @@ struct x86_64_paging_builder_state {
     u64 user_stack_page;
     u64 user_code_virtual;
     u64 user_stack_virtual;
+    u64 framebuffer_physical_base;
+    u64 framebuffer_virtual_base;
+    u64 framebuffer_virtual_address;
+    u64 framebuffer_bytes;
+    u32 framebuffer_huge_pages;
     u32 pml4_present_entries;
     u32 identity_huge_pages;
     u32 direct_huge_pages;
@@ -39,6 +48,9 @@ struct x86_64_paging_builder_state {
     u32 allocation_ok;
     u32 identity_entry_ok;
     u32 direct_map_entry_ok;
+    u32 framebuffer_requested;
+    u32 framebuffer_entry_ok;
+    u32 framebuffer_mapped;
     u32 kernel_entry_ok;
     u32 user_code_entry_ok;
     u32 user_stack_entry_ok;
@@ -85,7 +97,8 @@ struct x86_64_paging_probe_state {
 
 void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
                                 const struct x86_64_memory_layout *layout,
-                                const struct x86_64_paging_plan *plan);
+                                const struct x86_64_paging_plan *plan,
+                                const struct x86_64_boot_summary *boot_info);
 void x86_64_paging_builder_activate(struct x86_64_paging_activation_state *state,
                                     const struct x86_64_paging_builder_state *builder);
 void x86_64_paging_probe_active_mappings(struct x86_64_paging_probe_state *state,

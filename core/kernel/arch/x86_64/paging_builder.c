@@ -12,6 +12,7 @@
 #define X86_64_USER_CODE_FLAGS (X86_64_PAGE_PRESENT | X86_64_PAGE_USER)
 #define X86_64_USER_STACK_FLAGS (X86_64_PAGE_PRESENT | X86_64_PAGE_WRITABLE | X86_64_PAGE_USER)
 #define X86_64_PAGE_MASK (X86_64_PAGE_SIZE - 1ULL)
+#define X86_64_HUGE_PAGE_MASK (X86_64_HUGE_PAGE_SIZE - 1ULL)
 #define X86_64_USER_IMAGE_MAX_BYTES 65536U
 
 extern const u8 x86_64_user_init_image_start[];
@@ -86,6 +87,11 @@ static u32 huge_page_count_for(u64 bytes)
     return (u32)((bytes + X86_64_HUGE_PAGE_SIZE - 1ULL) / X86_64_HUGE_PAGE_SIZE);
 }
 
+static u64 align_down_huge(u64 value)
+{
+    return value & ~X86_64_HUGE_PAGE_MASK;
+}
+
 static u32 count_present_entries(const u64 *table)
 {
     u32 count = 0U;
@@ -100,6 +106,14 @@ static u32 count_present_entries(const u64 *table)
 static u32 entry_has_user(u64 entry)
 {
     return ((entry & X86_64_PAGE_USER) != 0ULL) ? 1U : 0U;
+}
+
+static u32 framebuffer_mapping_fits(u32 first_pd_index, u32 huge_pages)
+{
+    return ((huge_pages != 0U) &&
+            (huge_pages <= X86_64_PAGING_BUILDER_ENTRIES) &&
+            (first_pd_index < X86_64_PAGING_BUILDER_ENTRIES) &&
+            (huge_pages <= (X86_64_PAGING_BUILDER_ENTRIES - first_pd_index))) ? 1U : 0U;
 }
 
 static u32 checksum_bytes(const u8 *bytes, u32 count)
@@ -161,6 +175,8 @@ static u32 tables_are_aligned(const struct x86_64_paging_builder_state *state)
             (is_page_aligned(state->identity_pd_table) != 0U) &&
             (is_page_aligned(state->direct_pdpt_table) != 0U) &&
             (is_page_aligned(state->direct_pd_table) != 0U) &&
+            (is_page_aligned(state->framebuffer_pdpt_table) != 0U) &&
+            (is_page_aligned(state->framebuffer_pd_table) != 0U) &&
             (is_page_aligned(state->kernel_pdpt_table) != 0U) &&
             (is_page_aligned(state->kernel_pd_table) != 0U) &&
             (is_page_aligned(state->kernel_pt_table) != 0U) &&
@@ -297,7 +313,8 @@ static void load_embedded_user_image(struct x86_64_paging_builder_state *state)
 
 void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
                                 const struct x86_64_memory_layout *layout,
-                                const struct x86_64_paging_plan *plan)
+                                const struct x86_64_paging_plan *plan,
+                                const struct x86_64_boot_summary *boot_info)
 {
     clear_builder_state(state);
 
@@ -311,6 +328,8 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     u64 *builder_identity_pd = (u64 *)0;
     u64 *builder_direct_pdpt = (u64 *)0;
     u64 *builder_direct_pd = (u64 *)0;
+    u64 *builder_framebuffer_pdpt = (u64 *)0;
+    u64 *builder_framebuffer_pd = (u64 *)0;
     u64 *builder_kernel_pdpt = (u64 *)0;
     u64 *builder_kernel_pd = (u64 *)0;
     u64 *builder_kernel_pt = (u64 *)0;
@@ -325,6 +344,8 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
         allocate_table(&builder_identity_pd, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_direct_pdpt, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_direct_pd, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_framebuffer_pdpt, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_framebuffer_pd, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_kernel_pdpt, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_kernel_pd, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_kernel_pt, allocated_pages, &allocated_count) == 0U ||
@@ -343,6 +364,8 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     state->identity_pd_table = (u64)builder_identity_pd;
     state->direct_pdpt_table = (u64)builder_direct_pdpt;
     state->direct_pd_table = (u64)builder_direct_pd;
+    state->framebuffer_pdpt_table = (u64)builder_framebuffer_pdpt;
+    state->framebuffer_pd_table = (u64)builder_framebuffer_pd;
     state->kernel_pdpt_table = (u64)builder_kernel_pdpt;
     state->kernel_pd_table = (u64)builder_kernel_pd;
     state->kernel_pt_table = (u64)builder_kernel_pt;
@@ -374,6 +397,35 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     }
     for (u32 i = 0; i < direct_pages; ++i) {
         builder_direct_pd[i] = ((u64)i * X86_64_HUGE_PAGE_SIZE) | X86_64_HUGE_PAGE_FLAGS;
+    }
+
+    state->framebuffer_requested =
+        (boot_info != (const struct x86_64_boot_summary *)0 &&
+         boot_info->framebuffer_rgb_format_ok != 0U) ? 1U : 0U;
+    state->framebuffer_virtual_base = X86_64_FRAMEBUFFER_VIRTUAL_BASE;
+
+    u32 framebuffer_pml4_index = pml4_index_for(X86_64_FRAMEBUFFER_VIRTUAL_BASE);
+    u32 framebuffer_pdpt_index = pdpt_index_for(X86_64_FRAMEBUFFER_VIRTUAL_BASE);
+    u32 framebuffer_pd_index = pd_index_for(X86_64_FRAMEBUFFER_VIRTUAL_BASE);
+    if (state->framebuffer_requested != 0U) {
+        u64 framebuffer_offset = boot_info->framebuffer_addr & X86_64_HUGE_PAGE_MASK;
+        u64 framebuffer_bytes = ((u64)boot_info->framebuffer_pitch * (u64)boot_info->framebuffer_height) +
+                                framebuffer_offset;
+        u32 framebuffer_huge_pages = huge_page_count_for(framebuffer_bytes);
+        state->framebuffer_physical_base = align_down_huge(boot_info->framebuffer_addr);
+        state->framebuffer_virtual_address = X86_64_FRAMEBUFFER_VIRTUAL_BASE + framebuffer_offset;
+        state->framebuffer_bytes = framebuffer_bytes;
+        state->framebuffer_huge_pages = framebuffer_huge_pages;
+
+        if (framebuffer_mapping_fits(framebuffer_pd_index, framebuffer_huge_pages) != 0U) {
+            builder_framebuffer_pdpt[framebuffer_pdpt_index] =
+                ((u64)builder_framebuffer_pd) | X86_64_TABLE_FLAGS;
+            for (u32 i = 0; i < framebuffer_huge_pages; ++i) {
+                builder_framebuffer_pd[framebuffer_pd_index + i] =
+                    (state->framebuffer_physical_base + ((u64)i * X86_64_HUGE_PAGE_SIZE)) |
+                    X86_64_HUGE_PAGE_FLAGS;
+            }
+        }
     }
 
     u32 kernel_pages = align_page_count(layout->kernel_size_bytes);
@@ -409,6 +461,7 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
 
     builder_pml4[plan->identity_pml4_index] = ((u64)builder_identity_pdpt) | X86_64_USER_TABLE_FLAGS;
     builder_pml4[plan->direct_map_pml4_index] = ((u64)builder_direct_pdpt) | X86_64_TABLE_FLAGS;
+    builder_pml4[framebuffer_pml4_index] = ((u64)builder_framebuffer_pdpt) | X86_64_TABLE_FLAGS;
     builder_pml4[plan->kernel_pml4_index] = ((u64)builder_kernel_pdpt) | X86_64_TABLE_FLAGS;
 
     u32 split_identity_huge_pages = identity_pages;
@@ -430,6 +483,13 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
         (((builder_pml4[plan->direct_map_pml4_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
          ((builder_direct_pdpt[0] & X86_64_PAGE_PRESENT) != 0ULL) &&
          ((builder_direct_pd[0] & X86_64_PAGE_PRESENT) != 0ULL)) ? 1U : 0U;
+    state->framebuffer_entry_ok =
+        ((state->framebuffer_requested != 0U) &&
+         ((builder_pml4[framebuffer_pml4_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
+         ((builder_framebuffer_pdpt[framebuffer_pdpt_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
+         ((builder_framebuffer_pd[framebuffer_pd_index] & X86_64_PAGE_PRESENT) != 0ULL)) ? 1U : 0U;
+    state->framebuffer_mapped =
+        ((state->framebuffer_requested == 0U) || (state->framebuffer_entry_ok != 0U)) ? 1U : 0U;
     state->kernel_entry_ok =
         (((builder_pml4[plan->kernel_pml4_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
          ((builder_kernel_pdpt[kernel_pdpt_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
@@ -464,6 +524,7 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
          (state->allocation_ok != 0U) &&
          (state->identity_entry_ok != 0U) &&
          (state->direct_map_entry_ok != 0U) &&
+         (state->framebuffer_mapped != 0U) &&
          (state->kernel_entry_ok != 0U) &&
          (state->user_mapping_ok != 0U) &&
          (state->tables_aligned != 0U)) ? 1U : 0U;
