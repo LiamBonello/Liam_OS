@@ -189,22 +189,13 @@ x86_64-run-check-tools: x86_64-iso-check-tools
 	@command -v $(QEMU_x86_64) >/dev/null || (echo "Missing tool: $(QEMU_x86_64)" && exit 1)
 
 x86_64-info:
-	@echo "Liam_OS x86_64 path now builds and embeds a real ELF64 user init image before running the ring-3 syscall smoke path."
-	@echo "Current stable bootable default remains: ARCH=i386"
-	@echo "Artifact target: make x86_64-kernel"
-	@echo "ISO target: make x86_64-iso"
-	@echo "Run target: make x86_64-run"
-	@echo "GUI run target: make x86_64-run-gui"
-	@echo "Exception self-test ISO target: make x86_64-exception-test-iso"
-	@echo "Exception self-test run target: make x86_64-exception-test-run"
-	@echo "Artifact output: $(X86_64_KERNEL)"
-	@echo "ISO output: $(X86_64_ISO)"
-	@echo "Exception self-test ISO output: $(X86_64_EXCEPTION_TEST_ISO)"
-	@echo "Expected x86_64 screen messages: PIT timer ok: 1, Keyboard ready ok: 1, Heap smoke ok: 1, Process smoke ok: 1, Desc/IST ok: 1"
-	@echo "Expected serial markers include: User mode ok: 1, Paging builder ELF64 load ok: 1, Paging builder PMM backed: 1, Heap smoke ok: 1, Process stack execution ok: 1, Runtime entry ok: 1, Paging activation ok: 1, Paging probes ok: 1"
-	@echo "Expected exception self-test markers include: Exception self-test requested: 1, x86_64 exception self-test: ud2, Name: invalid opcode, Vector: 0x0000000000000006, x86_64 panic halt"
-	@echo "Interactive x86_64 serial input/output is routed to the terminal by make x86_64-run."
-	@echo "See: kernel/arch/x86_64/README.md and ../docs/core/x86_64-migration-plan.md"
+	@echo "Liam_OS x86_64 path is the active target architecture."
+	@echo "The default build remains i386 for compatibility while x86_64 reaches feature parity."
+	@echo "Targets: make x86_64-kernel, make x86_64-iso, make x86_64-run"
+	@echo "Artifacts: $(X86_64_KERNEL) and $(X86_64_ISO)"
+	@echo "Optional self-test targets: make x86_64-exception-test-iso and make x86_64-exception-test-run"
+	@echo "Interactive x86_64 serial I/O is routed to the terminal by make x86_64-run."
+	@echo "See: kernel/arch/x86_64/README.md for the current milestone plan."
 
 x86_64-kernel: x86_64-check-tools $(X86_64_KERNEL)
 	@echo "Built experimental x86_64 kernel artifact: $(X86_64_KERNEL)"

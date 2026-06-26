@@ -214,15 +214,6 @@ static void scheduler_assign_task_state(
     task->state = state;
 }
 
-static void scheduler_transition_task_state(
-    scheduler_task_t* task,
-    scheduler_task_state_t state
-)
-{
-    scheduler_assign_task_state(task, state);
-    scheduler_recalculate_task_counts();
-}
-
 static scheduler_task_t* scheduler_find_task_by_id_mutable(uint32_t task_id)
 {
     for (uint32_t i = 0; i < SCHEDULER_MAX_TASKS; i++)

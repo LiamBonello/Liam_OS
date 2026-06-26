@@ -1,6 +1,8 @@
 # Liam_OS x86_64 Architecture Path
 
-This directory contains the staged x86_64 kernel path. The i386 path in `core/kernel/arch/i386/` remains the stable default while x86_64 grows to feature parity in coherent, testable steps.
+This directory contains the active x86_64 kernel path. Liam_OS is being built around x86_64 as the long-term target architecture, so this directory is the main focus of ongoing work.
+
+The i386 path remains available only as a compatibility fallback while x86_64 reaches feature parity.
 
 ## Current status
 
