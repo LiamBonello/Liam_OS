@@ -64,7 +64,7 @@ clear
 exit
 ```
 
-`help`, `about`, and `version` are read through the VFS. `pid` and `/bin/sysinfo` report the live `getpid` syscall result. `ps` reports a kernel-owned process snapshot. `wait` consumes the latest completed child process status for the shell.
+`help`, `about`, and `version` are read through the VFS. `pid` and `/bin/sysinfo` report the live `getpid` syscall result. `ps` reports a kernel-owned process snapshot. `wait` consumes queued completed child process statuses for the shell.
 
 ## Manual validation
 

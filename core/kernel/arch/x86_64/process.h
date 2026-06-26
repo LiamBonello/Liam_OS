@@ -9,6 +9,7 @@
 #define X86_64_PROCESS_IMAGE_PATH_LEN 64U
 #define X86_64_PROCESS_KERNEL_STACK_BYTES 4096ULL
 #define X86_64_PROCESS_ADDRESS_SPACE_PAGES 8U
+#define X86_64_PROCESS_CHILD_STATUS_QUEUE 16U
 
 typedef void (*x86_64_process_entry_t)(void *arg);
 
@@ -108,6 +109,9 @@ struct x86_64_process_smoke_state {
     u32 completed_child_records;
     u32 completed_child_waits;
     u32 wait_misses;
+    u32 completed_child_queue_depth;
+    u32 completed_child_queue_high_watermark;
+    u32 completed_child_drops;
     u32 user_image_bytes;
     u32 user_image_copied;
     u32 user_process_ready;

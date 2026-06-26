@@ -1,5 +1,22 @@
 # Liam_OS Changelog
 
+## Core 0.8.63-dev
+
+### Added
+
+- Replaced the single x86_64 child wait slot with a bounded FIFO child-status queue.
+- Added queue-depth, high-watermark, and dropped-status diagnostics to the x86_64 process manager and `ps` output.
+- Extended the process smoke path to record and wait on two child statuses in FIFO order.
+
+### Changed
+
+- `wait` can now consume multiple completed child statuses one at a time instead of losing earlier child exits when another child finishes first.
+- Updated Liam_OS version to `0.8.63-dev`.
+
+### Notes
+
+- The queue is still intentionally bounded and kernel-owned. If it fills, the oldest child status is dropped and counted, which keeps the shell responsive while exposing pressure through diagnostics.
+
 ## Core 0.8.62-dev
 
 ### Added
@@ -17,7 +34,7 @@
 
 ### Notes
 
-- This is the first explicit parent-child wait contract. The current implementation keeps one pending child result per parent, which matches the current synchronous `exec` path. A later scheduler update can replace it with a per-parent queue and blocking wait.
+- This is the first explicit parent-child wait contract. A later scheduler update can add blocking wait once multiple user processes can stay alive at the same time.
 
 ## Core 0.8.61-dev
 
