@@ -92,6 +92,7 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
     case X86_64_SYSCALL_SERVICE_CLOSE:
     case X86_64_SYSCALL_SERVICE_STAT:
     case X86_64_SYSCALL_SERVICE_PS:
+    case X86_64_SYSCALL_SERVICE_WAIT:
         break;
 
     case X86_64_SYSCALL_SERVICE_READ:
@@ -182,8 +183,10 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
         state->last_child_pid = returned_pid;
         state->last_child_exit_code = state->exit_code;
         u32 marked_exited = x86_64_process_mark_user_exited(returned_pid, state->exit_code);
+        u32 recorded_child = x86_64_process_record_child_exit(current_pid, returned_pid, state->exit_code);
         u32 reaped = x86_64_process_reap_user(returned_pid);
-        state->last_child_reap_ok = ((marked_exited != 0U) && (reaped != 0U)) ? 1U : 0U;
+        state->last_child_reap_ok =
+            ((marked_exited != 0U) && (recorded_child != 0U) && (reaped != 0U)) ? 1U : 0U;
         if (state->last_child_reap_ok != 0U) {
             state->child_reap_count += 1U;
         }

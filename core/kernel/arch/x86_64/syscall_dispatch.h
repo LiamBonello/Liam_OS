@@ -13,6 +13,7 @@
 #define X86_64_SYSCALL_RET_OK 0ULL
 #define X86_64_SYSCALL_RET_EFAULT 0xFFFFFFFFFFFFFFF2ULL
 #define X86_64_SYSCALL_RET_EINVAL 0xFFFFFFFFFFFFFFEAULL
+#define X86_64_SYSCALL_RET_ENOENT 0xFFFFFFFFFFFFFFFEULL
 #define X86_64_SYSCALL_RET_ENOSYS 0xFFFFFFFFFFFFFFDAULL
 #define X86_64_SYSCALL_STDIN 0ULL
 #define X86_64_SYSCALL_STDOUT 1ULL
@@ -60,6 +61,9 @@ struct x86_64_syscall_dispatch_state {
     u32 yield_ok;
     u32 ps_ok;
     u32 ps_fault_ok;
+    u32 wait_ok;
+    u32 wait_empty_ok;
+    u32 wait_fault_ok;
     u32 exec_fault_ok;
     u32 exec_path_found;
     u32 exec_type_ok;
@@ -307,6 +311,9 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->yield_ok = 0U;
     state->ps_ok = 0U;
     state->ps_fault_ok = 0U;
+    state->wait_ok = 0U;
+    state->wait_empty_ok = 0U;
+    state->wait_fault_ok = 0U;
     state->exec_fault_ok = 0U;
     state->exec_path_found = 0U;
     state->exec_type_ok = 0U;
@@ -500,6 +507,27 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->ps_ok = (state->last_result != 0ULL) ? 1U : 0U;
         return state->last_result;
 
+    case X86_64_SYSCALL_SERVICE_WAIT: {
+        if (x86_64_syscall_user_range_ok(arg0, sizeof(u32)) == 0U ||
+            x86_64_syscall_user_range_ok(arg1, sizeof(u32)) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+
+        u32 child_pid = 0U;
+        u32 exit_code = 0U;
+        if (x86_64_process_wait_child(state->current_pid, &child_pid, &exit_code) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_ENOENT;
+            return state->last_result;
+        }
+
+        *((u32 *)arg0) = child_pid;
+        *((u32 *)arg1) = exit_code;
+        state->wait_ok = 1U;
+        state->last_result = X86_64_SYSCALL_RET_OK;
+        return state->last_result;
+    }
+
     default:
         state->last_result = X86_64_SYSCALL_RET_ENOSYS;
         return state->last_result;
@@ -589,6 +617,18 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
                                            0ULL, 0ULL, 0ULL);
     state->ps_fault_ok = (ps_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
 
+    u64 wait_empty = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_WAIT,
+                                             state->sample_user_buffer,
+                                             state->sample_user_buffer + sizeof(u32),
+                                             0ULL, 0ULL, 0ULL, 0ULL);
+    state->wait_empty_ok = (wait_empty == X86_64_SYSCALL_RET_ENOENT) ? 1U : 0U;
+
+    u64 wait_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_WAIT,
+                                             state->sample_kernel_pointer,
+                                             state->sample_user_buffer + sizeof(u32),
+                                             0ULL, 0ULL, 0ULL, 0ULL);
+    state->wait_fault_ok = (wait_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
+
     u64 exec_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_EXEC,
                                              state->sample_kernel_pointer, 0ULL, 0ULL,
                                              0ULL, 0ULL, 0ULL);
@@ -617,10 +657,12 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
          (state->getpid_ok != 0U) &&
          (state->yield_ok != 0U) &&
          (state->ps_fault_ok != 0U) &&
+         (state->wait_empty_ok != 0U) &&
+         (state->wait_fault_ok != 0U) &&
          (state->exec_fault_ok != 0U) &&
          (state->unknown_rejected != 0U) &&
          (state->exit_ok != 0U) &&
-         (state->dispatch_calls == 11U)) ? 1U : 0U;
+         (state->dispatch_calls == 13U)) ? 1U : 0U;
 }
 
 static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_dispatch_state *state)
@@ -648,6 +690,9 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall yield dispatch ok: ", state->yield_ok);
     x86_64_serial_write_u32("Syscall ps dispatch ok: ", state->ps_ok);
     x86_64_serial_write_u32("Syscall ps fault ok: ", state->ps_fault_ok);
+    x86_64_serial_write_u32("Syscall wait dispatch ok: ", state->wait_ok);
+    x86_64_serial_write_u32("Syscall wait empty ok: ", state->wait_empty_ok);
+    x86_64_serial_write_u32("Syscall wait fault ok: ", state->wait_fault_ok);
     x86_64_serial_write_u32("Syscall exec fault ok: ", state->exec_fault_ok);
     x86_64_serial_write_u32("Syscall exec path found: ", state->exec_path_found);
     x86_64_serial_write_u32("Syscall exec type ok: ", state->exec_type_ok);

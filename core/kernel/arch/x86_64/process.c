@@ -55,6 +55,10 @@ static struct x86_64_process_smoke_state process_state;
 static struct x86_64_process_paging_context process_paging_context;
 static u32 next_pid = X86_64_PROCESS_FIRST_PID;
 static u64 next_address_space_id = 1ULL;
+static u32 pending_child_valid;
+static u32 pending_child_parent_pid;
+static u32 pending_child_pid;
+static u32 pending_child_exit_code;
 static u32 worker_a_runs;
 static u32 worker_b_runs;
 static u64 worker_a_stack_sample;
@@ -627,6 +631,10 @@ void x86_64_process_initialize(struct x86_64_process_smoke_state *state)
     clear_bytes(&process_state, sizeof(process_state));
     next_pid = X86_64_PROCESS_FIRST_PID;
     next_address_space_id = 1ULL;
+    pending_child_valid = 0U;
+    pending_child_parent_pid = 0U;
+    pending_child_pid = 0U;
+    pending_child_exit_code = 0U;
     worker_a_runs = 0U;
     worker_b_runs = 0U;
     worker_a_stack_sample = 0ULL;
@@ -805,6 +813,56 @@ u32 x86_64_process_reap_exited_user_processes(void)
     return reaped;
 }
 
+u32 x86_64_process_record_child_exit(u32 parent_pid, u32 child_pid, u32 exit_code)
+{
+    if (parent_pid == X86_64_PROCESS_INVALID_PID ||
+        child_pid == X86_64_PROCESS_INVALID_PID ||
+        parent_pid == child_pid) {
+        return 0U;
+    }
+
+    pending_child_valid = 1U;
+    pending_child_parent_pid = parent_pid;
+    pending_child_pid = child_pid;
+    pending_child_exit_code = exit_code;
+
+    process_state.completed_child_records += 1U;
+    process_state.last_completed_parent_pid = parent_pid;
+    process_state.last_completed_child_pid = child_pid;
+    process_state.last_completed_exit_code = exit_code;
+
+    return 1U;
+}
+
+u32 x86_64_process_wait_child(u32 parent_pid, u32 *child_pid_out, u32 *exit_code_out)
+{
+    if (parent_pid == X86_64_PROCESS_INVALID_PID ||
+        child_pid_out == (u32 *)0 ||
+        exit_code_out == (u32 *)0) {
+        return 0U;
+    }
+
+    if (pending_child_valid == 0U || pending_child_parent_pid != parent_pid) {
+        process_state.wait_misses += 1U;
+        return 0U;
+    }
+
+    *child_pid_out = pending_child_pid;
+    *exit_code_out = pending_child_exit_code;
+
+    process_state.completed_child_waits += 1U;
+    process_state.last_wait_parent_pid = parent_pid;
+    process_state.last_wait_child_pid = pending_child_pid;
+    process_state.last_wait_exit_code = pending_child_exit_code;
+
+    pending_child_valid = 0U;
+    pending_child_parent_pid = 0U;
+    pending_child_pid = 0U;
+    pending_child_exit_code = 0U;
+
+    return 1U;
+}
+
 u64 x86_64_process_snapshot(char *buffer, u64 size)
 {
     if (buffer == (char *)0 || size == 0ULL) {
@@ -842,6 +900,12 @@ u64 x86_64_process_snapshot(char *buffer, u64 size)
     offset = append_u32_decimal(buffer, size, offset, process_state.user_processes_exited);
     offset = append_string(buffer, size, offset, " user-reaped ");
     offset = append_u32_decimal(buffer, size, offset, process_state.user_processes_reaped);
+    offset = append_string(buffer, size, offset, " wait-ready ");
+    offset = append_u32_decimal(buffer, size, offset, pending_child_valid);
+    offset = append_string(buffer, size, offset, " wait-records ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.completed_child_records);
+    offset = append_string(buffer, size, offset, " waits ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.completed_child_waits);
     offset = append_char(buffer, size, offset, '\n');
 
     if (offset < size) {
@@ -1071,10 +1135,21 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (is_aligned_u64(process_state.last_user_cr3, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
 
     u32 user_reap_ok = 0U;
+    u32 wait_ok = 0U;
     if (user_pid != X86_64_PROCESS_INVALID_PID) {
         u32 mark_ok = x86_64_process_mark_user_exited(user_pid, 0U);
+        u32 record_ok = x86_64_process_record_child_exit(first_pid, user_pid, 0U);
+        u32 waited_pid = 0U;
+        u32 waited_exit_code = 0U;
+        wait_ok = x86_64_process_wait_child(first_pid, &waited_pid, &waited_exit_code);
         u32 reap_ok = x86_64_process_reap_user(user_pid);
-        user_reap_ok = ((mark_ok != 0U) && (reap_ok != 0U)) ? 1U : 0U;
+        user_reap_ok =
+            ((mark_ok != 0U) &&
+             (record_ok != 0U) &&
+             (wait_ok != 0U) &&
+             (waited_pid == user_pid) &&
+             (waited_exit_code == 0U) &&
+             (reap_ok != 0U)) ? 1U : 0U;
     }
 
     process_state.smoke_ok =
@@ -1094,10 +1169,17 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.user_processes_created == 1U) &&
          (process_state.user_processes_exited == 1U) &&
          (process_state.user_processes_reaped == 1U) &&
+         (process_state.completed_child_records == 1U) &&
+         (process_state.completed_child_waits == 1U) &&
          (process_state.reap_failures == 0U) &&
          (process_state.last_exited_user_pid == user_pid) &&
          (process_state.last_reaped_pid == user_pid) &&
+         (process_state.last_completed_parent_pid == first_pid) &&
+         (process_state.last_completed_child_pid == user_pid) &&
+         (process_state.last_wait_parent_pid == first_pid) &&
+         (process_state.last_wait_child_pid == user_pid) &&
          (user_reap_ok != 0U) &&
+         (wait_ok != 0U) &&
          (process_state.user_image_bytes == 16U) &&
          (process_state.user_image_copied != 0U) &&
          (process_state.user_process_ready != 0U) &&
@@ -1135,6 +1217,9 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process user exited: ", process_state.user_processes_exited);
     x86_64_serial_write_u32("Process user reaped: ", process_state.user_processes_reaped);
     x86_64_serial_write_u32("Process reap failures: ", process_state.reap_failures);
+    x86_64_serial_write_u32("Process child records: ", process_state.completed_child_records);
+    x86_64_serial_write_u32("Process child waits: ", process_state.completed_child_waits);
+    x86_64_serial_write_u32("Process wait misses: ", process_state.wait_misses);
     x86_64_serial_write_u32("Process user image bytes: ", process_state.user_image_bytes);
     x86_64_serial_write_u32("Process user image copied: ", process_state.user_image_copied);
     x86_64_serial_write_u32("Process user ready: ", process_state.user_process_ready);
@@ -1143,6 +1228,12 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process last user pid: ", process_state.last_user_pid);
     x86_64_serial_write_u32("Process last exited user pid: ", process_state.last_exited_user_pid);
     x86_64_serial_write_u32("Process last reaped pid: ", process_state.last_reaped_pid);
+    x86_64_serial_write_u32("Process last completed parent pid: ", process_state.last_completed_parent_pid);
+    x86_64_serial_write_u32("Process last completed child pid: ", process_state.last_completed_child_pid);
+    x86_64_serial_write_u32("Process last completed exit code: ", process_state.last_completed_exit_code);
+    x86_64_serial_write_u32("Process last wait parent pid: ", process_state.last_wait_parent_pid);
+    x86_64_serial_write_u32("Process last wait child pid: ", process_state.last_wait_child_pid);
+    x86_64_serial_write_u32("Process last wait exit code: ", process_state.last_wait_exit_code);
     x86_64_serial_write_u32("Process last scheduled user pid: ", process_state.last_scheduled_user_pid);
     x86_64_serial_write_u32("Process last run pid: ", process_state.last_run_pid);
     x86_64_serial_write_hex64("Process first stack base: 0x", process_state.first_stack_base);

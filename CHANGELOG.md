@@ -1,5 +1,24 @@
 # Liam_OS Changelog
 
+## Core 0.8.62-dev
+
+### Added
+
+- Added an x86_64 `wait` syscall that lets the shell consume a completed child PID and exit code.
+- Added an x86_64 shell `wait` command that reports the last child completion or `wait: no child`.
+- Added process diagnostics for recorded child completions, wait calls, wait misses, and last wait status.
+- Added syscall dispatcher smoke checks for empty wait and invalid wait pointer handling.
+
+### Changed
+
+- Recorded child completion status before user process reaping so exit state survives long enough for the parent shell to observe it.
+- Updated x86_64 shell help text and README command examples to include `wait`.
+- Updated Liam_OS version to `0.8.62-dev`.
+
+### Notes
+
+- This is the first explicit parent-child wait contract. The current implementation keeps one pending child result per parent, which matches the current synchronous `exec` path. A later scheduler update can replace it with a per-parent queue and blocking wait.
+
 ## Core 0.8.61-dev
 
 ### Added
@@ -15,7 +34,7 @@
 
 ### Notes
 
-- The `ps` output is a read-only kernel snapshot. It does not expose mutable process handles, scheduling controls, or wait semantics yet.
+- The `ps` output is a read-only kernel snapshot. It does not expose mutable process handles or scheduling controls.
 - This builds on the process reaping step by making process lifecycle visible from inside the running x86_64 shell.
 
 ## Core 0.8.58-dev

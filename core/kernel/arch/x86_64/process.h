@@ -105,6 +105,9 @@ struct x86_64_process_smoke_state {
     u32 user_processes_exited;
     u32 user_processes_reaped;
     u32 reap_failures;
+    u32 completed_child_records;
+    u32 completed_child_waits;
+    u32 wait_misses;
     u32 user_image_bytes;
     u32 user_image_copied;
     u32 user_process_ready;
@@ -113,6 +116,12 @@ struct x86_64_process_smoke_state {
     u32 last_user_pid;
     u32 last_exited_user_pid;
     u32 last_reaped_pid;
+    u32 last_completed_parent_pid;
+    u32 last_completed_child_pid;
+    u32 last_completed_exit_code;
+    u32 last_wait_parent_pid;
+    u32 last_wait_child_pid;
+    u32 last_wait_exit_code;
     u32 last_scheduled_user_pid;
     u32 last_run_pid;
     u32 worker_a_count;
@@ -160,6 +169,8 @@ u32 x86_64_process_create_user_image(const char *path,
 u32 x86_64_process_mark_user_exited(u32 pid, u32 exit_code);
 u32 x86_64_process_reap_user(u32 pid);
 u32 x86_64_process_reap_exited_user_processes(void);
+u32 x86_64_process_record_child_exit(u32 parent_pid, u32 child_pid, u32 exit_code);
+u32 x86_64_process_wait_child(u32 parent_pid, u32 *child_pid_out, u32 *exit_code_out);
 u64 x86_64_process_snapshot(char *buffer, u64 size);
 u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state);
 u32 x86_64_process_run_next_ready(void);

@@ -51,7 +51,7 @@ static const char x86_64_vfs_file_version[] =
 
 static const char x86_64_vfs_file_help[] =
     "Available commands:\n"
-    "help, about, version, pid, ps, echo, ls, cat, stat, exec, clear, exit\n"
+    "help, about, version, pid, ps, wait, echo, ls, cat, stat, exec, clear, exit\n"
     "Executable files:\n"
     "/bin/hello\n"
     "/bin/sysinfo\n";

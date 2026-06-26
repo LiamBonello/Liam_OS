@@ -11,6 +11,7 @@ bits 64
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
 %define LIAM_SYSCALL_PS 11
+%define LIAM_SYSCALL_WAIT 12
 %define LIAM_RET_ENOENT 0xfffffffffffffffe
 
 %define LIAM_STDIN 0
@@ -265,11 +266,23 @@ check_pid:
 
 check_ps:
     cmp r15, 2
-    jne check_clear
+    jne check_wait
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'p'
-    jne check_clear
+    jne check_wait
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 's'
     je command_ps
+
+check_wait:
+    cmp r15, 4
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'w'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'a'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'i'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 't'
+    je command_wait
 
 check_clear:
     cmp r15, 5
@@ -421,6 +434,51 @@ ps_failed:
     lea rsi, [rel ps_error_text]
     mov edx, ps_error_text_len
     syscall
+    jmp command_done
+
+command_wait:
+    mov eax, LIAM_SYSCALL_WAIT
+    lea rdi, [rsp + LIAM_STAT_SIZE_OFFSET]
+    lea rsi, [rsp + LIAM_STAT_SIZE_OFFSET + 4]
+    syscall
+    test rax, rax
+    jz wait_success
+    cmp rax, LIAM_RET_ENOENT
+    je wait_no_child
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel wait_error_text]
+    mov edx, wait_error_text_len
+    syscall
+    jmp command_done
+
+wait_no_child:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel wait_no_child_text]
+    mov edx, wait_no_child_text_len
+    syscall
+    jmp command_done
+
+wait_success:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel wait_pid_text]
+    mov edx, wait_pid_text_len
+    syscall
+
+    mov eax, [rsp + LIAM_STAT_SIZE_OFFSET]
+    call write_rax_decimal_newline
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel wait_exit_text]
+    mov edx, wait_exit_text_len
+    syscall
+
+    mov eax, [rsp + LIAM_STAT_SIZE_OFFSET + 4]
+    call write_rax_decimal_newline
     jmp command_done
 
 command_clear:
@@ -783,6 +841,18 @@ stat_error_text_len equ $ - stat_error_text
 ps_error_text:
     db "ps: unavailable", 10
 ps_error_text_len equ $ - ps_error_text
+wait_pid_text:
+    db "wait: pid "
+wait_pid_text_len equ $ - wait_pid_text
+wait_exit_text:
+    db "wait: exit "
+wait_exit_text_len equ $ - wait_exit_text
+wait_no_child_text:
+    db "wait: no child", 10
+wait_no_child_text_len equ $ - wait_no_child_text
+wait_error_text:
+    db "wait: failed", 10
+wait_error_text_len equ $ - wait_error_text
 exec_error_text:
     db "exec: not implemented", 10
 exec_error_text_len equ $ - exec_error_text
