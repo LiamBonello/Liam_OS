@@ -16,7 +16,8 @@
 #define X86_64_SYSCALL_SERVICE_EXEC 8U
 #define X86_64_SYSCALL_SERVICE_GETPID 9U
 #define X86_64_SYSCALL_SERVICE_YIELD 10U
-#define X86_64_SYSCALL_SERVICE_COUNT 10U
+#define X86_64_SYSCALL_SERVICE_PS 11U
+#define X86_64_SYSCALL_SERVICE_COUNT 11U
 #define X86_64_SYSCALL_SERVICE_COUNT_OK 1U
 #define X86_64_MSR_IA32_EFER 0xC0000080ULL
 #define X86_64_MSR_IA32_STAR 0xC0000081ULL
@@ -59,6 +60,7 @@ struct x86_64_syscall_abi_state {
     u32 service_exec_planned;
     u32 service_getpid_planned;
     u32 service_yield_planned;
+    u32 service_ps_planned;
     u32 syscall_abi_ok;
     u32 syscall_entry_ready;
     u64 entry_lstar_target;
@@ -103,6 +105,7 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
     state->service_exec_planned = (X86_64_SYSCALL_SERVICE_EXEC == 8U) ? 1U : 0U;
     state->service_getpid_planned = (X86_64_SYSCALL_SERVICE_GETPID == 9U) ? 1U : 0U;
     state->service_yield_planned = (X86_64_SYSCALL_SERVICE_YIELD == 10U) ? 1U : 0U;
+    state->service_ps_planned = (X86_64_SYSCALL_SERVICE_PS == 11U) ? 1U : 0U;
     state->planned_star_value = X86_64_SYSCALL_STAR_VALUE;
     state->planned_fmask_value = X86_64_SYSCALL_FMASK_VALUE;
     state->ia32_efer_msr = X86_64_MSR_IA32_EFER;
@@ -141,7 +144,8 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
                              (state->service_get_arg_planned != 0U) &&
                              (state->service_exec_planned != 0U) &&
                              (state->service_getpid_planned != 0U) &&
-                             (state->service_yield_planned != 0U)) ? 1U : 0U;
+                             (state->service_yield_planned != 0U) &&
+                             (state->service_ps_planned != 0U)) ? 1U : 0U;
     state->syscall_entry_ready = ((state->syscall_abi_ok != 0U) &&
                                   (state->entry_stub_installed != 0U)) ? 1U : 0U;
 }
@@ -173,6 +177,7 @@ static inline void x86_64_syscall_abi_report(const struct x86_64_syscall_abi_sta
     x86_64_serial_write_u32("Syscall exec planned: ", state->service_exec_planned);
     x86_64_serial_write_u32("Syscall getpid planned: ", state->service_getpid_planned);
     x86_64_serial_write_u32("Syscall yield planned: ", state->service_yield_planned);
+    x86_64_serial_write_u32("Syscall ps planned: ", state->service_ps_planned);
     x86_64_serial_write_u32("Syscall MSR programming deferred: ", state->msr_programming_deferred);
     x86_64_serial_write_u32("Syscall MSR programming required: ", state->msr_programming_required);
     x86_64_serial_write_u32("Syscall user entry deferred: ", state->user_entry_deferred);

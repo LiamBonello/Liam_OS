@@ -91,6 +91,7 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
     case X86_64_SYSCALL_SERVICE_OPEN:
     case X86_64_SYSCALL_SERVICE_CLOSE:
     case X86_64_SYSCALL_SERVICE_STAT:
+    case X86_64_SYSCALL_SERVICE_PS:
         break;
 
     case X86_64_SYSCALL_SERVICE_READ:

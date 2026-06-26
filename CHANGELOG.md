@@ -1,5 +1,23 @@
 # Liam_OS Changelog
 
+## Core 0.8.61-dev
+
+### Added
+
+- Added an x86_64 `ps` syscall that safely formats the kernel process table into a user-provided buffer.
+- Added an x86_64 shell `ps` command that reports PID, state, mode, name/path, and process lifecycle counters.
+- Added syscall diagnostics for the new process snapshot service and its user-pointer fault path.
+
+### Changed
+
+- Updated x86_64 shell help text and README command examples to include `ps`.
+- Updated Liam_OS version to `0.8.61-dev`.
+
+### Notes
+
+- The `ps` output is a read-only kernel snapshot. It does not expose mutable process handles, scheduling controls, or wait semantics yet.
+- This builds on the process reaping step by making process lifecycle visible from inside the running x86_64 shell.
+
 ## Core 0.8.58-dev
 
 ### Added

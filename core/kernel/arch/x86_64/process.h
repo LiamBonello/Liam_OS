@@ -160,6 +160,7 @@ u32 x86_64_process_create_user_image(const char *path,
 u32 x86_64_process_mark_user_exited(u32 pid, u32 exit_code);
 u32 x86_64_process_reap_user(u32 pid);
 u32 x86_64_process_reap_exited_user_processes(void);
+u64 x86_64_process_snapshot(char *buffer, u64 size);
 u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state);
 u32 x86_64_process_run_next_ready(void);
 u32 x86_64_process_run_all_ready(u32 max_runs);

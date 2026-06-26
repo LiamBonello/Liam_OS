@@ -10,6 +10,7 @@ bits 64
 %define LIAM_SYSCALL_EXEC 8
 %define LIAM_SYSCALL_GETPID 9
 %define LIAM_SYSCALL_YIELD 10
+%define LIAM_SYSCALL_PS 11
 %define LIAM_RET_ENOENT 0xfffffffffffffffe
 
 %define LIAM_STDIN 0
@@ -19,12 +20,14 @@ bits 64
 %define LIAM_READ_BUFFER_LEN 64
 %define LIAM_LINE_BUFFER_LEN 80
 %define LIAM_DEC_BUFFER_LEN 24
+%define LIAM_PS_BUFFER_LEN 512
 %define LIAM_MODE_BUFFER_OFFSET 0
 %define LIAM_READ_BUFFER_OFFSET LIAM_MODE_BUFFER_LEN
 %define LIAM_LINE_BUFFER_OFFSET (LIAM_MODE_BUFFER_LEN + LIAM_READ_BUFFER_LEN)
 %define LIAM_STAT_SIZE_OFFSET (LIAM_MODE_BUFFER_LEN + LIAM_READ_BUFFER_LEN + LIAM_LINE_BUFFER_LEN)
 %define LIAM_DEC_BUFFER_OFFSET (LIAM_STAT_SIZE_OFFSET + 8)
-%define LIAM_STACK_BYTES 320
+%define LIAM_PS_BUFFER_OFFSET (LIAM_DEC_BUFFER_OFFSET + LIAM_DEC_BUFFER_LEN)
+%define LIAM_STACK_BYTES 832
 
 section .text
 global _start
@@ -252,13 +255,21 @@ check_exit:
 
 check_pid:
     cmp r15, 3
+    jne check_ps
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'p'
+    jne check_ps
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'i'
+    jne check_ps
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'd'
+    je command_pid
+
+check_ps:
+    cmp r15, 2
     jne check_clear
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'p'
     jne check_clear
-    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'i'
-    jne check_clear
-    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'd'
-    je command_pid
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 's'
+    je command_ps
 
 check_clear:
     cmp r15, 5
@@ -386,6 +397,30 @@ command_pid:
     mov eax, LIAM_SYSCALL_GETPID
     syscall
     call write_rax_decimal_newline
+    jmp command_done
+
+command_ps:
+    mov eax, LIAM_SYSCALL_PS
+    lea rdi, [rsp + LIAM_PS_BUFFER_OFFSET]
+    mov esi, LIAM_PS_BUFFER_LEN
+    syscall
+    test rax, rax
+    jz ps_failed
+    js ps_failed
+
+    mov rdx, rax
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_PS_BUFFER_OFFSET]
+    syscall
+    jmp command_done_fresh
+
+ps_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel ps_error_text]
+    mov edx, ps_error_text_len
+    syscall
     jmp command_done
 
 command_clear:
@@ -745,6 +780,9 @@ stat_size_text_len equ $ - stat_size_text
 stat_error_text:
     db "stat: not found", 10
 stat_error_text_len equ $ - stat_error_text
+ps_error_text:
+    db "ps: unavailable", 10
+ps_error_text_len equ $ - ps_error_text
 exec_error_text:
     db "exec: not implemented", 10
 exec_error_text_len equ $ - exec_error_text

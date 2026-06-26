@@ -58,6 +58,8 @@ struct x86_64_syscall_dispatch_state {
     u32 get_arg_ok;
     u32 getpid_ok;
     u32 yield_ok;
+    u32 ps_ok;
+    u32 ps_fault_ok;
     u32 exec_fault_ok;
     u32 exec_path_found;
     u32 exec_type_ok;
@@ -303,6 +305,8 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->get_arg_ok = 0U;
     state->getpid_ok = 0U;
     state->yield_ok = 0U;
+    state->ps_ok = 0U;
+    state->ps_fault_ok = 0U;
     state->exec_fault_ok = 0U;
     state->exec_path_found = 0U;
     state->exec_type_ok = 0U;
@@ -487,6 +491,15 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->last_result = X86_64_SYSCALL_RET_OK;
         return state->last_result;
 
+    case X86_64_SYSCALL_SERVICE_PS:
+        if (x86_64_syscall_user_range_ok(arg0, arg1) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        state->last_result = x86_64_process_snapshot((char *)arg0, arg1);
+        state->ps_ok = (state->last_result != 0ULL) ? 1U : 0U;
+        return state->last_result;
+
     default:
         state->last_result = X86_64_SYSCALL_RET_ENOSYS;
         return state->last_result;
@@ -571,6 +584,11 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
     state->yield_ok = ((yield_result == X86_64_SYSCALL_RET_OK) &&
                        (state->yield_count == 1U)) ? 1U : 0U;
 
+    u64 ps_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_PS,
+                                           state->sample_kernel_pointer, 32ULL, 0ULL,
+                                           0ULL, 0ULL, 0ULL);
+    state->ps_fault_ok = (ps_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
+
     u64 exec_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_EXEC,
                                              state->sample_kernel_pointer, 0ULL, 0ULL,
                                              0ULL, 0ULL, 0ULL);
@@ -598,10 +616,11 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
          (state->get_arg_ok != 0U) &&
          (state->getpid_ok != 0U) &&
          (state->yield_ok != 0U) &&
+         (state->ps_fault_ok != 0U) &&
          (state->exec_fault_ok != 0U) &&
          (state->unknown_rejected != 0U) &&
          (state->exit_ok != 0U) &&
-         (state->dispatch_calls == 10U)) ? 1U : 0U;
+         (state->dispatch_calls == 11U)) ? 1U : 0U;
 }
 
 static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_dispatch_state *state)
@@ -627,6 +646,8 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall get_arg dispatch ok: ", state->get_arg_ok);
     x86_64_serial_write_u32("Syscall getpid dispatch ok: ", state->getpid_ok);
     x86_64_serial_write_u32("Syscall yield dispatch ok: ", state->yield_ok);
+    x86_64_serial_write_u32("Syscall ps dispatch ok: ", state->ps_ok);
+    x86_64_serial_write_u32("Syscall ps fault ok: ", state->ps_fault_ok);
     x86_64_serial_write_u32("Syscall exec fault ok: ", state->exec_fault_ok);
     x86_64_serial_write_u32("Syscall exec path found: ", state->exec_path_found);
     x86_64_serial_write_u32("Syscall exec type ok: ", state->exec_type_ok);

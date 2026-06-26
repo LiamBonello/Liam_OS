@@ -53,6 +53,7 @@ help
 about
 version
 pid
+ps
 echo <text>
 ls <path>
 cat <path>
@@ -62,7 +63,7 @@ clear
 exit
 ```
 
-`help`, `about`, and `version` are read through the VFS. `pid` and `/bin/sysinfo` report the live `getpid` syscall result.
+`help`, `about`, and `version` are read through the VFS. `pid` and `/bin/sysinfo` report the live `getpid` syscall result. `ps` reports a kernel-owned process snapshot.
 
 ## Manual validation
 
@@ -84,6 +85,7 @@ help
 about
 version
 pid
+ps
 echo hello from x86_64
 ls /
 cat /usr/share/help.txt

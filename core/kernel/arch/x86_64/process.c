@@ -241,6 +241,78 @@ static void copy_image_path(char *dest, const char *src)
     copy_limited(dest, X86_64_PROCESS_IMAGE_PATH_LEN, src);
 }
 
+static u64 append_char(char *buffer, u64 size, u64 offset, char value)
+{
+    if (offset + 1ULL < size) {
+        buffer[offset] = value;
+    }
+
+    return offset + 1ULL;
+}
+
+static u64 append_string(char *buffer, u64 size, u64 offset, const char *value)
+{
+    if (value == (const char *)0) {
+        return offset;
+    }
+
+    for (u64 i = 0ULL; value[i] != '\0'; ++i) {
+        offset = append_char(buffer, size, offset, value[i]);
+    }
+
+    return offset;
+}
+
+static u64 append_u32_decimal(char *buffer, u64 size, u64 offset, u32 value)
+{
+    char digits[10];
+    u32 count = 0U;
+
+    if (value == 0U) {
+        return append_char(buffer, size, offset, '0');
+    }
+
+    while (value != 0U && count < (u32)sizeof(digits)) {
+        digits[count++] = (char)('0' + (value % 10U));
+        value /= 10U;
+    }
+
+    while (count > 0U) {
+        --count;
+        offset = append_char(buffer, size, offset, digits[count]);
+    }
+
+    return offset;
+}
+
+static const char *process_state_name(u32 state)
+{
+    switch (state) {
+    case X86_64_PROCESS_READY:
+        return "ready";
+    case X86_64_PROCESS_RUNNING:
+        return "running";
+    case X86_64_PROCESS_EXITED:
+        return "exited";
+    case X86_64_PROCESS_FAILED:
+        return "failed";
+    default:
+        return "unused";
+    }
+}
+
+static const char *process_mode_name(u32 mode)
+{
+    switch (mode) {
+    case X86_64_PROCESS_MODE_KERNEL:
+        return "kernel";
+    case X86_64_PROCESS_MODE_USER:
+        return "user";
+    default:
+        return "none";
+    }
+}
+
 static struct x86_64_process *find_unused_process(void)
 {
     for (u32 i = 0; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
@@ -731,6 +803,54 @@ u32 x86_64_process_reap_exited_user_processes(void)
     }
 
     return reaped;
+}
+
+u64 x86_64_process_snapshot(char *buffer, u64 size)
+{
+    if (buffer == (char *)0 || size == 0ULL) {
+        return 0ULL;
+    }
+
+    u64 offset = 0ULL;
+    offset = append_string(buffer, size, offset, "PID STATE MODE NAME\n");
+
+    for (u32 i = 0U; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
+        const struct x86_64_process *process = &process_table[i];
+        if (process->state == X86_64_PROCESS_UNUSED) {
+            continue;
+        }
+
+        offset = append_u32_decimal(buffer, size, offset, process->pid);
+        offset = append_char(buffer, size, offset, ' ');
+        offset = append_string(buffer, size, offset, process_state_name(process->state));
+        offset = append_char(buffer, size, offset, ' ');
+        offset = append_string(buffer, size, offset, process_mode_name(process->mode));
+        offset = append_char(buffer, size, offset, ' ');
+        offset = append_string(buffer, size, offset, process->name);
+        if (process->image_path[0] != '\0') {
+            offset = append_char(buffer, size, offset, ' ');
+            offset = append_string(buffer, size, offset, process->image_path);
+        }
+        offset = append_char(buffer, size, offset, '\n');
+    }
+
+    offset = append_string(buffer, size, offset, "created ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.created_processes);
+    offset = append_string(buffer, size, offset, " user-created ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.user_processes_created);
+    offset = append_string(buffer, size, offset, " user-exited ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.user_processes_exited);
+    offset = append_string(buffer, size, offset, " user-reaped ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.user_processes_reaped);
+    offset = append_char(buffer, size, offset, '\n');
+
+    if (offset < size) {
+        buffer[offset] = '\0';
+    } else {
+        buffer[size - 1ULL] = '\0';
+    }
+
+    return (offset < size) ? offset : (size - 1ULL);
 }
 
 u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state)
