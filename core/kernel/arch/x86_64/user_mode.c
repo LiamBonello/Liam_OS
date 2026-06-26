@@ -180,6 +180,12 @@ void x86_64_user_mode_start_init(struct x86_64_user_mode_state *state,
         state->child_return_count += 1U;
         state->last_child_pid = returned_pid;
         state->last_child_exit_code = state->exit_code;
+        u32 marked_exited = x86_64_process_mark_user_exited(returned_pid, state->exit_code);
+        u32 reaped = x86_64_process_reap_user(returned_pid);
+        state->last_child_reap_ok = ((marked_exited != 0U) && (reaped != 0U)) ? 1U : 0U;
+        if (state->last_child_reap_ok != 0U) {
+            state->child_reap_count += 1U;
+        }
         state->current_pid = current_pid;
         initialize_live_dispatcher(current_pid);
     }
@@ -207,6 +213,8 @@ void x86_64_user_mode_report(const struct x86_64_user_mode_state *state)
     x86_64_serial_write_u32("User mode current pid: ", state->current_pid);
     x86_64_serial_write_u32("User mode exit code: ", state->exit_code);
     x86_64_serial_write_u32("User mode child returns: ", state->child_return_count);
+    x86_64_serial_write_u32("User mode child reaps: ", state->child_reap_count);
+    x86_64_serial_write_u32("User mode last child reap ok: ", state->last_child_reap_ok);
     x86_64_serial_write_u32("User mode last child pid: ", state->last_child_pid);
     x86_64_serial_write_u32("User mode last child exit code: ", state->last_child_exit_code);
     x86_64_serial_write_hex64("User mode entry RIP: 0x", state->entry_rip);

@@ -35,6 +35,7 @@ struct x86_64_process {
     char image_path[X86_64_PROCESS_IMAGE_PATH_LEN];
     x86_64_process_entry_t entry;
     void *arg;
+    u64 kernel_stack_page;
     u64 kernel_stack_base;
     u64 kernel_stack_top;
     u64 address_space_id;
@@ -101,12 +102,17 @@ struct x86_64_process_smoke_state {
     u32 user_page_tables_ready;
     u32 user_page_table_entries_ok;
     u32 user_processes_created;
+    u32 user_processes_exited;
+    u32 user_processes_reaped;
+    u32 reap_failures;
     u32 user_image_bytes;
     u32 user_image_copied;
     u32 user_process_ready;
     u32 user_scheduler_ready;
     u32 last_created_pid;
     u32 last_user_pid;
+    u32 last_exited_user_pid;
+    u32 last_reaped_pid;
     u32 last_scheduled_user_pid;
     u32 last_run_pid;
     u32 worker_a_count;
@@ -151,6 +157,9 @@ u32 x86_64_process_create_user_image(const char *path,
                                       const u8 *loaded_code_page,
                                       u64 code_bytes,
                                       u64 entry);
+u32 x86_64_process_mark_user_exited(u32 pid, u32 exit_code);
+u32 x86_64_process_reap_user(u32 pid);
+u32 x86_64_process_reap_exited_user_processes(void);
 u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state);
 u32 x86_64_process_run_next_ready(void);
 u32 x86_64_process_run_all_ready(u32 max_runs);

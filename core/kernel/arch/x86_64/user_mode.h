@@ -30,6 +30,8 @@ struct x86_64_user_mode_state {
     u32 current_pid;
     u32 exit_code;
     u32 child_return_count;
+    u32 child_reap_count;
+    u32 last_child_reap_ok;
     u32 last_child_pid;
     u32 last_child_exit_code;
     u64 entry_rip;

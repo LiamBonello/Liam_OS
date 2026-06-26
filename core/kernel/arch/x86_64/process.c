@@ -2,7 +2,6 @@
 
 #include "console.h"
 #include "gdt.h"
-#include "heap.h"
 #include "paging_plan.h"
 #include "pmm.h"
 #include "syscall_dispatch.h"
@@ -349,6 +348,48 @@ static void release_address_space(struct x86_64_process *process)
     process->kernel_mappings_ready = 0U;
 }
 
+static u32 allocate_kernel_stack(struct x86_64_process *process)
+{
+    if (process == (struct x86_64_process *)0) {
+        return 0U;
+    }
+
+    u64 page = x86_64_pmm_alloc_page();
+    if (page == X86_64_PMM_INVALID_PAGE) {
+        return 0U;
+    }
+
+    clear_page(page);
+    process->kernel_stack_page = page;
+    process->kernel_stack_base = X86_64_DIRECT_MAP_BASE + page;
+    process->kernel_stack_top = process->kernel_stack_base + X86_64_PROCESS_KERNEL_STACK_BYTES;
+
+    return ((is_aligned_u64(process->kernel_stack_page, X86_64_PROCESS_KERNEL_STACK_BYTES) != 0U) &&
+            (is_aligned_u64(process->kernel_stack_base, X86_64_PROCESS_KERNEL_STACK_BYTES) != 0U) &&
+            (is_aligned_u64(process->kernel_stack_top, 16ULL) != 0U)) ? 1U : 0U;
+}
+
+static void release_kernel_stack(struct x86_64_process *process)
+{
+    if (process == (struct x86_64_process *)0) {
+        return;
+    }
+
+    if (process->kernel_stack_page != 0ULL) {
+        (void)x86_64_pmm_free_page(process->kernel_stack_page);
+    }
+
+    process->kernel_stack_page = 0ULL;
+    process->kernel_stack_base = 0ULL;
+    process->kernel_stack_top = 0ULL;
+}
+
+static void release_process_resources(struct x86_64_process *process)
+{
+    release_address_space(process);
+    release_kernel_stack(process);
+}
+
 static u32 validate_user_page_tables(const struct x86_64_process *process)
 {
     const u64 *pml4 = (const u64 *)process->cr3;
@@ -545,9 +586,8 @@ u32 x86_64_process_create(const char *name,
         return X86_64_PROCESS_INVALID_PID;
     }
 
-    void *stack = x86_64_heap_alloc((usize)X86_64_PROCESS_KERNEL_STACK_BYTES,
-                                    (usize)X86_64_PROCESS_KERNEL_STACK_BYTES);
-    if (stack == (void *)0) {
+    if (allocate_kernel_stack(process) == 0U) {
+        release_kernel_stack(process);
         release_address_space(process);
         return X86_64_PROCESS_INVALID_PID;
     }
@@ -560,8 +600,6 @@ u32 x86_64_process_create(const char *name,
     copy_image_path(process->image_path, "");
     process->entry = entry;
     process->arg = arg;
-    process->kernel_stack_base = (u64)stack;
-    process->kernel_stack_top = process->kernel_stack_base + X86_64_PROCESS_KERNEL_STACK_BYTES;
     process->user_entry = 0ULL;
     process->image_bytes = 0U;
     process->exit_code = 0U;
@@ -599,9 +637,8 @@ u32 x86_64_process_create_user_image(const char *path,
         return X86_64_PROCESS_INVALID_PID;
     }
 
-    void *stack = x86_64_heap_alloc((usize)X86_64_PROCESS_KERNEL_STACK_BYTES,
-                                    (usize)X86_64_PROCESS_KERNEL_STACK_BYTES);
-    if (stack == (void *)0) {
+    if (allocate_kernel_stack(process) == 0U) {
+        release_kernel_stack(process);
         release_address_space(process);
         return X86_64_PROCESS_INVALID_PID;
     }
@@ -614,8 +651,6 @@ u32 x86_64_process_create_user_image(const char *path,
     copy_image_path(process->image_path, path);
     process->entry = (x86_64_process_entry_t)0;
     process->arg = (void *)0;
-    process->kernel_stack_base = (u64)stack;
-    process->kernel_stack_top = process->kernel_stack_base + X86_64_PROCESS_KERNEL_STACK_BYTES;
     process->user_entry = entry;
     process->image_bytes = (u32)code_bytes;
     process->exit_code = 0U;
@@ -639,6 +674,63 @@ u32 x86_64_process_create_user_image(const char *path,
     process_state.user_page_table_entries_ok = validate_user_page_tables(process);
 
     return process->pid;
+}
+
+u32 x86_64_process_mark_user_exited(u32 pid, u32 exit_code)
+{
+    struct x86_64_process *process = find_process_by_pid(pid);
+    if (process == (struct x86_64_process *)0 ||
+        process->mode != X86_64_PROCESS_MODE_USER ||
+        process->state == X86_64_PROCESS_UNUSED) {
+        return 0U;
+    }
+
+    if (process->state != X86_64_PROCESS_EXITED) {
+        process_state.user_processes_exited += 1U;
+    }
+
+    process->state = X86_64_PROCESS_EXITED;
+    process->exit_code = exit_code;
+    process_state.last_exited_user_pid = pid;
+    refresh_counts();
+
+    return 1U;
+}
+
+u32 x86_64_process_reap_user(u32 pid)
+{
+    struct x86_64_process *process = find_process_by_pid(pid);
+    if (process == (struct x86_64_process *)0 ||
+        process->mode != X86_64_PROCESS_MODE_USER ||
+        (process->state != X86_64_PROCESS_EXITED &&
+         process->state != X86_64_PROCESS_FAILED)) {
+        process_state.reap_failures += 1U;
+        return 0U;
+    }
+
+    release_process_resources(process);
+    clear_bytes(process, sizeof(*process));
+    process_state.user_processes_reaped += 1U;
+    process_state.last_reaped_pid = pid;
+    refresh_counts();
+
+    return 1U;
+}
+
+u32 x86_64_process_reap_exited_user_processes(void)
+{
+    u32 reaped = 0U;
+    for (u32 i = 0; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
+        u32 pid = process_table[i].pid;
+        if (process_table[i].mode == X86_64_PROCESS_MODE_USER &&
+            (process_table[i].state == X86_64_PROCESS_EXITED ||
+             process_table[i].state == X86_64_PROCESS_FAILED) &&
+            x86_64_process_reap_user(pid) != 0U) {
+            reaped += 1U;
+        }
+    }
+
+    return reaped;
 }
 
 u32 x86_64_process_prepare_next_user(struct x86_64_user_schedule_state *state)
@@ -858,6 +950,13 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (is_aligned_u64(process_state.second_cr3, X86_64_USER_PAGE_BYTES) != 0U) &&
          (is_aligned_u64(process_state.last_user_cr3, X86_64_USER_PAGE_BYTES) != 0U)) ? 1U : 0U;
 
+    u32 user_reap_ok = 0U;
+    if (user_pid != X86_64_PROCESS_INVALID_PID) {
+        u32 mark_ok = x86_64_process_mark_user_exited(user_pid, 0U);
+        u32 reap_ok = x86_64_process_reap_user(user_pid);
+        user_reap_ok = ((mark_ok != 0U) && (reap_ok != 0U)) ? 1U : 0U;
+    }
+
     process_state.smoke_ok =
         ((process_state.initialized != 0U) &&
          (first_pid != X86_64_PROCESS_INVALID_PID) &&
@@ -873,6 +972,12 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.stack_execution_ok != 0U) &&
          (process_state.address_space_ok != 0U) &&
          (process_state.user_processes_created == 1U) &&
+         (process_state.user_processes_exited == 1U) &&
+         (process_state.user_processes_reaped == 1U) &&
+         (process_state.reap_failures == 0U) &&
+         (process_state.last_exited_user_pid == user_pid) &&
+         (process_state.last_reaped_pid == user_pid) &&
+         (user_reap_ok != 0U) &&
          (process_state.user_image_bytes == 16U) &&
          (process_state.user_image_copied != 0U) &&
          (process_state.user_process_ready != 0U) &&
@@ -907,12 +1012,17 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process page tables ready: ", process_state.user_page_tables_ready);
     x86_64_serial_write_u32("Process page table entries ok: ", process_state.user_page_table_entries_ok);
     x86_64_serial_write_u32("Process user creates: ", process_state.user_processes_created);
+    x86_64_serial_write_u32("Process user exited: ", process_state.user_processes_exited);
+    x86_64_serial_write_u32("Process user reaped: ", process_state.user_processes_reaped);
+    x86_64_serial_write_u32("Process reap failures: ", process_state.reap_failures);
     x86_64_serial_write_u32("Process user image bytes: ", process_state.user_image_bytes);
     x86_64_serial_write_u32("Process user image copied: ", process_state.user_image_copied);
     x86_64_serial_write_u32("Process user ready: ", process_state.user_process_ready);
     x86_64_serial_write_u32("Process user scheduler ready: ", process_state.user_scheduler_ready);
     x86_64_serial_write_u32("Process last created pid: ", process_state.last_created_pid);
     x86_64_serial_write_u32("Process last user pid: ", process_state.last_user_pid);
+    x86_64_serial_write_u32("Process last exited user pid: ", process_state.last_exited_user_pid);
+    x86_64_serial_write_u32("Process last reaped pid: ", process_state.last_reaped_pid);
     x86_64_serial_write_u32("Process last scheduled user pid: ", process_state.last_scheduled_user_pid);
     x86_64_serial_write_u32("Process last run pid: ", process_state.last_run_pid);
     x86_64_serial_write_hex64("Process first stack base: 0x", process_state.first_stack_base);
