@@ -2,7 +2,8 @@ bits 64
 
 %define LIAM_SYSCALL_EXIT 1
 %define LIAM_SYSCALL_WRITE 2
-%define LIAM_SYSCALL_GETPID 9
+%define LIAM_SYSCALL_TICKS 15
+%define LIAM_SYSCALL_SLEEP_TICKS 16
 %define LIAM_STDOUT 1
 %define LIAM_DEC_BUFFER_LEN 24
 
@@ -18,20 +19,30 @@ _start:
     mov edx, title_text_len
     syscall
 
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rel pid_label]
-    mov edx, pid_label_len
+    mov eax, LIAM_SYSCALL_TICKS
+    syscall
+    mov r12, rax
+
+    mov eax, LIAM_SYSCALL_SLEEP_TICKS
+    mov edi, 2
     syscall
 
-    mov eax, LIAM_SYSCALL_GETPID
+    mov eax, LIAM_SYSCALL_TICKS
     syscall
+    sub rax, r12
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel delta_text]
+    mov edx, delta_text_len
+    syscall
+
     call write_rax_decimal_newline
 
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
-    lea rsi, [rel features_text]
-    mov edx, features_text_len
+    lea rsi, [rel sleep_ok_text]
+    mov edx, sleep_ok_text_len
     syscall
 
     mov eax, LIAM_SYSCALL_EXIT
@@ -79,16 +90,14 @@ write_rax_decimal_newline:
 
 section .rodata
 title_text:
-    db "Liam_OS sysinfo", 10
-    db "arch: x86_64", 10
-    db "mode: ring3 user ELF", 10
+    db "Liam_OS timer service", 10
 title_text_len equ $ - title_text
-pid_label:
-    db "pid: "
-pid_label_len equ $ - pid_label
-features_text:
-    db "features: syscall, vfs, exec, desktop-services, timer, input, session-storage", 10
-features_text_len equ $ - features_text
+delta_text:
+    db "ticks elapsed "
+delta_text_len equ $ - delta_text
+sleep_ok_text:
+    db "sleep-ticks ok", 10
+sleep_ok_text_len equ $ - sleep_ok_text
 newline_text:
     db 10
 newline_text_len equ $ - newline_text

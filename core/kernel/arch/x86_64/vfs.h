@@ -16,10 +16,16 @@
 #define X86_64_VFS_NODE_FILE 1U
 #define X86_64_VFS_NODE_DIRECTORY 2U
 #define X86_64_VFS_NODE_EXECUTABLE 3U
+#define X86_64_VFS_OPEN_READ 0ULL
+#define X86_64_VFS_OPEN_WRITE 1ULL
+#define X86_64_VFS_OPEN_CREATE 2ULL
+#define X86_64_VFS_OPEN_TRUNCATE 4ULL
+#define X86_64_VFS_RAM_FILE_BYTES 256ULL
 
 struct x86_64_vfs_state {
     u32 initialized;
     u32 fd_used[X86_64_VFS_MAX_OPEN_FILES];
+    u64 fd_flags[X86_64_VFS_MAX_OPEN_FILES];
     u32 fd_node_index[X86_64_VFS_MAX_OPEN_FILES];
     u64 fd_offset[X86_64_VFS_MAX_OPEN_FILES];
 };
@@ -30,10 +36,12 @@ u32 x86_64_vfs_file_count(void);
 u32 x86_64_vfs_open_count(const struct x86_64_vfs_state *state);
 u64 x86_64_vfs_open(struct x86_64_vfs_state *state, const char *path, u64 flags);
 u64 x86_64_vfs_read(struct x86_64_vfs_state *state, u64 fd, char *buffer, u64 size);
+u64 x86_64_vfs_write(struct x86_64_vfs_state *state, u64 fd, const char *buffer, u64 size);
 u64 x86_64_vfs_close(struct x86_64_vfs_state *state, u64 fd);
 u64 x86_64_vfs_stat(const struct x86_64_vfs_state *state, const char *path, u64 *size_out);
 u64 x86_64_vfs_type(const struct x86_64_vfs_state *state, const char *path, u64 *type_out);
 u64 x86_64_vfs_resolve(const struct x86_64_vfs_state *state, const char *path,
                        const u8 **data_out, u64 *size_out, u64 *type_out);
+u32 x86_64_vfs_session_storage_ready(void);
 
 #endif

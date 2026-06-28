@@ -4,6 +4,12 @@ extern const u8 x86_64_user_hello_image_start[];
 extern const u8 x86_64_user_hello_image_end[];
 extern const u8 x86_64_user_sysinfo_image_start[];
 extern const u8 x86_64_user_sysinfo_image_end[];
+extern const u8 x86_64_user_inputd_image_start[];
+extern const u8 x86_64_user_inputd_image_end[];
+extern const u8 x86_64_user_storaged_image_start[];
+extern const u8 x86_64_user_storaged_image_end[];
+extern const u8 x86_64_user_timed_image_start[];
+extern const u8 x86_64_user_timed_image_end[];
 extern const u8 x86_64_user_windowd_image_start[];
 extern const u8 x86_64_user_windowd_image_end[];
 
@@ -19,13 +25,19 @@ static const char x86_64_vfs_dir_root[] =
     "etc\n"
     "proc\n"
     "sbin\n"
+    "tmp\n"
     "usr\n";
 
 static const char x86_64_vfs_dir_bin[] =
     "hello\n"
+    "inputd\n"
+    "storaged\n"
     "sysinfo\n"
+    "timed\n"
     "windowd\n";
 static const char x86_64_vfs_dir_sbin[] = "";
+static const char x86_64_vfs_dir_tmp[] =
+    "session.txt\n";
 
 static const char x86_64_vfs_dir_etc[] =
     "motd\n"
@@ -50,21 +62,27 @@ static const char x86_64_vfs_file_motd[] =
     "Liam_OS x86_64 read-only VFS mounted.\n";
 
 static const char x86_64_vfs_file_version[] =
-    "Liam_OS Core x86_64 0.8.66-dev\n";
+    "Liam_OS Core x86_64 0.8.67-dev\n";
 
 static const char x86_64_vfs_file_help[] =
     "Available commands:\n"
-    "help, about, version, pid, ps, wait, echo, ls, cat, stat, exec, clear, exit\n"
+    "help, about, version, pid, ps, deskcheck, wait, echo, ls, cat, stat, exec, clear, exit\n"
     "Executable files:\n"
     "/bin/hello\n"
+    "/bin/inputd\n"
+    "/bin/storaged\n"
     "/bin/sysinfo\n"
+    "/bin/timed\n"
     "/bin/windowd\n";
 
 static const char x86_64_vfs_file_files[] =
     "/\n"
     "/bin\n"
     "/bin/hello\n"
+    "/bin/inputd\n"
+    "/bin/storaged\n"
     "/bin/sysinfo\n"
+    "/bin/timed\n"
     "/bin/windowd\n"
     "/etc\n"
     "/etc/motd\n"
@@ -72,6 +90,8 @@ static const char x86_64_vfs_file_files[] =
     "/proc\n"
     "/proc/version\n"
     "/sbin\n"
+    "/tmp\n"
+    "/tmp/session.txt\n"
     "/usr\n"
     "/usr/share\n"
     "/usr/share/files.txt\n"
@@ -83,19 +103,34 @@ static const struct x86_64_vfs_node x86_64_vfs_nodes[] = {
     {"/etc", (const u8 *)x86_64_vfs_dir_etc, sizeof(x86_64_vfs_dir_etc) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/proc", (const u8 *)x86_64_vfs_dir_proc, sizeof(x86_64_vfs_dir_proc) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/sbin", (const u8 *)x86_64_vfs_dir_sbin, sizeof(x86_64_vfs_dir_sbin) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/tmp", (const u8 *)x86_64_vfs_dir_tmp, sizeof(x86_64_vfs_dir_tmp) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/usr", (const u8 *)x86_64_vfs_dir_usr, sizeof(x86_64_vfs_dir_usr) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/usr/share", (const u8 *)x86_64_vfs_dir_usr_share, sizeof(x86_64_vfs_dir_usr_share) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/bin/hello", x86_64_user_hello_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/inputd", x86_64_user_inputd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/storaged", x86_64_user_storaged_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/sysinfo", x86_64_user_sysinfo_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/timed", x86_64_user_timed_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/windowd", x86_64_user_windowd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/etc/motd", (const u8 *)x86_64_vfs_file_motd, sizeof(x86_64_vfs_file_motd) - 1ULL, X86_64_VFS_NODE_FILE},
     {"/etc/os-release", (const u8 *)x86_64_vfs_file_os_release, sizeof(x86_64_vfs_file_os_release) - 1ULL, X86_64_VFS_NODE_FILE},
     {"/proc/version", (const u8 *)x86_64_vfs_file_version, sizeof(x86_64_vfs_file_version) - 1ULL, X86_64_VFS_NODE_FILE},
+    {"/tmp/session.txt", (const u8 *)0, 0ULL, X86_64_VFS_NODE_FILE},
     {"/usr/share/files.txt", (const u8 *)x86_64_vfs_file_files, sizeof(x86_64_vfs_file_files) - 1ULL, X86_64_VFS_NODE_FILE},
     {"/usr/share/help.txt", (const u8 *)x86_64_vfs_file_help, sizeof(x86_64_vfs_file_help) - 1ULL, X86_64_VFS_NODE_FILE},
 };
 
 #define X86_64_VFS_NODE_COUNT ((u32)(sizeof(x86_64_vfs_nodes) / sizeof(x86_64_vfs_nodes[0])))
+
+static u8 x86_64_vfs_session_storage[X86_64_VFS_RAM_FILE_BYTES];
+static u64 x86_64_vfs_session_storage_size;
+
+static u32 x86_64_vfs_is_session_storage_node(const struct x86_64_vfs_node *node)
+{
+    return (node != (const struct x86_64_vfs_node *)0 &&
+            node->data == (const u8 *)0 &&
+            node->type == X86_64_VFS_NODE_FILE) ? 1U : 0U;
+}
 
 static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
 {
@@ -103,15 +138,40 @@ static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
         return (u64)(x86_64_user_hello_image_end - x86_64_user_hello_image_start);
     }
 
+    if (node->data == x86_64_user_inputd_image_start) {
+        return (u64)(x86_64_user_inputd_image_end - x86_64_user_inputd_image_start);
+    }
+
+    if (node->data == x86_64_user_storaged_image_start) {
+        return (u64)(x86_64_user_storaged_image_end - x86_64_user_storaged_image_start);
+    }
+
     if (node->data == x86_64_user_sysinfo_image_start) {
         return (u64)(x86_64_user_sysinfo_image_end - x86_64_user_sysinfo_image_start);
+    }
+
+    if (node->data == x86_64_user_timed_image_start) {
+        return (u64)(x86_64_user_timed_image_end - x86_64_user_timed_image_start);
     }
 
     if (node->data == x86_64_user_windowd_image_start) {
         return (u64)(x86_64_user_windowd_image_end - x86_64_user_windowd_image_start);
     }
 
+    if (x86_64_vfs_is_session_storage_node(node) != 0U) {
+        return x86_64_vfs_session_storage_size;
+    }
+
     return node->size;
+}
+
+static const u8 *x86_64_vfs_node_data(const struct x86_64_vfs_node *node)
+{
+    if (x86_64_vfs_is_session_storage_node(node) != 0U) {
+        return x86_64_vfs_session_storage;
+    }
+
+    return node->data;
 }
 
 static u32 x86_64_vfs_normalize_path(const char *path, char *normalized)
@@ -235,6 +295,7 @@ void x86_64_vfs_init(struct x86_64_vfs_state *state)
     state->initialized = 1U;
     for (u32 i = 0U; i < X86_64_VFS_MAX_OPEN_FILES; ++i) {
         state->fd_used[i] = 0U;
+        state->fd_flags[i] = X86_64_VFS_OPEN_READ;
         state->fd_node_index[i] = X86_64_VFS_NO_NODE;
         state->fd_offset[i] = 0ULL;
     }
@@ -331,6 +392,16 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
+    if (x86_64_vfs_type(&probe, "/bin/inputd", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/bin/storaged", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
     if (x86_64_vfs_type(&probe, "/bin/sysinfo", &type) != X86_64_VFS_RET_OK ||
         type != X86_64_VFS_NODE_EXECUTABLE) {
         return 0U;
@@ -340,12 +411,27 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
+    if (x86_64_vfs_type(&probe, "/bin/timed", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
     if (x86_64_vfs_type(&probe, "/bin/windowd", &type) != X86_64_VFS_RET_OK ||
         type != X86_64_VFS_NODE_EXECUTABLE) {
         return 0U;
     }
 
     if (x86_64_vfs_stat(&probe, "/bin/../bin/windowd", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/tmp/session.txt", &size) != X86_64_VFS_RET_OK ||
+        size > X86_64_VFS_RAM_FILE_BYTES) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/tmp/session.txt", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_FILE) {
         return 0U;
     }
 
@@ -380,7 +466,7 @@ u32 x86_64_vfs_open_count(const struct x86_64_vfs_state *state)
 
 u64 x86_64_vfs_open(struct x86_64_vfs_state *state, const char *path, u64 flags)
 {
-    if (state == (struct x86_64_vfs_state *)0 || path == (const char *)0 || flags != 0ULL) {
+    if (state == (struct x86_64_vfs_state *)0 || path == (const char *)0) {
         return X86_64_VFS_RET_EINVAL;
     }
 
@@ -389,9 +475,25 @@ u64 x86_64_vfs_open(struct x86_64_vfs_state *state, const char *path, u64 flags)
         return X86_64_VFS_RET_ENOENT;
     }
 
+    const struct x86_64_vfs_node *node = &x86_64_vfs_nodes[node_index];
+    u64 supported_flags = X86_64_VFS_OPEN_WRITE |
+                          X86_64_VFS_OPEN_CREATE |
+                          X86_64_VFS_OPEN_TRUNCATE;
+    if ((flags & ~supported_flags) != 0ULL) {
+        return X86_64_VFS_RET_EINVAL;
+    }
+    if (flags != X86_64_VFS_OPEN_READ &&
+        x86_64_vfs_is_session_storage_node(node) == 0U) {
+        return X86_64_VFS_RET_EINVAL;
+    }
+    if ((flags & X86_64_VFS_OPEN_TRUNCATE) != 0ULL) {
+        x86_64_vfs_session_storage_size = 0ULL;
+    }
+
     for (u32 slot = 0U; slot < X86_64_VFS_MAX_OPEN_FILES; ++slot) {
         if (state->fd_used[slot] == 0U) {
             state->fd_used[slot] = 1U;
+            state->fd_flags[slot] = flags;
             state->fd_node_index[slot] = node_index;
             state->fd_offset[slot] = 0ULL;
             return X86_64_VFS_FD_BASE + (u64)slot;
@@ -418,6 +520,7 @@ u64 x86_64_vfs_read(struct x86_64_vfs_state *state, u64 fd, char *buffer, u64 si
     }
 
     const struct x86_64_vfs_node *node = &x86_64_vfs_nodes[node_index];
+    const u8 *node_data = x86_64_vfs_node_data(node);
     u64 node_size = x86_64_vfs_node_size(node);
     u64 offset = state->fd_offset[slot];
     if (offset >= node_size || size == 0ULL) {
@@ -427,10 +530,49 @@ u64 x86_64_vfs_read(struct x86_64_vfs_state *state, u64 fd, char *buffer, u64 si
     u64 remaining = node_size - offset;
     u64 bytes = (size < remaining) ? size : remaining;
     for (u64 i = 0ULL; i < bytes; ++i) {
-        buffer[i] = (char)node->data[offset + i];
+        buffer[i] = (char)node_data[offset + i];
     }
 
     state->fd_offset[slot] = offset + bytes;
+    return bytes;
+}
+
+u64 x86_64_vfs_write(struct x86_64_vfs_state *state, u64 fd, const char *buffer, u64 size)
+{
+    if (state == (struct x86_64_vfs_state *)0 || buffer == (const char *)0) {
+        return X86_64_VFS_RET_EINVAL;
+    }
+
+    u32 slot = x86_64_vfs_fd_slot(fd);
+    if (slot >= X86_64_VFS_MAX_OPEN_FILES || state->fd_used[slot] == 0U) {
+        return X86_64_VFS_RET_EBADF;
+    }
+    if ((state->fd_flags[slot] & X86_64_VFS_OPEN_WRITE) == 0ULL) {
+        return X86_64_VFS_RET_EBADF;
+    }
+
+    u32 node_index = state->fd_node_index[slot];
+    if (node_index >= X86_64_VFS_NODE_COUNT ||
+        x86_64_vfs_is_session_storage_node(&x86_64_vfs_nodes[node_index]) == 0U) {
+        return X86_64_VFS_RET_EBADF;
+    }
+
+    u64 offset = state->fd_offset[slot];
+    if (offset >= X86_64_VFS_RAM_FILE_BYTES || size == 0ULL) {
+        return 0ULL;
+    }
+
+    u64 remaining = X86_64_VFS_RAM_FILE_BYTES - offset;
+    u64 bytes = (size < remaining) ? size : remaining;
+    for (u64 i = 0ULL; i < bytes; ++i) {
+        x86_64_vfs_session_storage[offset + i] = (u8)buffer[i];
+    }
+
+    state->fd_offset[slot] = offset + bytes;
+    if (x86_64_vfs_session_storage_size < state->fd_offset[slot]) {
+        x86_64_vfs_session_storage_size = state->fd_offset[slot];
+    }
+
     return bytes;
 }
 
@@ -446,6 +588,7 @@ u64 x86_64_vfs_close(struct x86_64_vfs_state *state, u64 fd)
     }
 
     state->fd_used[slot] = 0U;
+    state->fd_flags[slot] = X86_64_VFS_OPEN_READ;
     state->fd_node_index[slot] = X86_64_VFS_NO_NODE;
     state->fd_offset[slot] = 0ULL;
     return X86_64_VFS_RET_OK;
@@ -503,8 +646,57 @@ u64 x86_64_vfs_resolve(const struct x86_64_vfs_state *state, const char *path,
     }
 
     const struct x86_64_vfs_node *node = &x86_64_vfs_nodes[node_index];
-    *data_out = node->data;
+    *data_out = x86_64_vfs_node_data(node);
     *size_out = x86_64_vfs_node_size(node);
     *type_out = (u64)node->type;
     return X86_64_VFS_RET_OK;
+}
+
+u32 x86_64_vfs_session_storage_ready(void)
+{
+    struct x86_64_vfs_state probe;
+    char buffer[4];
+    const char value[] = "ram";
+    u8 saved[X86_64_VFS_RAM_FILE_BYTES];
+    u64 saved_size = x86_64_vfs_session_storage_size;
+    u32 ok = 0U;
+
+    for (u64 i = 0ULL; i < X86_64_VFS_RAM_FILE_BYTES; ++i) {
+        saved[i] = x86_64_vfs_session_storage[i];
+    }
+
+    x86_64_vfs_init(&probe);
+    u64 fd = x86_64_vfs_open(&probe, "/tmp/session.txt",
+                             X86_64_VFS_OPEN_WRITE |
+                             X86_64_VFS_OPEN_CREATE |
+                             X86_64_VFS_OPEN_TRUNCATE);
+    if (fd < X86_64_VFS_FD_BASE) {
+        goto restore;
+    }
+    if (x86_64_vfs_write(&probe, fd, value, 3ULL) != 3ULL) {
+        goto restore;
+    }
+    if (x86_64_vfs_close(&probe, fd) != X86_64_VFS_RET_OK) {
+        goto restore;
+    }
+
+    fd = x86_64_vfs_open(&probe, "/tmp/session.txt", X86_64_VFS_OPEN_READ);
+    if (fd < X86_64_VFS_FD_BASE) {
+        goto restore;
+    }
+    if (x86_64_vfs_read(&probe, fd, buffer, 3ULL) != 3ULL ||
+        buffer[0] != 'r' ||
+        buffer[1] != 'a' ||
+        buffer[2] != 'm') {
+        goto restore;
+    }
+
+    ok = (x86_64_vfs_close(&probe, fd) == X86_64_VFS_RET_OK) ? 1U : 0U;
+
+restore:
+    for (u64 i = 0ULL; i < X86_64_VFS_RAM_FILE_BYTES; ++i) {
+        x86_64_vfs_session_storage[i] = saved[i];
+    }
+    x86_64_vfs_session_storage_size = saved_size;
+    return ok;
 }

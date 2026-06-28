@@ -1,5 +1,25 @@
 # Liam_OS Changelog
 
+## Core 0.8.67-dev
+
+### Added
+
+- Added timer syscalls for reading PIT ticks and sleeping for a bounded number of ticks.
+- Added an input-status syscall that exposes keyboard readiness, buffered characters, capacity, and scancode counters to userland.
+- Added a RAM-backed writable VFS session file at `/tmp/session.txt` and file-descriptor writes through the existing `write` syscall.
+- Added `/bin/timed`, `/bin/inputd`, and `/bin/storaged` userland probes for timer, input, and writable session-storage services.
+- Added a shell `deskcheck` command that exercises window status, timer sleep, input status, and writable session storage from one deterministic readiness check.
+- Extended the x86_64 smoke check to run `deskcheck` and verify `/tmp/session.txt` contents through the shell.
+
+### Changed
+
+- Updated the x86_64 `/proc/version` text and Liam_OS version to `0.8.67-dev`.
+- Desktop service status now distinguishes read-only VFS readiness, writable session storage readiness, and persistent disk storage readiness.
+
+### Notes
+
+- `/tmp/session.txt` is RAM-backed and survives within a boot session only. A real disk-backed filesystem and block driver are still required before calling storage persistent across reboot.
+
 ## Core 0.8.66-dev
 
 ### Added

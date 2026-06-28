@@ -56,6 +56,7 @@ about
 version
 pid
 ps
+deskcheck
 wait
 echo <text>
 ls <path>
@@ -66,7 +67,7 @@ clear
 exit
 ```
 
-`help`, `about`, and `version` are read through the VFS. `pid` and `/bin/sysinfo` report the live `getpid` syscall result. `ps` reports a kernel-owned process snapshot. `wait` consumes queued completed child process statuses for the shell.
+`help`, `about`, and `version` are read through the VFS. `pid` and `/bin/sysinfo` report the live `getpid` syscall result. `ps` reports a kernel-owned process snapshot. `deskcheck` exercises the desktop-readiness syscalls from the shell. `wait` consumes queued completed child process statuses for the shell.
 
 ## Manual validation
 
@@ -89,6 +90,7 @@ about
 version
 pid
 ps
+deskcheck
 echo hello from x86_64
 ls /
 cat /usr/share/help.txt
@@ -111,9 +113,10 @@ make x86_64-smoke
 ```
 
 The smoke check builds the x86_64 ISO, boots it in QEMU with serial I/O, runs
-`version`, `pid`, `ps`, `exec /bin/windowd`, `wait`, and `exit`, and verifies
-the expected framebuffer, desktop-services, shell, and process markers. The
-expected graphics foundation markers are:
+`version`, `pid`, `ps`, `exec /bin/windowd`, `wait`, `deskcheck`, and `exit`,
+and verifies the expected framebuffer, desktop-services, shell,
+session-storage, and process markers. The expected graphics foundation markers
+are:
 
 ```txt
 Framebuffer found: 1
@@ -129,6 +132,7 @@ Framebuffer smoke ok: 1
 Desktop scheduler ticks ready: 1
 Desktop input ready: 1
 Desktop storage readonly VFS ready: 1
+Desktop session storage ready: 1
 Desktop persistent storage ready: 0
 Desktop graphics ready: 1
 Desktop window service ready: 1
@@ -186,7 +190,10 @@ Already in place:
    keyboard input readiness, read-only VFS storage capability, graphics
    readiness, and userspace window-present requests.
 10. `/bin/windowd` userspace probe for desktop status and demo window drawing.
-11. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
+11. Timer, sleep, input-status, and writable RAM-backed session-storage
+    syscalls with `/bin/timed`, `/bin/inputd`, and `/bin/storaged` probes.
+12. Shell-level `deskcheck` validation for desktop-readiness syscalls.
+13. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
 
 Still blocking a desktop handoff:
 
@@ -198,8 +205,9 @@ Still blocking a desktop handoff:
 3. Expand process-owned address spaces beyond one code page and one stack page:
    mapped heap, guard pages, multi-segment ELF64 loads, and safe teardown.
 4. Add a real persistent filesystem/storage path. The current VFS is useful for
-   early userland, but a desktop needs storage-backed files, directories, and
-   executable loading.
+   early userland and now has writable RAM-backed session storage, but a desktop
+   needs storage-backed files, directories, and executable loading that survive
+   reboot.
 5. Expand input beyond buffered keyboard characters into a structured event
    queue shared with long-running services.
 6. Run an i386-vs-x86_64 parity pass before changing the default build.

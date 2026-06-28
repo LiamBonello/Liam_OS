@@ -15,6 +15,7 @@ struct x86_64_desktop_services_state {
     u32 input_buffer_capacity;
     u32 input_buffered_chars;
     u32 storage_readonly_vfs_ready;
+    u32 storage_session_ready;
     u32 storage_persistent_ready;
     u32 storage_mounts;
     u32 graphics_ready;

@@ -84,6 +84,7 @@ static void refresh_desktop_state(void)
     desktop_state.input_buffer_capacity = keyboard.buffer_capacity;
     desktop_state.input_buffered_chars = keyboard.buffered_chars;
     desktop_state.storage_readonly_vfs_ready = 1U;
+    desktop_state.storage_session_ready = x86_64_vfs_session_storage_ready();
     desktop_state.storage_persistent_ready = 0U;
     desktop_state.storage_mounts = 1U;
     desktop_state.graphics_ready = desktop_framebuffer.initialized;
@@ -91,6 +92,7 @@ static void refresh_desktop_state(void)
         ((desktop_state.scheduler_tick_ready != 0U) &&
          (desktop_state.input_ready != 0U) &&
          (desktop_state.storage_readonly_vfs_ready != 0U) &&
+         (desktop_state.storage_session_ready != 0U) &&
          (desktop_state.graphics_ready != 0U)) ? 1U : 0U;
 }
 
@@ -146,6 +148,9 @@ u64 x86_64_desktop_services_snapshot(char *buffer, u64 size)
     offset = append_char(buffer, size, offset, '\n');
     offset = append_string(buffer, size, offset, "storage-readonly-vfs ");
     offset = append_u32(buffer, size, offset, desktop_state.storage_readonly_vfs_ready);
+    offset = append_char(buffer, size, offset, '\n');
+    offset = append_string(buffer, size, offset, "storage-session ");
+    offset = append_u32(buffer, size, offset, desktop_state.storage_session_ready);
     offset = append_char(buffer, size, offset, '\n');
     offset = append_string(buffer, size, offset, "storage-persistent ");
     offset = append_u32(buffer, size, offset, desktop_state.storage_persistent_ready);
@@ -234,6 +239,7 @@ void x86_64_desktop_services_run_smoke(struct x86_64_desktop_services_state *sta
          (desktop_state.scheduler_tick_ready != 0U) &&
          (desktop_state.input_ready != 0U) &&
          (desktop_state.storage_readonly_vfs_ready != 0U) &&
+         (desktop_state.storage_session_ready != 0U) &&
          (desktop_state.graphics_ready != 0U) &&
          (desktop_state.window_service_ready != 0U) &&
          (desktop_state.snapshot_ok != 0U) &&

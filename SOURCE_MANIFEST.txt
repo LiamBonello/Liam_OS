@@ -160,8 +160,11 @@
 ./core/userland/flat/uptime/uptime.asm
 ./core/userland/x86_64/hello/hello.asm
 ./core/userland/x86_64/init/init.asm
+./core/userland/x86_64/inputd/inputd.asm
 ./core/userland/x86_64/linker.ld
+./core/userland/x86_64/storaged/storaged.asm
 ./core/userland/x86_64/sysinfo/sysinfo.asm
+./core/userland/x86_64/timed/timed.asm
 ./core/userland/x86_64/windowd/windowd.asm
 ./scripts/check-core.sh
 ./scripts/check-x86_64.sh

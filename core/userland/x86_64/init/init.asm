@@ -12,10 +12,18 @@ bits 64
 %define LIAM_SYSCALL_YIELD 10
 %define LIAM_SYSCALL_PS 11
 %define LIAM_SYSCALL_WAIT 12
+%define LIAM_SYSCALL_DESKTOP_STATUS 13
+%define LIAM_SYSCALL_WINDOW_PRESENT 14
+%define LIAM_SYSCALL_TICKS 15
+%define LIAM_SYSCALL_SLEEP_TICKS 16
+%define LIAM_SYSCALL_INPUT_STATUS 17
 %define LIAM_RET_ENOENT 0xfffffffffffffffe
 
 %define LIAM_STDIN 0
 %define LIAM_STDOUT 1
+%define LIAM_OPEN_WRITE 1
+%define LIAM_OPEN_CREATE 2
+%define LIAM_OPEN_TRUNCATE 4
 %define LIAM_ARG_SHELL_MODE 0
 %define LIAM_MODE_BUFFER_LEN 16
 %define LIAM_READ_BUFFER_LEN 64
@@ -266,11 +274,33 @@ check_pid:
 
 check_ps:
     cmp r15, 2
-    jne check_wait
+    jne check_deskcheck
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'p'
-    jne check_wait
+    jne check_deskcheck
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 's'
     je command_ps
+
+check_deskcheck:
+    cmp r15, 9
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'd'
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'e'
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 's'
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'k'
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], 'c'
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 5], 'h'
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 6], 'e'
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 7], 'c'
+    jne check_wait
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 8], 'k'
+    je command_deskcheck
 
 check_wait:
     cmp r15, 4
@@ -435,6 +465,191 @@ ps_failed:
     mov edx, ps_error_text_len
     syscall
     jmp command_done
+
+command_deskcheck:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel deskcheck_title]
+    mov edx, deskcheck_title_len
+    syscall
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel window_title_text]
+    mov edx, window_title_text_len
+    syscall
+
+    mov eax, LIAM_SYSCALL_DESKTOP_STATUS
+    lea rdi, [rsp + LIAM_PS_BUFFER_OFFSET]
+    mov esi, LIAM_PS_BUFFER_LEN
+    syscall
+    test rax, rax
+    jle deskcheck_window_present
+
+    mov rdx, rax
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_PS_BUFFER_OFFSET]
+    syscall
+
+deskcheck_window_present:
+    mov eax, LIAM_SYSCALL_WINDOW_PRESENT
+    syscall
+    cmp rax, 1
+    jne deskcheck_window_failed
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel window_present_ok_text]
+    mov edx, window_present_ok_text_len
+    syscall
+    jmp deskcheck_timer
+
+deskcheck_window_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel window_present_failed_text]
+    mov edx, window_present_failed_text_len
+    syscall
+
+deskcheck_timer:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel timer_title_text]
+    mov edx, timer_title_text_len
+    syscall
+
+    mov eax, LIAM_SYSCALL_TICKS
+    syscall
+    mov r12, rax
+
+    mov eax, LIAM_SYSCALL_SLEEP_TICKS
+    mov edi, 2
+    syscall
+
+    mov eax, LIAM_SYSCALL_TICKS
+    syscall
+    sub rax, r12
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel ticks_elapsed_text]
+    mov edx, ticks_elapsed_text_len
+    syscall
+
+    call write_rax_decimal_newline
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel sleep_ok_text]
+    mov edx, sleep_ok_text_len
+    syscall
+
+deskcheck_input:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel input_title_text]
+    mov edx, input_title_text_len
+    syscall
+
+    mov eax, LIAM_SYSCALL_INPUT_STATUS
+    lea rdi, [rsp + LIAM_PS_BUFFER_OFFSET]
+    mov esi, LIAM_PS_BUFFER_LEN
+    syscall
+    test rax, rax
+    jle deskcheck_input_failed
+
+    mov rdx, rax
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_PS_BUFFER_OFFSET]
+    syscall
+    jmp deskcheck_storage
+
+deskcheck_input_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel input_failed_text]
+    mov edx, input_failed_text_len
+    syscall
+
+deskcheck_storage:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel storage_title_text]
+    mov edx, storage_title_text_len
+    syscall
+
+    mov eax, LIAM_SYSCALL_OPEN
+    lea rdi, [rel session_path]
+    mov esi, LIAM_OPEN_WRITE | LIAM_OPEN_CREATE | LIAM_OPEN_TRUNCATE
+    syscall
+    cmp rax, 3
+    jb deskcheck_storage_failed
+    cmp rax, 6
+    ja deskcheck_storage_failed
+    mov r14, rax
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov rdi, r14
+    lea rsi, [rel session_text]
+    mov edx, session_text_len
+    syscall
+    cmp rax, session_text_len
+    jne deskcheck_storage_close_failed
+
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+
+    mov eax, LIAM_SYSCALL_OPEN
+    lea rdi, [rel session_path]
+    xor esi, esi
+    syscall
+    cmp rax, 3
+    jb deskcheck_storage_failed
+    cmp rax, 6
+    ja deskcheck_storage_failed
+    mov r14, rax
+
+    mov eax, LIAM_SYSCALL_READ
+    mov rdi, r14
+    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    mov edx, LIAM_READ_BUFFER_LEN
+    syscall
+    test rax, rax
+    jle deskcheck_storage_close_failed
+    mov r13, rax
+
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    mov rdx, r13
+    syscall
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel storage_ok_text]
+    mov edx, storage_ok_text_len
+    syscall
+    jmp command_done_fresh
+
+deskcheck_storage_close_failed:
+    mov eax, LIAM_SYSCALL_CLOSE
+    mov rdi, r14
+    syscall
+
+deskcheck_storage_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel storage_failed_text]
+    mov edx, storage_failed_text_len
+    syscall
+    jmp command_done_fresh
 
 command_wait:
     mov eax, LIAM_SYSCALL_WAIT
@@ -811,9 +1026,50 @@ hello_exec_path:
     db "/bin/hello", 0
 sysinfo_exec_path:
     db "/bin/sysinfo", 0
+session_path:
+    db "/tmp/session.txt", 0
+session_text:
+    db "session storage ok", 10
+session_text_len equ $ - session_text
 pid_label:
     db "pid: "
 pid_label_len equ $ - pid_label
+deskcheck_title:
+    db "Liam_OS desktop readiness check", 10
+deskcheck_title_len equ $ - deskcheck_title
+window_title_text:
+    db "Liam_OS window service", 10
+window_title_text_len equ $ - window_title_text
+window_present_ok_text:
+    db "window-present ok", 10
+window_present_ok_text_len equ $ - window_present_ok_text
+window_present_failed_text:
+    db "window-present failed", 10
+window_present_failed_text_len equ $ - window_present_failed_text
+timer_title_text:
+    db "Liam_OS timer service", 10
+timer_title_text_len equ $ - timer_title_text
+ticks_elapsed_text:
+    db "ticks elapsed "
+ticks_elapsed_text_len equ $ - ticks_elapsed_text
+sleep_ok_text:
+    db "sleep-ticks ok", 10
+sleep_ok_text_len equ $ - sleep_ok_text
+input_title_text:
+    db "Liam_OS input service", 10
+input_title_text_len equ $ - input_title_text
+input_failed_text:
+    db "input-status failed", 10
+input_failed_text_len equ $ - input_failed_text
+storage_title_text:
+    db "Liam_OS storage service", 10
+storage_title_text_len equ $ - storage_title_text
+storage_ok_text:
+    db "storage-write ok", 10
+storage_ok_text_len equ $ - storage_ok_text
+storage_failed_text:
+    db "storage-write failed", 10
+storage_failed_text_len equ $ - storage_failed_text
 clear_text:
     db 27, "[2J", 27, "[H"
 clear_text_len equ $ - clear_text

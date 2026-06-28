@@ -68,6 +68,10 @@ struct x86_64_syscall_dispatch_state {
     u32 desktop_status_ok;
     u32 desktop_status_fault_ok;
     u32 window_present_ok;
+    u32 ticks_ok;
+    u32 sleep_ticks_ok;
+    u32 input_status_ok;
+    u32 input_status_fault_ok;
     u32 exec_fault_ok;
     u32 exec_path_found;
     u32 exec_type_ok;
@@ -182,6 +186,84 @@ static inline u64 x86_64_syscall_copy_string_arg(char *buffer, u64 size, const c
 
     buffer[written] = '\0';
     return written;
+}
+
+static inline u64 x86_64_syscall_append_char(char *buffer, u64 size, u64 offset, char value)
+{
+    if (offset + 1ULL < size) {
+        buffer[offset] = value;
+    }
+
+    return offset + 1ULL;
+}
+
+static inline u64 x86_64_syscall_append_string(char *buffer, u64 size, u64 offset, const char *value)
+{
+    if (value == (const char *)0) {
+        return offset;
+    }
+
+    for (u64 i = 0ULL; value[i] != '\0'; ++i) {
+        offset = x86_64_syscall_append_char(buffer, size, offset, value[i]);
+    }
+
+    return offset;
+}
+
+static inline u64 x86_64_syscall_append_u32(char *buffer, u64 size, u64 offset, u32 value)
+{
+    char digits[10];
+    u32 count = 0U;
+
+    if (value == 0U) {
+        return x86_64_syscall_append_char(buffer, size, offset, '0');
+    }
+
+    while (value != 0U && count < (u32)sizeof(digits)) {
+        digits[count++] = (char)('0' + (value % 10U));
+        value /= 10U;
+    }
+
+    while (count > 0U) {
+        --count;
+        offset = x86_64_syscall_append_char(buffer, size, offset, digits[count]);
+    }
+
+    return offset;
+}
+
+static inline u64 x86_64_syscall_format_input_status(char *buffer, u64 size)
+{
+    struct x86_64_keyboard_state keyboard;
+    x86_64_keyboard_get_state(&keyboard);
+
+    u64 offset = 0ULL;
+    offset = x86_64_syscall_append_string(buffer, size, offset, "input status\n");
+    offset = x86_64_syscall_append_string(buffer, size, offset, "keyboard-ready ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.keyboard_ok);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "buffered ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.buffered_chars);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "capacity ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.buffer_capacity);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "scancodes ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.scancodes_seen);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "translated ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.translated_chars_seen);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+
+    if (size != 0ULL) {
+        if (offset < size) {
+            buffer[offset] = '\0';
+        } else {
+            buffer[size - 1ULL] = '\0';
+        }
+    }
+
+    return offset;
 }
 
 static inline u32 x86_64_syscall_image_range_fits(u64 offset, u64 size, u64 image_size)
@@ -321,6 +403,10 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->desktop_status_ok = 0U;
     state->desktop_status_fault_ok = 0U;
     state->window_present_ok = 0U;
+    state->ticks_ok = 0U;
+    state->sleep_ticks_ok = 0U;
+    state->input_status_ok = 0U;
+    state->input_status_fault_ok = 0U;
     state->exec_fault_ok = 0U;
     state->exec_path_found = 0U;
     state->exec_type_ok = 0U;
@@ -373,18 +459,19 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_WRITE:
-        if (arg0 != X86_64_SYSCALL_STDOUT && arg0 != X86_64_SYSCALL_STDERR) {
-            state->last_result = X86_64_SYSCALL_RET_EINVAL;
-            return state->last_result;
-        }
         if (x86_64_syscall_user_range_ok(arg1, arg2) == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
-        if (state->write_output_enabled != 0U) {
-            x86_64_syscall_write_serial((const char *)arg1, arg2);
+        if (arg0 == X86_64_SYSCALL_STDOUT || arg0 == X86_64_SYSCALL_STDERR) {
+            if (state->write_output_enabled != 0U) {
+                x86_64_syscall_write_serial((const char *)arg1, arg2);
+            }
+            state->last_result = arg2;
+            return state->last_result;
         }
-        state->last_result = arg2;
+
+        state->last_result = x86_64_vfs_write(&state->vfs, arg0, (const char *)arg1, arg2);
         return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_OPEN:
@@ -549,6 +636,39 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->window_present_ok = (state->last_result == 1ULL) ? 1U : 0U;
         return state->last_result;
 
+    case X86_64_SYSCALL_SERVICE_TICKS: {
+        struct x86_64_timer_state timer;
+        x86_64_timer_get_state(&timer);
+        state->ticks_ok = timer.timer_ok;
+        state->last_result = (u64)timer.ticks;
+        return state->last_result;
+    }
+
+    case X86_64_SYSCALL_SERVICE_SLEEP_TICKS: {
+        if (arg0 > 1000ULL) {
+            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+            return state->last_result;
+        }
+        struct x86_64_timer_state before;
+        struct x86_64_timer_state after;
+        x86_64_timer_get_state(&before);
+        x86_64_timer_wait_for_ticks((u32)arg0);
+        x86_64_timer_get_state(&after);
+        state->sleep_ticks_ok =
+            (after.ticks >= before.ticks && (after.ticks - before.ticks) >= (u32)arg0) ? 1U : 0U;
+        state->last_result = (u64)(after.ticks - before.ticks);
+        return state->last_result;
+    }
+
+    case X86_64_SYSCALL_SERVICE_INPUT_STATUS:
+        if (x86_64_syscall_user_range_ok(arg0, arg1) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        state->last_result = x86_64_syscall_format_input_status((char *)arg0, arg1);
+        state->input_status_ok = (state->last_result != 0ULL) ? 1U : 0U;
+        return state->last_result;
+
     default:
         state->last_result = X86_64_SYSCALL_RET_ENOSYS;
         return state->last_result;
@@ -666,6 +786,27 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
                                                  0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL);
     state->window_present_ok = (window_present == 1ULL) ? 1U : 0U;
 
+    u64 ticks_before = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_TICKS,
+                                               0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL);
+    u64 sleep_ticks = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_SLEEP_TICKS,
+                                              1ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL);
+    u64 ticks_after = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_TICKS,
+                                              0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL);
+    state->ticks_ok = (ticks_after >= ticks_before) ? 1U : 0U;
+    state->sleep_ticks_ok = (sleep_ticks >= 1ULL) ? 1U : 0U;
+
+    u64 input_status = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_INPUT_STATUS,
+                                               state->sample_user_buffer, 128ULL, 0ULL,
+                                               0ULL, 0ULL, 0ULL);
+    state->input_status_ok = (input_status != 0ULL) ? 1U : 0U;
+
+    u64 input_status_fault =
+        x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_INPUT_STATUS,
+                                state->sample_kernel_pointer, 128ULL, 0ULL,
+                                0ULL, 0ULL, 0ULL);
+    state->input_status_fault_ok =
+        (input_status_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
+
     u64 exec_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_EXEC,
                                              state->sample_kernel_pointer, 0ULL, 0ULL,
                                              0ULL, 0ULL, 0ULL);
@@ -699,10 +840,14 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
          (state->desktop_status_ok != 0U) &&
          (state->desktop_status_fault_ok != 0U) &&
          (state->window_present_ok != 0U) &&
+         (state->ticks_ok != 0U) &&
+         (state->sleep_ticks_ok != 0U) &&
+         (state->input_status_ok != 0U) &&
+         (state->input_status_fault_ok != 0U) &&
          (state->exec_fault_ok != 0U) &&
          (state->unknown_rejected != 0U) &&
          (state->exit_ok != 0U) &&
-         (state->dispatch_calls == 16U)) ? 1U : 0U;
+         (state->dispatch_calls == 21U)) ? 1U : 0U;
 }
 
 static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_dispatch_state *state)
@@ -736,6 +881,10 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall desktop status ok: ", state->desktop_status_ok);
     x86_64_serial_write_u32("Syscall desktop status fault ok: ", state->desktop_status_fault_ok);
     x86_64_serial_write_u32("Syscall window present ok: ", state->window_present_ok);
+    x86_64_serial_write_u32("Syscall ticks ok: ", state->ticks_ok);
+    x86_64_serial_write_u32("Syscall sleep ticks ok: ", state->sleep_ticks_ok);
+    x86_64_serial_write_u32("Syscall input status ok: ", state->input_status_ok);
+    x86_64_serial_write_u32("Syscall input status fault ok: ", state->input_status_fault_ok);
     x86_64_serial_write_u32("Syscall exec fault ok: ", state->exec_fault_ok);
     x86_64_serial_write_u32("Syscall exec path found: ", state->exec_path_found);
     x86_64_serial_write_u32("Syscall exec type ok: ", state->exec_type_ok);
