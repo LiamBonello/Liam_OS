@@ -87,7 +87,7 @@ pid_label:
     db "pid: "
 pid_label_len equ $ - pid_label
 features_text:
-    db "features: syscall, vfs, exec", 10
+    db "features: syscall, vfs, exec, desktop-services", 10
 features_text_len equ $ - features_text
 newline_text:
     db 10

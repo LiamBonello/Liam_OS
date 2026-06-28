@@ -1,5 +1,23 @@
 # Liam_OS Changelog
 
+## Core 0.8.66-dev
+
+### Added
+
+- Added an x86_64 desktop-services kernel layer that reports timer-backed scheduler readiness, keyboard input readiness, read-only VFS storage capability, framebuffer graphics readiness, and window-service readiness.
+- Added `desktop_status` and `window_present` syscall services for userspace desktop plumbing.
+- Added `/bin/windowd`, a first userspace window service probe that reads desktop status and asks the kernel to draw a demo window.
+- Extended the x86_64 smoke check to run `/bin/windowd`, wait for it, and verify desktop service markers.
+
+### Changed
+
+- Updated the x86_64 `/proc/version` text and Liam_OS version to `0.8.66-dev`.
+- Updated `/bin/sysinfo` feature text and VFS help/listing output for the desktop-services milestone.
+
+### Notes
+
+- Persistent storage is still reported as not ready. This milestone exposes the current read-only VFS capability honestly while creating the kernel/userland contract that a future storage-backed filesystem can plug into.
+
 ## Core 0.8.65-dev
 
 ### Added

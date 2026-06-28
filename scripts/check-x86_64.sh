@@ -21,6 +21,10 @@ timeout 20s sh -c '
     sleep 1
     printf "ps\n"
     sleep 1
+    printf "exec /bin/windowd\n"
+    sleep 1
+    printf "wait\n"
+    sleep 1
     printf "exit\n"
     sleep 1
   } | qemu-system-x86_64 -display none -monitor none -serial stdio -boot d -cdrom build/x86_64/liam_os_x86_64.iso
@@ -55,10 +59,22 @@ require_marker "Framebuffer huge pages: 2"
 require_marker "Framebuffer mapping ready: 1"
 require_marker "Framebuffer surface ready: 1"
 require_marker "Framebuffer smoke ok: 1"
-require_marker "Liam_OS Core x86_64 0.8.65-dev"
+require_marker "Desktop scheduler ticks ready: 1"
+require_marker "Desktop input ready: 1"
+require_marker "Desktop storage readonly VFS ready: 1"
+require_marker "Desktop persistent storage ready: 0"
+require_marker "Desktop graphics ready: 1"
+require_marker "Desktop window service ready: 1"
+require_marker "Desktop services smoke ok: 1"
+require_marker "Liam_OS Core x86_64 0.8.66-dev"
 require_marker "pid: 1"
 require_marker "PID STATE MODE NAME"
 require_marker "created 1 user-created 0 user-exited 0 user-reaped 0"
+require_marker "Liam_OS window service"
+require_marker "window-service-ready 1"
+require_marker "window-present ok"
+require_marker "wait: pid 2"
+require_marker "wait: exit 0"
 require_marker "Liam_OS x86_64 shell exited"
 
 printf 'x86_64 smoke log: %s\n' "$LOG"

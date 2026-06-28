@@ -18,6 +18,8 @@ struct x86_64_user_mode_state {
     u32 read_ok;
     u32 get_arg_ok;
     u32 yield_ok;
+    u32 desktop_status_ok;
+    u32 window_present_ok;
     u32 exec_ok;
     u32 exit_ok;
     u32 unexpected_syscall;

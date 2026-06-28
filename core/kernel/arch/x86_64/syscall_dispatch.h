@@ -3,6 +3,7 @@
 
 #include "boot_info.h"
 #include "console.h"
+#include "desktop_services.h"
 #include "idt.h"
 #include "process.h"
 #include "syscall.h"
@@ -64,6 +65,9 @@ struct x86_64_syscall_dispatch_state {
     u32 wait_ok;
     u32 wait_empty_ok;
     u32 wait_fault_ok;
+    u32 desktop_status_ok;
+    u32 desktop_status_fault_ok;
+    u32 window_present_ok;
     u32 exec_fault_ok;
     u32 exec_path_found;
     u32 exec_type_ok;
@@ -314,6 +318,9 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->wait_ok = 0U;
     state->wait_empty_ok = 0U;
     state->wait_fault_ok = 0U;
+    state->desktop_status_ok = 0U;
+    state->desktop_status_fault_ok = 0U;
+    state->window_present_ok = 0U;
     state->exec_fault_ok = 0U;
     state->exec_path_found = 0U;
     state->exec_type_ok = 0U;
@@ -528,6 +535,20 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         return state->last_result;
     }
 
+    case X86_64_SYSCALL_SERVICE_DESKTOP_STATUS:
+        if (x86_64_syscall_user_range_ok(arg0, arg1) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        state->last_result = x86_64_desktop_services_snapshot((char *)arg0, arg1);
+        state->desktop_status_ok = (state->last_result != 0ULL) ? 1U : 0U;
+        return state->last_result;
+
+    case X86_64_SYSCALL_SERVICE_WINDOW_PRESENT:
+        state->last_result = x86_64_desktop_services_present_demo_window();
+        state->window_present_ok = (state->last_result == 1ULL) ? 1U : 0U;
+        return state->last_result;
+
     default:
         state->last_result = X86_64_SYSCALL_RET_ENOSYS;
         return state->last_result;
@@ -629,6 +650,22 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
                                              0ULL, 0ULL, 0ULL, 0ULL);
     state->wait_fault_ok = (wait_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
 
+    u64 desktop_status = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_DESKTOP_STATUS,
+                                                 state->sample_user_buffer, 256ULL, 0ULL,
+                                                 0ULL, 0ULL, 0ULL);
+    state->desktop_status_ok = (desktop_status != 0ULL) ? 1U : 0U;
+
+    u64 desktop_status_fault =
+        x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_DESKTOP_STATUS,
+                                state->sample_kernel_pointer, 256ULL, 0ULL,
+                                0ULL, 0ULL, 0ULL);
+    state->desktop_status_fault_ok =
+        (desktop_status_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
+
+    u64 window_present = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_WINDOW_PRESENT,
+                                                 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL);
+    state->window_present_ok = (window_present == 1ULL) ? 1U : 0U;
+
     u64 exec_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_EXEC,
                                              state->sample_kernel_pointer, 0ULL, 0ULL,
                                              0ULL, 0ULL, 0ULL);
@@ -659,10 +696,13 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
          (state->ps_fault_ok != 0U) &&
          (state->wait_empty_ok != 0U) &&
          (state->wait_fault_ok != 0U) &&
+         (state->desktop_status_ok != 0U) &&
+         (state->desktop_status_fault_ok != 0U) &&
+         (state->window_present_ok != 0U) &&
          (state->exec_fault_ok != 0U) &&
          (state->unknown_rejected != 0U) &&
          (state->exit_ok != 0U) &&
-         (state->dispatch_calls == 13U)) ? 1U : 0U;
+         (state->dispatch_calls == 16U)) ? 1U : 0U;
 }
 
 static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_dispatch_state *state)
@@ -693,6 +733,9 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall wait dispatch ok: ", state->wait_ok);
     x86_64_serial_write_u32("Syscall wait empty ok: ", state->wait_empty_ok);
     x86_64_serial_write_u32("Syscall wait fault ok: ", state->wait_fault_ok);
+    x86_64_serial_write_u32("Syscall desktop status ok: ", state->desktop_status_ok);
+    x86_64_serial_write_u32("Syscall desktop status fault ok: ", state->desktop_status_fault_ok);
+    x86_64_serial_write_u32("Syscall window present ok: ", state->window_present_ok);
     x86_64_serial_write_u32("Syscall exec fault ok: ", state->exec_fault_ok);
     x86_64_serial_write_u32("Syscall exec path found: ", state->exec_path_found);
     x86_64_serial_write_u32("Syscall exec type ok: ", state->exec_type_ok);

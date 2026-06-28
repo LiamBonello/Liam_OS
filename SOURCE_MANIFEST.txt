@@ -38,6 +38,8 @@
 ./core/kernel/arch/x86_64/console.h
 ./core/kernel/arch/x86_64/cpuid.c
 ./core/kernel/arch/x86_64/cpuid.h
+./core/kernel/arch/x86_64/desktop_services.c
+./core/kernel/arch/x86_64/desktop_services.h
 ./core/kernel/arch/x86_64/framebuffer.c
 ./core/kernel/arch/x86_64/framebuffer.h
 ./core/kernel/arch/x86_64/gdt.c
@@ -160,6 +162,7 @@
 ./core/userland/x86_64/init/init.asm
 ./core/userland/x86_64/linker.ld
 ./core/userland/x86_64/sysinfo/sysinfo.asm
+./core/userland/x86_64/windowd/windowd.asm
 ./scripts/check-core.sh
 ./scripts/check-x86_64.sh
 ./scripts/package-source.sh

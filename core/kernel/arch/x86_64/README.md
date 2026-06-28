@@ -111,8 +111,9 @@ make x86_64-smoke
 ```
 
 The smoke check builds the x86_64 ISO, boots it in QEMU with serial I/O, runs
-`version`, `pid`, `ps`, and `exit`, and verifies the expected framebuffer,
-shell, and process markers. The expected graphics foundation markers are:
+`version`, `pid`, `ps`, `exec /bin/windowd`, `wait`, and `exit`, and verifies
+the expected framebuffer, desktop-services, shell, and process markers. The
+expected graphics foundation markers are:
 
 ```txt
 Framebuffer found: 1
@@ -125,6 +126,13 @@ Framebuffer virtual address: 0xFFFF900000000000
 Framebuffer mapping ready: 1
 Framebuffer surface ready: 1
 Framebuffer smoke ok: 1
+Desktop scheduler ticks ready: 1
+Desktop input ready: 1
+Desktop storage readonly VFS ready: 1
+Desktop persistent storage ready: 0
+Desktop graphics ready: 1
+Desktop window service ready: 1
+Desktop services smoke ok: 1
 ```
 
 Use this separate opt-in path for the x86_64 IRQ and exception self-test:
@@ -174,21 +182,26 @@ Already in place:
    higher-half framebuffer mapping for future graphics code.
 8. Kernel framebuffer drawing surface with RGB packing, pixel writes,
    rectangle fills, and smoke-draw/readback validation.
-9. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
+9. Desktop-services kernel contract for timer-backed scheduler readiness,
+   keyboard input readiness, read-only VFS storage capability, graphics
+   readiness, and userspace window-present requests.
+10. `/bin/windowd` userspace probe for desktop status and demo window drawing.
+11. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
 
 Still blocking a desktop handoff:
 
 1. Replace cooperative/shell-driven user execution with a real x86_64 scheduler
    that can keep multiple user processes alive and switch between them.
 2. Add blocking waits, process sleep/wake, and timer-driven scheduling instead
-   of only command-driven child reaping.
+   of only command-driven child reaping. The PIT tick source is present, but it
+   is not yet driving preemptive context switches.
 3. Expand process-owned address spaces beyond one code page and one stack page:
    mapped heap, guard pages, multi-segment ELF64 loads, and safe teardown.
 4. Add a real persistent filesystem/storage path. The current VFS is useful for
    early userland, but a desktop needs storage-backed files, directories, and
    executable loading.
-5. Add input plumbing and a userspace graphics/window service after the
-   scheduler and process model can support long-running services.
+5. Expand input beyond buffered keyboard characters into a structured event
+   queue shared with long-running services.
 6. Run an i386-vs-x86_64 parity pass before changing the default build.
 7. Keep i386 only until x86_64 can do what the current i386 path does, then
    retire it deliberately.

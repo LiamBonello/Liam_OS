@@ -1,6 +1,7 @@
 #include "boot_context.h"
 #include "console.h"
 #include "cpuid.h"
+#include "desktop_services.h"
 #include "framebuffer.h"
 #include "gdt.h"
 #include "heap.h"
@@ -118,6 +119,26 @@ static void report_framebuffer_surface(const struct x86_64_framebuffer_state *st
     x86_64_serial_write_u32("Framebuffer pixel ok: ", state->pixel_ok);
     x86_64_serial_write_hex32("Framebuffer sampled color: 0x", state->sampled_color);
     x86_64_serial_write_u32("Framebuffer smoke ok: ", state->smoke_ok);
+}
+
+static void report_desktop_services(const struct x86_64_desktop_services_state *state)
+{
+    x86_64_serial_write_line("x86_64 desktop services online");
+    x86_64_serial_write_u32("Desktop services initialized: ", state->initialized);
+    x86_64_serial_write_u32("Desktop scheduler ticks ready: ", state->scheduler_tick_ready);
+    x86_64_serial_write_u32("Desktop scheduler quantum ticks: ", state->scheduler_quantum_ticks);
+    x86_64_serial_write_u32("Desktop scheduler observed ticks: ", state->scheduler_observed_ticks);
+    x86_64_serial_write_u32("Desktop scheduler observed slices: ", state->scheduler_observed_slices);
+    x86_64_serial_write_u32("Desktop input ready: ", state->input_ready);
+    x86_64_serial_write_u32("Desktop input buffer capacity: ", state->input_buffer_capacity);
+    x86_64_serial_write_u32("Desktop storage readonly VFS ready: ", state->storage_readonly_vfs_ready);
+    x86_64_serial_write_u32("Desktop persistent storage ready: ", state->storage_persistent_ready);
+    x86_64_serial_write_u32("Desktop graphics ready: ", state->graphics_ready);
+    x86_64_serial_write_u32("Desktop window service ready: ", state->window_service_ready);
+    x86_64_serial_write_u32("Desktop window present calls: ", state->window_present_calls);
+    x86_64_serial_write_u32("Desktop services snapshot ok: ", state->snapshot_ok);
+    x86_64_serial_write_u32("Desktop services present ok: ", state->present_ok);
+    x86_64_serial_write_u32("Desktop services smoke ok: ", state->smoke_ok);
 }
 
 static void report_cpu_state(const struct x86_64_cpuid_state *state)
@@ -471,6 +492,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
     struct x86_64_boot_context context;
     struct x86_64_cpuid_state cpuid_state;
+    struct x86_64_desktop_services_state desktop_services_state;
     struct x86_64_framebuffer_state framebuffer_state;
     struct x86_64_gdt_state gdt_state;
     struct x86_64_heap_state heap_state;
@@ -504,6 +526,8 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     tss_state.loaded = gdt_state.tss_loaded;
     x86_64_idt_init();
     x86_64_idt_get_state(&idt_state);
+    x86_64_desktop_services_init(&framebuffer_state);
+    x86_64_desktop_services_run_smoke(&desktop_services_state);
     x86_64_paging_probe_active_mappings(&paging_probe, &paging_activation,
                                         &context.memory_layout, &paging_plan);
     x86_64_higher_half_probe_run(&higher_half_probe, &paging_activation, &paging_probe,
@@ -513,6 +537,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_framebuffer_summary(&context.boot_info);
     report_framebuffer_mapping_summary(&paging_builder);
     report_framebuffer_surface(&framebuffer_state);
+    report_desktop_services(&desktop_services_state);
     x86_64_user_mode_start_init(&user_mode_state, &paging_builder, 1U);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);

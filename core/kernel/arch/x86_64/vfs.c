@@ -4,6 +4,8 @@ extern const u8 x86_64_user_hello_image_start[];
 extern const u8 x86_64_user_hello_image_end[];
 extern const u8 x86_64_user_sysinfo_image_start[];
 extern const u8 x86_64_user_sysinfo_image_end[];
+extern const u8 x86_64_user_windowd_image_start[];
+extern const u8 x86_64_user_windowd_image_end[];
 
 struct x86_64_vfs_node {
     const char *path;
@@ -21,7 +23,8 @@ static const char x86_64_vfs_dir_root[] =
 
 static const char x86_64_vfs_dir_bin[] =
     "hello\n"
-    "sysinfo\n";
+    "sysinfo\n"
+    "windowd\n";
 static const char x86_64_vfs_dir_sbin[] = "";
 
 static const char x86_64_vfs_dir_etc[] =
@@ -47,20 +50,22 @@ static const char x86_64_vfs_file_motd[] =
     "Liam_OS x86_64 read-only VFS mounted.\n";
 
 static const char x86_64_vfs_file_version[] =
-    "Liam_OS Core x86_64 0.8.65-dev\n";
+    "Liam_OS Core x86_64 0.8.66-dev\n";
 
 static const char x86_64_vfs_file_help[] =
     "Available commands:\n"
     "help, about, version, pid, ps, wait, echo, ls, cat, stat, exec, clear, exit\n"
     "Executable files:\n"
     "/bin/hello\n"
-    "/bin/sysinfo\n";
+    "/bin/sysinfo\n"
+    "/bin/windowd\n";
 
 static const char x86_64_vfs_file_files[] =
     "/\n"
     "/bin\n"
     "/bin/hello\n"
     "/bin/sysinfo\n"
+    "/bin/windowd\n"
     "/etc\n"
     "/etc/motd\n"
     "/etc/os-release\n"
@@ -82,6 +87,7 @@ static const struct x86_64_vfs_node x86_64_vfs_nodes[] = {
     {"/usr/share", (const u8 *)x86_64_vfs_dir_usr_share, sizeof(x86_64_vfs_dir_usr_share) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/bin/hello", x86_64_user_hello_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/sysinfo", x86_64_user_sysinfo_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/windowd", x86_64_user_windowd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/etc/motd", (const u8 *)x86_64_vfs_file_motd, sizeof(x86_64_vfs_file_motd) - 1ULL, X86_64_VFS_NODE_FILE},
     {"/etc/os-release", (const u8 *)x86_64_vfs_file_os_release, sizeof(x86_64_vfs_file_os_release) - 1ULL, X86_64_VFS_NODE_FILE},
     {"/proc/version", (const u8 *)x86_64_vfs_file_version, sizeof(x86_64_vfs_file_version) - 1ULL, X86_64_VFS_NODE_FILE},
@@ -99,6 +105,10 @@ static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
 
     if (node->data == x86_64_user_sysinfo_image_start) {
         return (u64)(x86_64_user_sysinfo_image_end - x86_64_user_sysinfo_image_start);
+    }
+
+    if (node->data == x86_64_user_windowd_image_start) {
+        return (u64)(x86_64_user_windowd_image_end - x86_64_user_windowd_image_start);
     }
 
     return node->size;
@@ -327,6 +337,15 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
     }
 
     if (x86_64_vfs_stat(&probe, "/bin/../bin/sysinfo", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/bin/windowd", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/bin/../bin/windowd", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
         return 0U;
     }
 
