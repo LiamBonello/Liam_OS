@@ -117,6 +117,11 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
                                   result != X86_64_SYSCALL_RET_EINVAL) ? 1U : 0U;
         break;
 
+    case X86_64_SYSCALL_SERVICE_INPUT_EVENTS:
+        state->input_events_ok = (result != X86_64_SYSCALL_RET_EFAULT &&
+                                  result != X86_64_SYSCALL_RET_EINVAL) ? 1U : 0U;
+        break;
+
     case X86_64_SYSCALL_SERVICE_READ:
         state->read_ok = (result != X86_64_SYSCALL_RET_EFAULT &&
                           result != X86_64_SYSCALL_RET_EINVAL) ? 1U : 0U;
@@ -235,6 +240,7 @@ void x86_64_user_mode_report(const struct x86_64_user_mode_state *state)
     x86_64_serial_write_u32("User mode ticks ok: ", state->ticks_ok);
     x86_64_serial_write_u32("User mode sleep ticks ok: ", state->sleep_ticks_ok);
     x86_64_serial_write_u32("User mode input status ok: ", state->input_status_ok);
+    x86_64_serial_write_u32("User mode input events ok: ", state->input_events_ok);
     x86_64_serial_write_u32("User mode exec ok: ", state->exec_ok);
     x86_64_serial_write_u32("User mode exit ok: ", state->exit_ok);
     x86_64_serial_write_u32("User mode unexpected syscall: ", state->unexpected_syscall);

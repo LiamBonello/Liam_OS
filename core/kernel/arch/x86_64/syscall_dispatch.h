@@ -19,7 +19,7 @@
 #define X86_64_SYSCALL_STDIN 0ULL
 #define X86_64_SYSCALL_STDOUT 1ULL
 #define X86_64_SYSCALL_STDERR 2ULL
-#define X86_64_SYSCALL_WRITE_MAX_BYTES 256ULL
+#define X86_64_SYSCALL_WRITE_MAX_BYTES 1024ULL
 #define X86_64_SYSCALL_ARG_SHELL_MODE 0ULL
 
 struct x86_64_syscall_frame {
@@ -72,6 +72,9 @@ struct x86_64_syscall_dispatch_state {
     u32 sleep_ticks_ok;
     u32 input_status_ok;
     u32 input_status_fault_ok;
+    u32 input_events_ok;
+    u32 input_events_empty_ok;
+    u32 input_events_fault_ok;
     u32 exec_fault_ok;
     u32 exec_path_found;
     u32 exec_type_ok;
@@ -254,6 +257,18 @@ static inline u64 x86_64_syscall_format_input_status(char *buffer, u64 size)
     offset = x86_64_syscall_append_string(buffer, size, offset, "translated ");
     offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.translated_chars_seen);
     offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "event-capacity ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.event_queue_capacity);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "event-queued ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.event_queued);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "event-drops ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.event_drops);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "events-read ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.events_read);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
 
     if (size != 0ULL) {
         if (offset < size) {
@@ -407,6 +422,9 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->sleep_ticks_ok = 0U;
     state->input_status_ok = 0U;
     state->input_status_fault_ok = 0U;
+    state->input_events_ok = 0U;
+    state->input_events_empty_ok = 0U;
+    state->input_events_fault_ok = 0U;
     state->exec_fault_ok = 0U;
     state->exec_path_found = 0U;
     state->exec_type_ok = 0U;
@@ -669,6 +687,23 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->input_status_ok = (state->last_result != 0ULL) ? 1U : 0U;
         return state->last_result;
 
+    case X86_64_SYSCALL_SERVICE_INPUT_EVENTS: {
+        u64 max_events = arg1;
+        u64 byte_count = max_events * (u64)sizeof(struct x86_64_input_event);
+        if (max_events > X86_64_INPUT_EVENT_QUEUE_CAPACITY || byte_count / sizeof(struct x86_64_input_event) != max_events) {
+            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+            return state->last_result;
+        }
+        if (x86_64_syscall_user_range_ok(arg0, byte_count) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        state->last_result = x86_64_input_events_read((struct x86_64_input_event *)arg0, max_events);
+        state->input_events_ok = 1U;
+        state->input_events_empty_ok = (state->last_result == 0ULL) ? 1U : 0U;
+        return state->last_result;
+    }
+
     default:
         state->last_result = X86_64_SYSCALL_RET_ENOSYS;
         return state->last_result;
@@ -807,6 +842,19 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
     state->input_status_fault_ok =
         (input_status_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
 
+    u64 input_events = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_INPUT_EVENTS,
+                                               state->sample_user_buffer, 2ULL, 0ULL,
+                                               0ULL, 0ULL, 0ULL);
+    state->input_events_ok = (input_events <= 2ULL) ? 1U : 0U;
+    state->input_events_empty_ok = (input_events == 0ULL) ? 1U : 0U;
+
+    u64 input_events_fault =
+        x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_INPUT_EVENTS,
+                                state->sample_kernel_pointer, 1ULL, 0ULL,
+                                0ULL, 0ULL, 0ULL);
+    state->input_events_fault_ok =
+        (input_events_fault == X86_64_SYSCALL_RET_EFAULT) ? 1U : 0U;
+
     u64 exec_fault = x86_64_syscall_dispatch(state, X86_64_SYSCALL_SERVICE_EXEC,
                                              state->sample_kernel_pointer, 0ULL, 0ULL,
                                              0ULL, 0ULL, 0ULL);
@@ -844,10 +892,13 @@ static inline void x86_64_syscall_dispatch_run_smoke(struct x86_64_syscall_dispa
          (state->sleep_ticks_ok != 0U) &&
          (state->input_status_ok != 0U) &&
          (state->input_status_fault_ok != 0U) &&
+         (state->input_events_ok != 0U) &&
+         (state->input_events_empty_ok != 0U) &&
+         (state->input_events_fault_ok != 0U) &&
          (state->exec_fault_ok != 0U) &&
          (state->unknown_rejected != 0U) &&
          (state->exit_ok != 0U) &&
-         (state->dispatch_calls == 21U)) ? 1U : 0U;
+         (state->dispatch_calls == 23U)) ? 1U : 0U;
 }
 
 static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_dispatch_state *state)
@@ -885,6 +936,9 @@ static inline void x86_64_syscall_dispatch_report(const struct x86_64_syscall_di
     x86_64_serial_write_u32("Syscall sleep ticks ok: ", state->sleep_ticks_ok);
     x86_64_serial_write_u32("Syscall input status ok: ", state->input_status_ok);
     x86_64_serial_write_u32("Syscall input status fault ok: ", state->input_status_fault_ok);
+    x86_64_serial_write_u32("Syscall input events ok: ", state->input_events_ok);
+    x86_64_serial_write_u32("Syscall input events empty ok: ", state->input_events_empty_ok);
+    x86_64_serial_write_u32("Syscall input events fault ok: ", state->input_events_fault_ok);
     x86_64_serial_write_u32("Syscall exec fault ok: ", state->exec_fault_ok);
     x86_64_serial_write_u32("Syscall exec path found: ", state->exec_path_found);
     x86_64_serial_write_u32("Syscall exec type ok: ", state->exec_type_ok);

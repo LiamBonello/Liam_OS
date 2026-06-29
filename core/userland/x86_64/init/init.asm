@@ -17,6 +17,7 @@ bits 64
 %define LIAM_SYSCALL_TICKS 15
 %define LIAM_SYSCALL_SLEEP_TICKS 16
 %define LIAM_SYSCALL_INPUT_STATUS 17
+%define LIAM_SYSCALL_INPUT_EVENTS 18
 %define LIAM_RET_ENOENT 0xfffffffffffffffe
 
 %define LIAM_STDIN 0
@@ -29,7 +30,7 @@ bits 64
 %define LIAM_READ_BUFFER_LEN 64
 %define LIAM_LINE_BUFFER_LEN 80
 %define LIAM_DEC_BUFFER_LEN 24
-%define LIAM_PS_BUFFER_LEN 512
+%define LIAM_PS_BUFFER_LEN 1024
 %define LIAM_MODE_BUFFER_OFFSET 0
 %define LIAM_READ_BUFFER_OFFSET LIAM_MODE_BUFFER_LEN
 %define LIAM_LINE_BUFFER_OFFSET (LIAM_MODE_BUFFER_LEN + LIAM_READ_BUFFER_LEN)
@@ -564,7 +565,7 @@ deskcheck_input:
     mov edi, LIAM_STDOUT
     lea rsi, [rsp + LIAM_PS_BUFFER_OFFSET]
     syscall
-    jmp deskcheck_storage
+    jmp deskcheck_input_events
 
 deskcheck_input_failed:
     mov eax, LIAM_SYSCALL_WRITE
@@ -572,6 +573,28 @@ deskcheck_input_failed:
     lea rsi, [rel input_failed_text]
     mov edx, input_failed_text_len
     syscall
+
+deskcheck_input_events:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel input_events_title_text]
+    mov edx, input_events_title_text_len
+    syscall
+
+    mov eax, LIAM_SYSCALL_INPUT_EVENTS
+    lea rdi, [rsp + LIAM_READ_BUFFER_OFFSET]
+    mov esi, 2
+    syscall
+
+    mov r12, rax
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel events_read_text]
+    mov edx, events_read_text_len
+    syscall
+
+    mov rax, r12
+    call write_rax_decimal_newline
 
 deskcheck_storage:
     mov eax, LIAM_SYSCALL_WRITE
@@ -1061,6 +1084,12 @@ input_title_text_len equ $ - input_title_text
 input_failed_text:
     db "input-status failed", 10
 input_failed_text_len equ $ - input_failed_text
+input_events_title_text:
+    db "Liam_OS input event service", 10
+input_events_title_text_len equ $ - input_events_title_text
+events_read_text:
+    db "events read "
+events_read_text_len equ $ - events_read_text
 storage_title_text:
     db "Liam_OS storage service", 10
 storage_title_text_len equ $ - storage_title_text

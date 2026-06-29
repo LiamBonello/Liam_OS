@@ -131,6 +131,9 @@ static void report_desktop_services(const struct x86_64_desktop_services_state *
     x86_64_serial_write_u32("Desktop scheduler observed slices: ", state->scheduler_observed_slices);
     x86_64_serial_write_u32("Desktop input ready: ", state->input_ready);
     x86_64_serial_write_u32("Desktop input buffer capacity: ", state->input_buffer_capacity);
+    x86_64_serial_write_u32("Desktop input events ready: ", state->input_event_service_ready);
+    x86_64_serial_write_u32("Desktop input event capacity: ", state->input_event_capacity);
+    x86_64_serial_write_u32("Desktop input event queued: ", state->input_event_queued);
     x86_64_serial_write_u32("Desktop storage readonly VFS ready: ", state->storage_readonly_vfs_ready);
     x86_64_serial_write_u32("Desktop session storage ready: ", state->storage_session_ready);
     x86_64_serial_write_u32("Desktop persistent storage ready: ", state->storage_persistent_ready);

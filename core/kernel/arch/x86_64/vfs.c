@@ -1,5 +1,7 @@
 #include "vfs.h"
 
+extern const u8 x86_64_user_eventd_image_start[];
+extern const u8 x86_64_user_eventd_image_end[];
 extern const u8 x86_64_user_hello_image_start[];
 extern const u8 x86_64_user_hello_image_end[];
 extern const u8 x86_64_user_sysinfo_image_start[];
@@ -29,6 +31,7 @@ static const char x86_64_vfs_dir_root[] =
     "usr\n";
 
 static const char x86_64_vfs_dir_bin[] =
+    "eventd\n"
     "hello\n"
     "inputd\n"
     "storaged\n"
@@ -62,12 +65,13 @@ static const char x86_64_vfs_file_motd[] =
     "Liam_OS x86_64 read-only VFS mounted.\n";
 
 static const char x86_64_vfs_file_version[] =
-    "Liam_OS Core x86_64 0.8.67-dev\n";
+    "Liam_OS Core x86_64 0.8.68-dev\n";
 
 static const char x86_64_vfs_file_help[] =
     "Available commands:\n"
     "help, about, version, pid, ps, deskcheck, wait, echo, ls, cat, stat, exec, clear, exit\n"
     "Executable files:\n"
+    "/bin/eventd\n"
     "/bin/hello\n"
     "/bin/inputd\n"
     "/bin/storaged\n"
@@ -78,6 +82,7 @@ static const char x86_64_vfs_file_help[] =
 static const char x86_64_vfs_file_files[] =
     "/\n"
     "/bin\n"
+    "/bin/eventd\n"
     "/bin/hello\n"
     "/bin/inputd\n"
     "/bin/storaged\n"
@@ -106,6 +111,7 @@ static const struct x86_64_vfs_node x86_64_vfs_nodes[] = {
     {"/tmp", (const u8 *)x86_64_vfs_dir_tmp, sizeof(x86_64_vfs_dir_tmp) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/usr", (const u8 *)x86_64_vfs_dir_usr, sizeof(x86_64_vfs_dir_usr) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/usr/share", (const u8 *)x86_64_vfs_dir_usr_share, sizeof(x86_64_vfs_dir_usr_share) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/bin/eventd", x86_64_user_eventd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/hello", x86_64_user_hello_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/inputd", x86_64_user_inputd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/storaged", x86_64_user_storaged_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
@@ -134,6 +140,10 @@ static u32 x86_64_vfs_is_session_storage_node(const struct x86_64_vfs_node *node
 
 static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
 {
+    if (node->data == x86_64_user_eventd_image_start) {
+        return (u64)(x86_64_user_eventd_image_end - x86_64_user_eventd_image_start);
+    }
+
     if (node->data == x86_64_user_hello_image_start) {
         return (u64)(x86_64_user_hello_image_end - x86_64_user_hello_image_start);
     }
@@ -384,6 +394,11 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
     }
 
     if (x86_64_vfs_type(&probe, "/etc/../bin//hello", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/bin/eventd", &type) != X86_64_VFS_RET_OK ||
         type != X86_64_VFS_NODE_EXECUTABLE) {
         return 0U;
     }

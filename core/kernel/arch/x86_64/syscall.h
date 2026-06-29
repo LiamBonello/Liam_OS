@@ -23,7 +23,8 @@
 #define X86_64_SYSCALL_SERVICE_TICKS 15U
 #define X86_64_SYSCALL_SERVICE_SLEEP_TICKS 16U
 #define X86_64_SYSCALL_SERVICE_INPUT_STATUS 17U
-#define X86_64_SYSCALL_SERVICE_COUNT 17U
+#define X86_64_SYSCALL_SERVICE_INPUT_EVENTS 18U
+#define X86_64_SYSCALL_SERVICE_COUNT 18U
 #define X86_64_SYSCALL_SERVICE_COUNT_OK 1U
 #define X86_64_MSR_IA32_EFER 0xC0000080ULL
 #define X86_64_MSR_IA32_STAR 0xC0000081ULL
@@ -73,6 +74,7 @@ struct x86_64_syscall_abi_state {
     u32 service_ticks_planned;
     u32 service_sleep_ticks_planned;
     u32 service_input_status_planned;
+    u32 service_input_events_planned;
     u32 syscall_abi_ok;
     u32 syscall_entry_ready;
     u64 entry_lstar_target;
@@ -128,6 +130,8 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
         (X86_64_SYSCALL_SERVICE_SLEEP_TICKS == 16U) ? 1U : 0U;
     state->service_input_status_planned =
         (X86_64_SYSCALL_SERVICE_INPUT_STATUS == 17U) ? 1U : 0U;
+    state->service_input_events_planned =
+        (X86_64_SYSCALL_SERVICE_INPUT_EVENTS == 18U) ? 1U : 0U;
     state->planned_star_value = X86_64_SYSCALL_STAR_VALUE;
     state->planned_fmask_value = X86_64_SYSCALL_FMASK_VALUE;
     state->ia32_efer_msr = X86_64_MSR_IA32_EFER;
@@ -173,7 +177,8 @@ static inline void x86_64_syscall_abi_init(struct x86_64_syscall_abi_state *stat
                              (state->service_window_present_planned != 0U) &&
                              (state->service_ticks_planned != 0U) &&
                              (state->service_sleep_ticks_planned != 0U) &&
-                             (state->service_input_status_planned != 0U)) ? 1U : 0U;
+                             (state->service_input_status_planned != 0U) &&
+                             (state->service_input_events_planned != 0U)) ? 1U : 0U;
     state->syscall_entry_ready = ((state->syscall_abi_ok != 0U) &&
                                   (state->entry_stub_installed != 0U)) ? 1U : 0U;
 }
@@ -212,6 +217,7 @@ static inline void x86_64_syscall_abi_report(const struct x86_64_syscall_abi_sta
     x86_64_serial_write_u32("Syscall ticks planned: ", state->service_ticks_planned);
     x86_64_serial_write_u32("Syscall sleep ticks planned: ", state->service_sleep_ticks_planned);
     x86_64_serial_write_u32("Syscall input status planned: ", state->service_input_status_planned);
+    x86_64_serial_write_u32("Syscall input events planned: ", state->service_input_events_planned);
     x86_64_serial_write_u32("Syscall MSR programming deferred: ", state->msr_programming_deferred);
     x86_64_serial_write_u32("Syscall MSR programming required: ", state->msr_programming_required);
     x86_64_serial_write_u32("Syscall user entry deferred: ", state->user_entry_deferred);

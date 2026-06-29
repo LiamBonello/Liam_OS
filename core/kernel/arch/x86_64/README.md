@@ -96,6 +96,7 @@ ls /
 cat /usr/share/help.txt
 stat /bin/sysinfo
 exec /bin/sysinfo
+exec /bin/eventd
 clear
 exit
 ```
@@ -131,6 +132,8 @@ Framebuffer surface ready: 1
 Framebuffer smoke ok: 1
 Desktop scheduler ticks ready: 1
 Desktop input ready: 1
+Desktop input events ready: 1
+Desktop input event capacity: 64
 Desktop storage readonly VFS ready: 1
 Desktop session storage ready: 1
 Desktop persistent storage ready: 0
@@ -187,13 +190,14 @@ Already in place:
 8. Kernel framebuffer drawing surface with RGB packing, pixel writes,
    rectangle fills, and smoke-draw/readback validation.
 9. Desktop-services kernel contract for timer-backed scheduler readiness,
-   keyboard input readiness, read-only VFS storage capability, graphics
+   keyboard input and input-event readiness, read-only VFS storage capability, graphics
    readiness, and userspace window-present requests.
 10. `/bin/windowd` userspace probe for desktop status and demo window drawing.
 11. Timer, sleep, input-status, and writable RAM-backed session-storage
     syscalls with `/bin/timed`, `/bin/inputd`, and `/bin/storaged` probes.
-12. Shell-level `deskcheck` validation for desktop-readiness syscalls.
-13. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
+12. Structured input-event syscall plumbing with `/bin/eventd` probe coverage.
+13. Shell-level `deskcheck` validation for desktop-readiness syscalls.
+14. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
 
 Still blocking a desktop handoff:
 
@@ -208,8 +212,8 @@ Still blocking a desktop handoff:
    early userland and now has writable RAM-backed session storage, but a desktop
    needs storage-backed files, directories, and executable loading that survive
    reboot.
-5. Expand input beyond buffered keyboard characters into a structured event
-   queue shared with long-running services.
+5. Expand the early input-event queue into a blocking, multi-client event
+   stream shared with long-running services.
 6. Run an i386-vs-x86_64 parity pass before changing the default build.
 7. Keep i386 only until x86_64 can do what the current i386 path does, then
    retire it deliberately.

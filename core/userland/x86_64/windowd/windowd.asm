@@ -5,7 +5,7 @@ bits 64
 %define LIAM_SYSCALL_DESKTOP_STATUS 13
 %define LIAM_SYSCALL_WINDOW_PRESENT 14
 %define LIAM_STDOUT 1
-%define LIAM_STATUS_BUFFER_LEN 512
+%define LIAM_STATUS_BUFFER_LEN 1024
 
 section .text
 global _start

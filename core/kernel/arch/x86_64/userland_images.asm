@@ -1,5 +1,7 @@
 global x86_64_user_init_image_start
 global x86_64_user_init_image_end
+global x86_64_user_eventd_image_start
+global x86_64_user_eventd_image_end
 global x86_64_user_hello_image_start
 global x86_64_user_hello_image_end
 global x86_64_user_inputd_image_start
@@ -18,6 +20,11 @@ align 16
 x86_64_user_init_image_start:
     incbin "build/x86_64/userland/init.elf"
 x86_64_user_init_image_end:
+
+align 16
+x86_64_user_eventd_image_start:
+    incbin "build/x86_64/userland/eventd.elf"
+x86_64_user_eventd_image_end:
 
 align 16
 x86_64_user_hello_image_start:

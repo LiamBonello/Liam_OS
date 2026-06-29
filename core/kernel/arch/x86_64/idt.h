@@ -14,6 +14,20 @@
 #define X86_64_IRQ_PIT_VECTOR 32U
 #define X86_64_IRQ_KEYBOARD_VECTOR 33U
 #define X86_64_PIT_DEFAULT_FREQUENCY_HZ 100U
+#define X86_64_INPUT_EVENT_QUEUE_CAPACITY 64U
+#define X86_64_INPUT_EVENT_TYPE_KEYBOARD 1U
+#define X86_64_INPUT_EVENT_FLAG_PRESSED 1U
+#define X86_64_INPUT_EVENT_FLAG_RELEASED 2U
+#define X86_64_INPUT_EVENT_FLAG_SHIFT 4U
+
+struct x86_64_input_event {
+    u32 type;
+    u32 code;
+    u32 value;
+    u32 flags;
+    u32 tick;
+    u32 reserved;
+};
 
 struct x86_64_idt_state {
     u64 idtr_base;
@@ -74,6 +88,11 @@ struct x86_64_keyboard_state {
     u32 buffered_chars;
     u32 buffer_capacity;
     u32 buffer_overflows;
+    u32 event_queue_capacity;
+    u32 event_queued;
+    u32 event_drops;
+    u32 event_read_calls;
+    u32 events_read;
     u32 read_calls;
     u32 bytes_read;
     u32 last_scancode;
@@ -89,6 +108,7 @@ void x86_64_timer_get_state(struct x86_64_timer_state *state);
 void x86_64_keyboard_initialize(void);
 void x86_64_keyboard_get_state(struct x86_64_keyboard_state *state);
 u64 x86_64_keyboard_read(char *buffer, u64 size);
+u64 x86_64_input_events_read(struct x86_64_input_event *events, u64 max_events);
 void x86_64_exception_handler(u64 vector, u64 error_code);
 void x86_64_irq_handler(u64 vector);
 

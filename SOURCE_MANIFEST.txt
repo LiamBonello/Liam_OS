@@ -158,6 +158,7 @@
 ./core/userland/flat/syscheck/syscheck.asm
 ./core/userland/flat/ticks/ticks.asm
 ./core/userland/flat/uptime/uptime.asm
+./core/userland/x86_64/eventd/eventd.asm
 ./core/userland/x86_64/hello/hello.asm
 ./core/userland/x86_64/init/init.asm
 ./core/userland/x86_64/inputd/inputd.asm

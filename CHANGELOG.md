@@ -1,5 +1,19 @@
 # Liam_OS Changelog
 
+## Core 0.8.68-dev
+
+### Added
+
+- Added a structured x86_64 input-event ring beside the keyboard character buffer.
+- Added an `input_events` syscall that copies bounded input events to userland.
+- Added `/bin/eventd`, a userland probe for input status and event-queue reads.
+- Extended desktop service status and `deskcheck` to report input-event readiness.
+
+### Changed
+
+- Updated the x86_64 `/proc/version` text and Liam_OS version to `0.8.68-dev`.
+- Updated `/bin/sysinfo` feature text and x86_64 VFS listings for input-event plumbing.
+
 ## Core 0.8.67-dev
 
 ### Added

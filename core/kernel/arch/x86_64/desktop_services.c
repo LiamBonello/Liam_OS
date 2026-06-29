@@ -83,6 +83,12 @@ static void refresh_desktop_state(void)
     desktop_state.input_ready = keyboard.keyboard_ok;
     desktop_state.input_buffer_capacity = keyboard.buffer_capacity;
     desktop_state.input_buffered_chars = keyboard.buffered_chars;
+    desktop_state.input_event_capacity = keyboard.event_queue_capacity;
+    desktop_state.input_event_queued = keyboard.event_queued;
+    desktop_state.input_event_drops = keyboard.event_drops;
+    desktop_state.input_event_service_ready =
+        ((keyboard.keyboard_ok != 0U) &&
+         (keyboard.event_queue_capacity == X86_64_INPUT_EVENT_QUEUE_CAPACITY)) ? 1U : 0U;
     desktop_state.storage_readonly_vfs_ready = 1U;
     desktop_state.storage_session_ready = x86_64_vfs_session_storage_ready();
     desktop_state.storage_persistent_ready = 0U;
@@ -91,6 +97,7 @@ static void refresh_desktop_state(void)
     desktop_state.window_service_ready =
         ((desktop_state.scheduler_tick_ready != 0U) &&
          (desktop_state.input_ready != 0U) &&
+         (desktop_state.input_event_service_ready != 0U) &&
          (desktop_state.storage_readonly_vfs_ready != 0U) &&
          (desktop_state.storage_session_ready != 0U) &&
          (desktop_state.graphics_ready != 0U)) ? 1U : 0U;
@@ -146,6 +153,18 @@ u64 x86_64_desktop_services_snapshot(char *buffer, u64 size)
     offset = append_string(buffer, size, offset, "input-buffered ");
     offset = append_u32(buffer, size, offset, desktop_state.input_buffered_chars);
     offset = append_char(buffer, size, offset, '\n');
+    offset = append_string(buffer, size, offset, "input-events-ready ");
+    offset = append_u32(buffer, size, offset, desktop_state.input_event_service_ready);
+    offset = append_char(buffer, size, offset, '\n');
+    offset = append_string(buffer, size, offset, "input-events-capacity ");
+    offset = append_u32(buffer, size, offset, desktop_state.input_event_capacity);
+    offset = append_char(buffer, size, offset, '\n');
+    offset = append_string(buffer, size, offset, "input-events-queued ");
+    offset = append_u32(buffer, size, offset, desktop_state.input_event_queued);
+    offset = append_char(buffer, size, offset, '\n');
+    offset = append_string(buffer, size, offset, "input-events-drops ");
+    offset = append_u32(buffer, size, offset, desktop_state.input_event_drops);
+    offset = append_char(buffer, size, offset, '\n');
     offset = append_string(buffer, size, offset, "storage-readonly-vfs ");
     offset = append_u32(buffer, size, offset, desktop_state.storage_readonly_vfs_ready);
     offset = append_char(buffer, size, offset, '\n');
@@ -165,14 +184,15 @@ u64 x86_64_desktop_services_snapshot(char *buffer, u64 size)
     offset = append_u32(buffer, size, offset, desktop_state.window_present_calls);
     offset = append_char(buffer, size, offset, '\n');
 
+    u64 bytes = (offset < size) ? offset : (size - 1ULL);
     if (offset < size) {
-        buffer[offset] = '\0';
+        buffer[bytes] = '\0';
     } else {
-        buffer[size - 1ULL] = '\0';
+        buffer[bytes] = '\0';
     }
 
-    desktop_state.snapshot_ok = (offset > 0ULL && offset < size) ? 1U : 0U;
-    return offset;
+    desktop_state.snapshot_ok = (bytes > 0ULL && offset < size) ? 1U : 0U;
+    return bytes;
 }
 
 u64 x86_64_desktop_services_present_demo_window(void)
@@ -227,7 +247,7 @@ u64 x86_64_desktop_services_present_demo_window(void)
 
 void x86_64_desktop_services_run_smoke(struct x86_64_desktop_services_state *state)
 {
-    char buffer[512];
+    char buffer[1024];
     u64 snapshot_bytes = x86_64_desktop_services_snapshot(buffer, sizeof(buffer));
     u64 present_result = x86_64_desktop_services_present_demo_window();
 
@@ -238,6 +258,7 @@ void x86_64_desktop_services_run_smoke(struct x86_64_desktop_services_state *sta
         ((desktop_state.initialized != 0U) &&
          (desktop_state.scheduler_tick_ready != 0U) &&
          (desktop_state.input_ready != 0U) &&
+         (desktop_state.input_event_service_ready != 0U) &&
          (desktop_state.storage_readonly_vfs_ready != 0U) &&
          (desktop_state.storage_session_ready != 0U) &&
          (desktop_state.graphics_ready != 0U) &&
