@@ -11,8 +11,11 @@ make x86_64-iso
 
 rm -f "$LOG"
 
+printf '%s\n' 'Running x86_64 QEMU smoke test...'
+printf 'Smoke log: %s\n' "$LOG"
+
 set +e
-timeout 150s sh -c '
+timeout 45s sh -c '
   {
     sleep 4
     printf "version\n"
@@ -96,4 +99,5 @@ require_marker "session storage ok"
 require_marker "storage-write ok"
 require_marker "Liam_OS x86_64 shell exited"
 
+printf '%s\n' 'x86_64 smoke test passed'
 printf 'x86_64 smoke log: %s\n' "$LOG"
