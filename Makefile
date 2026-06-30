@@ -1,4 +1,4 @@
-.PHONY: all core core-debug run run-debug check-tools check-x86_64 clean dist structure
+.PHONY: all core core-debug run run-debug check-tools check-x86_64 clean manifest dist structure
 
 all: core
 
@@ -24,9 +24,15 @@ clean:
 	$(MAKE) -C core clean
 	rm -rf dist
 
-dist:
-	mkdir -p dist
-	git archive --format=zip --output=dist/Liam_OS_source.zip HEAD
+manifest:
+	find . \
+		-path './.git' -prune -o \
+		-path './core/build' -prune -o \
+		-path './dist' -prune -o \
+		-type f -print | sort > SOURCE_MANIFEST.txt
+
+dist: manifest
+	./scripts/package-source.sh
 
 structure:
 	find . -path './.git' -prune -o -path './core/build' -prune -o -type f -print | sort

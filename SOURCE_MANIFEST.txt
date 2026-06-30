@@ -1,9 +1,5 @@
 ./.gitignore
-./CHANGELOG.md
-./LEGAL_PACKAGING.md
 ./Makefile
-./RELEASE_CHECKLIST.md
-./SECURITY.md
 ./SOURCE_MANIFEST.txt
 ./core/Makefile
 ./core/boot/grub-x86_64-exception-test.cfg
@@ -31,7 +27,6 @@
 ./core/kernel/arch/i386/start.asm
 ./core/kernel/arch/i386/tss.c
 ./core/kernel/arch/i386/tss.h
-./core/kernel/arch/x86_64/README.md
 ./core/kernel/arch/x86_64/boot32.asm
 ./core/kernel/arch/x86_64/boot_context.c
 ./core/kernel/arch/x86_64/boot_context.h

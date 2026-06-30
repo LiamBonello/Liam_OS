@@ -4,6 +4,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/dist"
 mkdir -p "$OUT"
 cd "$ROOT"
+
+find . \
+  -path './.git' -prune -o \
+  -path './core/build' -prune -o \
+  -path './dist' -prune -o \
+  -type f -print | sort > SOURCE_MANIFEST.txt
+
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT
