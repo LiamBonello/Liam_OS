@@ -1,4 +1,4 @@
-.PHONY: all core core-debug run run-debug check-tools check-x86_64 clean manifest dist structure
+.PHONY: all core core-debug run run-debug check-tools check-x86_64 x86_64-info x86_64-kernel x86_64-iso x86_64-run clean manifest dist structure
 
 all: core
 
@@ -19,6 +19,18 @@ check-tools:
 
 check-x86_64:
 	./scripts/check-x86_64.sh
+
+x86_64-info:
+	$(MAKE) -C core x86_64-info
+
+x86_64-kernel:
+	$(MAKE) -C core x86_64-kernel
+
+x86_64-iso:
+	$(MAKE) -C core x86_64-iso
+
+x86_64-run:
+	$(MAKE) -C core x86_64-run
 
 clean:
 	$(MAKE) -C core clean
