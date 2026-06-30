@@ -128,6 +128,10 @@ struct x86_64_process_smoke_state {
     u32 last_wait_exit_code;
     u32 last_scheduled_user_pid;
     u32 last_run_pid;
+    u32 kernel_scheduler_selections;
+    u32 user_scheduler_selections;
+    u32 kernel_scheduler_cursor;
+    u32 user_scheduler_cursor;
     u32 worker_a_count;
     u32 worker_b_count;
     u32 userland_foundation_ok;

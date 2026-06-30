@@ -354,10 +354,13 @@ static struct x86_64_process *find_next_ready_process(void)
             process_table[index].mode == X86_64_PROCESS_MODE_KERNEL &&
             process_table[index].entry != (x86_64_process_entry_t)0) {
             kernel_schedule_cursor = (index + 1U) % X86_64_PROCESS_MAX_PROCESSES;
+            process_state.kernel_scheduler_selections += 1U;
+            process_state.kernel_scheduler_cursor = kernel_schedule_cursor;
             return &process_table[index];
         }
     }
 
+    process_state.kernel_scheduler_cursor = kernel_schedule_cursor;
     return (struct x86_64_process *)0;
 }
 
@@ -370,10 +373,13 @@ static struct x86_64_process *find_next_ready_user_process(void)
             process_table[index].mode == X86_64_PROCESS_MODE_USER &&
             process_table[index].user_entry != 0ULL) {
             user_schedule_cursor = (index + 1U) % X86_64_PROCESS_MAX_PROCESSES;
+            process_state.user_scheduler_selections += 1U;
+            process_state.user_scheduler_cursor = user_schedule_cursor;
             return &process_table[index];
         }
     }
 
+    process_state.user_scheduler_cursor = user_schedule_cursor;
     return (struct x86_64_process *)0;
 }
 
@@ -675,6 +681,10 @@ void x86_64_process_initialize(struct x86_64_process_smoke_state *state)
     next_address_space_id = 1ULL;
     kernel_schedule_cursor = 0U;
     user_schedule_cursor = 0U;
+    process_state.kernel_scheduler_selections = 0U;
+    process_state.user_scheduler_selections = 0U;
+    process_state.kernel_scheduler_cursor = 0U;
+    process_state.user_scheduler_cursor = 0U;
     child_status_count = 0U;
     worker_a_runs = 0U;
     worker_b_runs = 0U;
@@ -957,6 +967,14 @@ u64 x86_64_process_snapshot(char *buffer, u64 size)
     offset = append_u32_decimal(buffer, size, offset, process_state.completed_child_waits);
     offset = append_string(buffer, size, offset, " wait-drops ");
     offset = append_u32_decimal(buffer, size, offset, process_state.completed_child_drops);
+    offset = append_string(buffer, size, offset, " kernel-sched ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.kernel_scheduler_selections);
+    offset = append_string(buffer, size, offset, " user-sched ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.user_scheduler_selections);
+    offset = append_string(buffer, size, offset, " kernel-cursor ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.kernel_scheduler_cursor);
+    offset = append_string(buffer, size, offset, " user-cursor ");
+    offset = append_u32_decimal(buffer, size, offset, process_state.user_scheduler_cursor);
     offset = append_char(buffer, size, offset, '\n');
 
     if (offset < size) {
@@ -1249,6 +1267,10 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
          (process_state.user_image_copied != 0U) &&
          (process_state.user_process_ready != 0U) &&
          (process_state.user_scheduler_ready != 0U) &&
+         (process_state.kernel_scheduler_selections == 3U) &&
+         (process_state.user_scheduler_selections == 1U) &&
+         (process_state.kernel_scheduler_cursor == 2U) &&
+         (process_state.user_scheduler_cursor == 3U) &&
          (process_state.worker_a_count == 1U) &&
          (process_state.worker_b_count == 1U) &&
          (process_state.userland_foundation_ok != 0U) &&
@@ -1304,6 +1326,10 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_u32("Process last wait exit code: ", process_state.last_wait_exit_code);
     x86_64_serial_write_u32("Process last scheduled user pid: ", process_state.last_scheduled_user_pid);
     x86_64_serial_write_u32("Process last run pid: ", process_state.last_run_pid);
+    x86_64_serial_write_u32("Process kernel scheduler selections: ", process_state.kernel_scheduler_selections);
+    x86_64_serial_write_u32("Process user scheduler selections: ", process_state.user_scheduler_selections);
+    x86_64_serial_write_u32("Process kernel scheduler cursor: ", process_state.kernel_scheduler_cursor);
+    x86_64_serial_write_u32("Process user scheduler cursor: ", process_state.user_scheduler_cursor);
     x86_64_serial_write_hex64("Process first stack base: 0x", process_state.first_stack_base);
     x86_64_serial_write_hex64("Process first stack top: 0x", process_state.first_stack_top);
     x86_64_serial_write_hex64("Process second stack base: 0x", process_state.second_stack_base);
@@ -1331,6 +1357,10 @@ void x86_64_process_run_smoke(struct x86_64_process_smoke_state *state)
     x86_64_serial_write_hex64("Process worker B stack sample: 0x", process_state.worker_b_stack_sample);
     x86_64_serial_write_u32("Process worker A count: ", process_state.worker_a_count);
     x86_64_serial_write_u32("Process worker B count: ", process_state.worker_b_count);
+    x86_64_serial_write_u32("Process kernel scheduler selections: ", process_state.kernel_scheduler_selections);
+    x86_64_serial_write_u32("Process user scheduler selections: ", process_state.user_scheduler_selections);
+    x86_64_serial_write_u32("Process kernel scheduler cursor: ", process_state.kernel_scheduler_cursor);
+    x86_64_serial_write_u32("Process user scheduler cursor: ", process_state.user_scheduler_cursor);
     x86_64_serial_write_u32("Process userland foundation ok: ", process_state.userland_foundation_ok);
     x86_64_serial_write_u32("Process syscall dispatcher ok: ", process_state.syscall_dispatcher_ok);
     x86_64_serial_write_u32("Process user context ok: ", process_state.user_context_ok);
