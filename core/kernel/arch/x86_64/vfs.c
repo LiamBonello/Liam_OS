@@ -2,6 +2,8 @@
 
 extern const u8 x86_64_user_eventd_image_start[];
 extern const u8 x86_64_user_eventd_image_end[];
+extern const u8 x86_64_user_datatest_image_start[];
+extern const u8 x86_64_user_datatest_image_end[];
 extern const u8 x86_64_user_hello_image_start[];
 extern const u8 x86_64_user_hello_image_end[];
 extern const u8 x86_64_user_sysinfo_image_start[];
@@ -33,6 +35,7 @@ static const char x86_64_vfs_dir_root[] =
     "usr\n";
 
 static const char x86_64_vfs_dir_bin[] =
+    "datatest\n"
     "eventd\n"
     "hello\n"
     "inputd\n"
@@ -74,6 +77,7 @@ static const char x86_64_vfs_file_help[] =
     "Available commands:\n"
     "help, about, version, pid, ps, deskcheck, wait, echo, ls, cat, stat, exec, clear, exit\n"
     "Executable files:\n"
+    "/bin/datatest\n"
     "/bin/eventd\n"
     "/bin/hello\n"
     "/bin/inputd\n"
@@ -86,6 +90,7 @@ static const char x86_64_vfs_file_help[] =
 static const char x86_64_vfs_file_files[] =
     "/\n"
     "/bin\n"
+    "/bin/datatest\n"
     "/bin/eventd\n"
     "/bin/hello\n"
     "/bin/inputd\n"
@@ -116,6 +121,7 @@ static const struct x86_64_vfs_node x86_64_vfs_nodes[] = {
     {"/tmp", (const u8 *)x86_64_vfs_dir_tmp, sizeof(x86_64_vfs_dir_tmp) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/usr", (const u8 *)x86_64_vfs_dir_usr, sizeof(x86_64_vfs_dir_usr) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/usr/share", (const u8 *)x86_64_vfs_dir_usr_share, sizeof(x86_64_vfs_dir_usr_share) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
+    {"/bin/datatest", x86_64_user_datatest_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/eventd", x86_64_user_eventd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/hello", x86_64_user_hello_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/inputd", x86_64_user_inputd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
@@ -148,6 +154,10 @@ static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
 {
     if (node->data == x86_64_user_eventd_image_start) {
         return (u64)(x86_64_user_eventd_image_end - x86_64_user_eventd_image_start);
+    }
+
+    if (node->data == x86_64_user_datatest_image_start) {
+        return (u64)(x86_64_user_datatest_image_end - x86_64_user_datatest_image_start);
     }
 
     if (node->data == x86_64_user_hello_image_start) {

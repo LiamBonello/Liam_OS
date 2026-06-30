@@ -10,7 +10,8 @@ u64 x86_64_user_mode_kernel_cr3;
 
 static struct x86_64_user_mode_state *active_state;
 static struct x86_64_syscall_dispatch_state active_dispatcher;
-static u8 active_exec_user_code_page[X86_64_USER_PAGE_BYTES] __attribute__((aligned(4096)));
+static u8 active_exec_user_image_pages[X86_64_USER_IMAGE_MAX_PAGES][X86_64_USER_PAGE_BYTES]
+    __attribute__((aligned(4096)));
 
 static void clear_state(struct x86_64_user_mode_state *state)
 {
@@ -40,7 +41,10 @@ static u32 is_user_stack_ready(const struct x86_64_paging_builder_state *paging_
 static void initialize_live_dispatcher(u32 current_pid)
 {
     x86_64_syscall_dispatch_init(&active_dispatcher, current_pid);
-    active_dispatcher.exec_user_code_page = (u64)active_exec_user_code_page;
+    active_dispatcher.exec_user_code_page = (u64)active_exec_user_image_pages[0];
+    for (u32 i = 0U; i < X86_64_USER_IMAGE_MAX_PAGES; ++i) {
+        active_dispatcher.exec_user_image_pages[i] = (u64)active_exec_user_image_pages[i];
+    }
     active_dispatcher.write_output_enabled = 1U;
     active_dispatcher.blocking_read_enabled = 1U;
 }

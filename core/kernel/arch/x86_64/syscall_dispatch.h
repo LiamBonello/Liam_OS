@@ -21,6 +21,8 @@
 #define X86_64_SYSCALL_STDERR 2ULL
 #define X86_64_SYSCALL_WRITE_MAX_BYTES 1024ULL
 #define X86_64_SYSCALL_ARG_SHELL_MODE 0ULL
+#define X86_64_ELF_PF_X 1U
+#define X86_64_ELF_PF_W 2U
 
 struct x86_64_syscall_frame {
     u64 number;
@@ -95,6 +97,10 @@ struct x86_64_syscall_dispatch_state {
     u32 yield_count;
     struct x86_64_vfs_state vfs;
     u64 exec_user_code_page;
+    u64 exec_user_image_pages[X86_64_USER_IMAGE_MAX_PAGES];
+    u32 exec_user_image_page_count;
+    u32 exec_user_writable_page_bitmap;
+    u64 exec_user_image_bytes;
     u64 exec_entry;
     u64 exec_target_cr3;
     u64 last_syscall;
@@ -309,19 +315,43 @@ static inline const struct x86_64_elf_program_header *x86_64_syscall_program_hea
     return (const struct x86_64_elf_program_header *)(image + offset);
 }
 
-static inline void x86_64_syscall_clear_user_code_page(struct x86_64_syscall_dispatch_state *state)
+static inline void x86_64_syscall_clear_user_image_pages(struct x86_64_syscall_dispatch_state *state)
 {
-    u8 *code = (u8 *)state->exec_user_code_page;
-    for (u64 i = 0ULL; i < X86_64_USER_PAGE_BYTES; ++i) {
-        code[i] = 0U;
+    for (u32 page_index = 0U; page_index < X86_64_USER_IMAGE_MAX_PAGES; ++page_index) {
+        u8 *page = (u8 *)state->exec_user_image_pages[page_index];
+        if (page == (u8 *)0) {
+            continue;
+        }
+
+        for (u64 i = 0ULL; i < X86_64_USER_PAGE_BYTES; ++i) {
+            page[i] = 0U;
+        }
     }
+
+    state->exec_user_image_page_count = 0U;
+    state->exec_user_writable_page_bitmap = 0U;
+    state->exec_user_image_bytes = 0ULL;
+}
+
+static inline u32 x86_64_syscall_copy_to_user_image_page(struct x86_64_syscall_dispatch_state *state,
+                                                         u64 image_offset,
+                                                         u8 value)
+{
+    u32 page_index = (u32)(image_offset / X86_64_USER_PAGE_BYTES);
+    if (page_index >= X86_64_USER_IMAGE_MAX_PAGES ||
+        state->exec_user_image_pages[page_index] == 0ULL) {
+        return 0U;
+    }
+
+    ((u8 *)state->exec_user_image_pages[page_index])[image_offset & (X86_64_USER_PAGE_BYTES - 1ULL)] = value;
+    return 1U;
 }
 
 static inline u32 x86_64_syscall_load_exec_elf(struct x86_64_syscall_dispatch_state *state,
                                                const u8 *image,
                                                u64 image_size)
 {
-    if (state->exec_user_code_page == 0ULL ||
+    if (state->exec_user_image_pages[0] == 0ULL ||
         image == (const u8 *)0 ||
         image_size < sizeof(struct x86_64_elf_header) ||
         image_size > X86_64_USER_STACK_BYTES) {
@@ -352,48 +382,75 @@ static inline u32 x86_64_syscall_load_exec_elf(struct x86_64_syscall_dispatch_st
         return 0U;
     }
 
-    const struct x86_64_elf_program_header *load_phdr =
-        (const struct x86_64_elf_program_header *)0;
+    x86_64_syscall_clear_user_image_pages(state);
+
+    u32 load_seen = 0U;
+    u32 entry_segment_seen = 0U;
+    u64 image_bytes = 0ULL;
     for (u16 i = 0U; i < header->program_header_count; ++i) {
         const struct x86_64_elf_program_header *candidate =
             x86_64_syscall_program_header_at(image, header, i);
-        if (candidate->type == X86_64_ELF_PROGRAM_TYPE_LOAD) {
-            load_phdr = candidate;
-            break;
+        if (candidate->type != X86_64_ELF_PROGRAM_TYPE_LOAD) {
+            continue;
         }
+        if (candidate->memory_size == 0ULL) {
+            continue;
+        }
+
+        u64 segment_end = candidate->virtual_address + candidate->memory_size;
+        if (segment_end < candidate->virtual_address ||
+            candidate->virtual_address < X86_64_USER_CODE_BASE ||
+            segment_end > (X86_64_USER_CODE_BASE + X86_64_USER_IMAGE_MAX_BYTES) ||
+            candidate->alignment != X86_64_USER_PAGE_BYTES ||
+            candidate->file_size > candidate->memory_size ||
+            x86_64_syscall_image_range_fits(candidate->offset, candidate->file_size, image_size) == 0U) {
+            return 0U;
+        }
+
+        u64 segment_offset = candidate->virtual_address - X86_64_USER_CODE_BASE;
+        u64 segment_image_end = segment_offset + candidate->memory_size;
+        u32 first_page = (u32)(segment_offset / X86_64_USER_PAGE_BYTES);
+        u32 last_page = (u32)((segment_image_end - 1ULL) / X86_64_USER_PAGE_BYTES);
+        for (u32 page_index = first_page; page_index <= last_page; ++page_index) {
+            if (page_index >= X86_64_USER_IMAGE_MAX_PAGES) {
+                return 0U;
+            }
+            if ((candidate->flags & X86_64_ELF_PF_W) != 0U) {
+                state->exec_user_writable_page_bitmap |= (1U << page_index);
+            }
+        }
+
+        const u8 *segment = image + candidate->offset;
+        for (u64 byte_index = 0ULL; byte_index < candidate->file_size; ++byte_index) {
+            if (x86_64_syscall_copy_to_user_image_page(state,
+                                                       segment_offset + byte_index,
+                                                       segment[byte_index]) == 0U) {
+                return 0U;
+            }
+        }
+
+        if (header->entry >= candidate->virtual_address &&
+            header->entry < segment_end &&
+            (candidate->flags & X86_64_ELF_PF_X) != 0U) {
+            entry_segment_seen = 1U;
+        }
+        if (segment_image_end > image_bytes) {
+            image_bytes = segment_image_end;
+        }
+        load_seen = 1U;
     }
 
-    if (load_phdr == (const struct x86_64_elf_program_header *)0) {
+    if (load_seen == 0U ||
+        entry_segment_seen == 0U ||
+        image_bytes == 0ULL ||
+        image_bytes > X86_64_USER_IMAGE_MAX_BYTES) {
         return 0U;
-    }
-
-    u64 segment_end = load_phdr->virtual_address + load_phdr->memory_size;
-    if (segment_end < load_phdr->virtual_address) {
-        return 0U;
-    }
-
-    u32 load_ok =
-        ((load_phdr->type == X86_64_ELF_PROGRAM_TYPE_LOAD) &&
-         ((load_phdr->flags & 1U) != 0U) &&
-         (load_phdr->alignment == X86_64_USER_PAGE_BYTES) &&
-         (load_phdr->virtual_address == X86_64_USER_CODE_BASE) &&
-         (load_phdr->file_size <= load_phdr->memory_size) &&
-         (load_phdr->memory_size <= X86_64_USER_PAGE_BYTES) &&
-         (header->entry >= load_phdr->virtual_address) &&
-         (header->entry < segment_end) &&
-         (x86_64_syscall_image_range_fits(load_phdr->offset, load_phdr->file_size, image_size) != 0U)) ? 1U : 0U;
-    if (load_ok == 0U) {
-        return 0U;
-    }
-
-    x86_64_syscall_clear_user_code_page(state);
-    const u8 *segment = image + load_phdr->offset;
-    u8 *code = (u8 *)state->exec_user_code_page;
-    for (u64 i = 0ULL; i < load_phdr->file_size; ++i) {
-        code[i] = segment[i];
     }
 
     state->exec_entry = header->entry;
+    state->exec_user_image_bytes = image_bytes;
+    state->exec_user_image_page_count =
+        (u32)((image_bytes + X86_64_USER_PAGE_BYTES - 1ULL) / X86_64_USER_PAGE_BYTES);
     state->exec_loaded = 1U;
     return 1U;
 }
@@ -457,6 +514,12 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->exit_code = 0U;
     state->yield_count = 0U;
     state->exec_user_code_page = 0ULL;
+    for (u32 i = 0U; i < X86_64_USER_IMAGE_MAX_PAGES; ++i) {
+        state->exec_user_image_pages[i] = 0ULL;
+    }
+    state->exec_user_image_page_count = 0U;
+    state->exec_user_writable_page_bitmap = 0U;
+    state->exec_user_image_bytes = 0ULL;
     state->exec_entry = 0ULL;
     state->exec_target_cr3 = 0ULL;
     state->last_syscall = 0ULL;
@@ -603,8 +666,10 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
 
         state->exec_spawned_pid = x86_64_process_create_user_image((const char *)arg0,
                                                                    (const u8 *)state->exec_user_code_page,
-                                                                   X86_64_USER_PAGE_BYTES,
-                                                                   state->exec_entry);
+                                                                   state->exec_user_image_bytes,
+                                                                   state->exec_entry,
+                                                                   state->exec_user_image_page_count,
+                                                                   state->exec_user_writable_page_bitmap);
         if (state->exec_spawned_pid == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EINVAL;
             return state->last_result;
@@ -667,8 +732,10 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->spawn_loaded = 1U;
         state->spawn_spawned_pid = x86_64_process_create_user_image((const char *)arg0,
                                                                     (const u8 *)state->exec_user_code_page,
-                                                                    X86_64_USER_PAGE_BYTES,
-                                                                    state->exec_entry);
+                                                                    state->exec_user_image_bytes,
+                                                                    state->exec_entry,
+                                                                    state->exec_user_image_page_count,
+                                                                    state->exec_user_writable_page_bitmap);
         if (state->spawn_spawned_pid == 0U) {
             state->last_result = X86_64_SYSCALL_RET_EINVAL;
             return state->last_result;

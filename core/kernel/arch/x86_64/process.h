@@ -3,12 +3,13 @@
 
 #include "paging_builder.h"
 #include "types.h"
+#include "userland.h"
 
 #define X86_64_PROCESS_MAX_PROCESSES 64U
 #define X86_64_PROCESS_NAME_LEN 24U
 #define X86_64_PROCESS_IMAGE_PATH_LEN 64U
 #define X86_64_PROCESS_KERNEL_STACK_BYTES 4096ULL
-#define X86_64_PROCESS_ADDRESS_SPACE_PAGES 8U
+#define X86_64_PROCESS_ADDRESS_SPACE_PAGES (7U + X86_64_USER_IMAGE_MAX_PAGES)
 #define X86_64_PROCESS_CHILD_STATUS_QUEUE 16U
 
 typedef void (*x86_64_process_entry_t)(void *arg);
@@ -47,6 +48,8 @@ struct x86_64_process {
     u64 user_code_pt_page;
     u64 user_stack_pt_page;
     u64 user_code_page;
+    u64 user_code_pages[X86_64_USER_IMAGE_MAX_PAGES];
+    u64 user_code_page_flags[X86_64_USER_IMAGE_MAX_PAGES];
     u64 user_stack_page;
     u64 user_code_virtual;
     u64 user_stack_virtual;
@@ -54,6 +57,7 @@ struct x86_64_process {
     u32 address_space_owned;
     u32 user_page_tables_ready;
     u32 kernel_mappings_ready;
+    u32 user_code_page_count;
     u32 exit_code;
 };
 
@@ -171,9 +175,11 @@ u32 x86_64_process_create(const char *name,
                           x86_64_process_entry_t entry,
                           void *arg);
 u32 x86_64_process_create_user_image(const char *path,
-                                      const u8 *loaded_code_page,
+                                      const u8 *loaded_code_pages,
                                       u64 code_bytes,
-                                      u64 entry);
+                                      u64 entry,
+                                      u32 page_count,
+                                      u32 writable_page_bitmap);
 u32 x86_64_process_mark_user_exited(u32 pid, u32 exit_code);
 u32 x86_64_process_reap_user(u32 pid);
 u32 x86_64_process_reap_exited_user_processes(void);

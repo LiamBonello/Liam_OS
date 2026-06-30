@@ -24,6 +24,10 @@ timeout 45s sh -c '
     sleep 1
     printf "ps\n"
     sleep 1
+    printf "exec /bin/datatest\n"
+    sleep 1
+    printf "wait\n"
+    sleep 1
     printf "exec /bin/windowd\n"
     sleep 2
     printf "wait\n"
@@ -80,6 +84,7 @@ require_marker "PID STATE MODE NAME"
 require_marker "init: service pid "
 require_marker "/bin/windowd-service"
 require_marker "created 2 user-created 1 user-exited 0 user-reaped 0"
+require_marker "data-write ok"
 require_marker "wait: pid "
 require_marker "wait: exit 0"
 require_marker "kernel-sched "

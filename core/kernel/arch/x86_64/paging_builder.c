@@ -13,7 +13,7 @@
 #define X86_64_USER_STACK_FLAGS (X86_64_PAGE_PRESENT | X86_64_PAGE_WRITABLE | X86_64_PAGE_USER)
 #define X86_64_PAGE_MASK (X86_64_PAGE_SIZE - 1ULL)
 #define X86_64_HUGE_PAGE_MASK (X86_64_HUGE_PAGE_SIZE - 1ULL)
-#define X86_64_USER_IMAGE_MAX_BYTES 65536U
+#define X86_64_EMBEDDED_INIT_ELF_MAX_BYTES 65536U
 #define X86_64_EMBEDDED_INIT_MAX_BYTES \
     (X86_64_PAGING_BUILDER_USER_CODE_PAGES * X86_64_USER_PAGE_BYTES)
 
@@ -249,7 +249,7 @@ static void load_embedded_user_image(struct x86_64_paging_builder_state *state)
     state->user_image_embedded =
         ((image != (const u8 *)0) &&
          (image_bytes >= sizeof(struct x86_64_elf_header)) &&
-         (image_bytes <= X86_64_USER_IMAGE_MAX_BYTES)) ? 1U : 0U;
+         (image_bytes <= X86_64_EMBEDDED_INIT_ELF_MAX_BYTES)) ? 1U : 0U;
     state->user_image_source_ok = state->user_image_embedded;
 
     if (state->user_image_source_ok != 0U) {
