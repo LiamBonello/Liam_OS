@@ -142,6 +142,14 @@ u64 x86_64_user_mode_syscall_entry(struct x86_64_syscall_frame *frame)
         }
         break;
 
+    case X86_64_SYSCALL_SERVICE_SPAWN:
+        state->exec_ok = (result > 0ULL &&
+                          result != X86_64_SYSCALL_RET_EFAULT &&
+                          result != X86_64_SYSCALL_RET_EINVAL &&
+                          result != X86_64_SYSCALL_RET_ENOSYS &&
+                          result != X86_64_VFS_RET_ENOENT) ? 1U : 0U;
+        break;
+
     case X86_64_SYSCALL_SERVICE_YIELD:
         state->yield_ok = ((result == X86_64_SYSCALL_RET_OK) &&
                            (active_dispatcher.yield_count >= 1U)) ? 1U : 0U;

@@ -18,6 +18,7 @@ bits 64
 %define LIAM_SYSCALL_SLEEP_TICKS 16
 %define LIAM_SYSCALL_INPUT_STATUS 17
 %define LIAM_SYSCALL_INPUT_EVENTS 18
+%define LIAM_SYSCALL_SPAWN 19
 %define LIAM_RET_ENOENT 0xfffffffffffffffe
 
 %define LIAM_STDIN 0
@@ -305,15 +306,35 @@ check_deskcheck:
 
 check_wait:
     cmp r15, 4
-    jne check_clear
+    jne check_service
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 'w'
-    jne check_clear
+    jne check_service
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'a'
-    jne check_clear
+    jne check_service
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'i'
-    jne check_clear
+    jne check_service
     cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 't'
     je command_wait
+
+check_service:
+    cmp r15, 9
+    jb check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 0], 's'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 1], 'e'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 2], 'r'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 3], 'v'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 4], 'i'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 5], 'c'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 6], 'e'
+    jne check_clear
+    cmp byte [rsp + LIAM_LINE_BUFFER_OFFSET + 7], ' '
+    je command_service
 
 check_clear:
     cmp r15, 5
@@ -760,6 +781,44 @@ command_direct_sysinfo:
     lea rdi, [rel sysinfo_exec_path]
     jmp exec_path_pointer
 
+command_service:
+    lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET + 8]
+    mov eax, LIAM_SYSCALL_SPAWN
+    syscall
+    test rax, rax
+    jle service_failed
+
+    mov r12, rax
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel service_pid_text]
+    mov edx, service_pid_text_len
+    syscall
+
+    mov rax, r12
+    call write_rax_decimal_newline
+    jmp command_done
+
+service_failed:
+    cmp rax, LIAM_RET_ENOENT
+    je service_not_found
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel service_error_text]
+    mov edx, service_error_text_len
+    syscall
+    jmp command_done
+
+service_not_found:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel service_not_found_text]
+    mov edx, service_not_found_text_len
+    syscall
+    jmp command_done
+
 command_exec:
     lea rdi, [rsp + LIAM_LINE_BUFFER_OFFSET + 5]
     jmp exec_path_pointer
@@ -1138,6 +1197,19 @@ wait_no_child_text_len equ $ - wait_no_child_text
 wait_error_text:
     db "wait: failed", 10
 wait_error_text_len equ $ - wait_error_text
+
+service_pid_text:
+    db "service: pid "
+service_pid_text_len equ $ - service_pid_text
+
+service_error_text:
+    db "service: failed", 10
+service_error_text_len equ $ - service_error_text
+
+service_not_found_text:
+    db "service: not found", 10
+service_not_found_text_len equ $ - service_not_found_text
+
 exec_error_text:
     db "exec: not implemented", 10
 exec_error_text_len equ $ - exec_error_text

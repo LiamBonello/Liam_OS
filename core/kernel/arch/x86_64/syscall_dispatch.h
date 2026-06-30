@@ -83,6 +83,12 @@ struct x86_64_syscall_dispatch_state {
     u32 exec_process_created;
     u32 exec_cr3_switch_requested;
     u32 exec_spawned_pid;
+    u32 spawn_fault_ok;
+    u32 spawn_path_found;
+    u32 spawn_type_ok;
+    u32 spawn_loaded;
+    u32 spawn_process_created;
+    u32 spawn_spawned_pid;
     u32 unknown_rejected;
     u32 dispatcher_ok;
     u32 exit_code;
@@ -440,6 +446,12 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->exec_process_created = 0U;
     state->exec_cr3_switch_requested = 0U;
     state->exec_spawned_pid = 0U;
+    state->spawn_fault_ok = 0U;
+    state->spawn_path_found = 0U;
+    state->spawn_type_ok = 0U;
+    state->spawn_loaded = 0U;
+    state->spawn_process_created = 0U;
+    state->spawn_spawned_pid = 0U;
     state->unknown_rejected = 0U;
     state->dispatcher_ok = 0U;
     state->exit_code = 0U;
@@ -608,6 +620,63 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->last_result = X86_64_SYSCALL_RET_OK;
         return state->last_result;
     }
+
+    case X86_64_SYSCALL_SERVICE_SPAWN:
+        state->spawn_fault_ok = 0U;
+        state->spawn_path_found = 0U;
+        state->spawn_type_ok = 0U;
+        state->spawn_loaded = 0U;
+        state->spawn_process_created = 0U;
+        state->spawn_spawned_pid = 0U;
+        state->exec_loaded = 0U;
+        state->exec_entry = 0ULL;
+        state->exec_target_cr3 = 0ULL;
+        state->exec_cr3_switch_requested = 0U;
+
+        if (x86_64_syscall_user_path_ok(arg0) == 0U) {
+            state->spawn_fault_ok = 1U;
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+
+        const u8 *spawn_image = (const u8 *)0;
+        u64 spawn_image_size = 0ULL;
+        u64 spawn_node_type = 0ULL;
+        u64 spawn_resolve_result = x86_64_vfs_resolve(&state->vfs,
+                                                      (const char *)arg0,
+                                                      &spawn_image,
+                                                      &spawn_image_size,
+                                                      &spawn_node_type);
+        if (spawn_resolve_result != X86_64_VFS_RET_OK) {
+            state->last_result = spawn_resolve_result;
+            return state->last_result;
+        }
+
+        state->spawn_path_found = 1U;
+        if (spawn_node_type != X86_64_VFS_NODE_EXECUTABLE) {
+            state->last_result = X86_64_SYSCALL_RET_ENOSYS;
+            return state->last_result;
+        }
+
+        state->spawn_type_ok = 1U;
+        if (x86_64_syscall_load_exec_elf(state, spawn_image, spawn_image_size) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+            return state->last_result;
+        }
+
+        state->spawn_loaded = 1U;
+        state->spawn_spawned_pid = x86_64_process_create_user_image((const char *)arg0,
+                                                                    (const u8 *)state->exec_user_code_page,
+                                                                    X86_64_USER_PAGE_BYTES,
+                                                                    state->exec_entry);
+        if (state->spawn_spawned_pid == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EINVAL;
+            return state->last_result;
+        }
+
+        state->spawn_process_created = 1U;
+        state->last_result = (u64)state->spawn_spawned_pid;
+        return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_GETPID:
         state->last_result = (u64)state->current_pid;
