@@ -38,15 +38,13 @@ bits 64
 %define LIAM_STAT_SIZE_OFFSET (LIAM_MODE_BUFFER_LEN + LIAM_READ_BUFFER_LEN + LIAM_LINE_BUFFER_LEN)
 %define LIAM_DEC_BUFFER_OFFSET (LIAM_STAT_SIZE_OFFSET + 8)
 %define LIAM_PS_BUFFER_OFFSET (LIAM_DEC_BUFFER_OFFSET + LIAM_DEC_BUFFER_LEN)
-%define LIAM_SERVICE_STARTED_OFFSET (LIAM_PS_BUFFER_OFFSET + LIAM_PS_BUFFER_LEN)
-%define LIAM_STACK_BYTES 1280
+%define LIAM_STACK_BYTES 1248
 
 section .text
 global _start
 
 _start:
     sub rsp, LIAM_STACK_BYTES
-    mov byte [rsp + LIAM_SERVICE_STARTED_OFFSET], 0
     xor r15d, r15d
 
     mov eax, LIAM_SYSCALL_GETPID
@@ -90,10 +88,20 @@ shell_loop:
 process_input:
     mov r13, rax
 
-    cmp byte [rsp + LIAM_SERVICE_STARTED_OFFSET], 1
-    je init_services_done
-    mov byte [rsp + LIAM_SERVICE_STARTED_OFFSET], 1
+    mov eax, LIAM_SYSCALL_PS
+    lea rdi, [rsp + LIAM_PS_BUFFER_OFFSET]
+    mov esi, LIAM_PS_BUFFER_LEN
+    syscall
+    test rax, rax
+    jle init_service_probe_spawn
 
+    mov r11, rax
+    lea rdi, [rsp + LIAM_PS_BUFFER_OFFSET]
+    call ps_contains_windowd_service
+    cmp eax, 1
+    je init_services_done
+
+init_service_probe_spawn:
     mov eax, LIAM_SYSCALL_SPAWN
     lea rdi, [rel windowd_service_exec_path]
     syscall
@@ -1042,6 +1050,50 @@ command_done_fresh:
     syscall
     jmp shell_loop
 
+ps_contains_windowd_service:
+    xor r8d, r8d
+
+ps_contains_windowd_service_next:
+    cmp r8, r11
+    jae ps_contains_windowd_service_not_found
+
+    mov al, [rdi + r8]
+    cmp al, '/'
+    jne ps_contains_windowd_service_advance
+
+    mov rax, r11
+    sub rax, r8
+    cmp rax, windowd_service_exec_path_len
+    jb ps_contains_windowd_service_not_found
+
+    mov r10, rdi
+    add r10, r8
+    lea rsi, [rel windowd_service_exec_path]
+    xor r9d, r9d
+
+ps_contains_windowd_service_compare:
+    cmp r9, windowd_service_exec_path_len
+    jae ps_contains_windowd_service_found
+
+    mov al, [r10 + r9]
+    cmp al, [rsi + r9]
+    jne ps_contains_windowd_service_advance
+
+    inc r9
+    jmp ps_contains_windowd_service_compare
+
+ps_contains_windowd_service_found:
+    mov eax, 1
+    ret
+
+ps_contains_windowd_service_advance:
+    inc r8
+    jmp ps_contains_windowd_service_next
+
+ps_contains_windowd_service_not_found:
+    xor eax, eax
+    ret
+
 print_file:
     mov eax, LIAM_SYSCALL_OPEN
     xor esi, esi
@@ -1143,6 +1195,7 @@ sysinfo_exec_path:
     db "/bin/sysinfo", 0
 windowd_service_exec_path:
     db "/bin/windowd-service", 0
+windowd_service_exec_path_len equ $ - windowd_service_exec_path - 1
 session_path:
     db "/tmp/session.txt", 0
 session_text:
