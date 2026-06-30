@@ -61,6 +61,8 @@ static struct x86_64_process_smoke_state process_state;
 static struct x86_64_process_paging_context process_paging_context;
 static u32 next_pid = X86_64_PROCESS_FIRST_PID;
 static u64 next_address_space_id = 1ULL;
+static u32 kernel_schedule_cursor;
+static u32 user_schedule_cursor;
 static struct x86_64_child_status child_status_queue[X86_64_PROCESS_CHILD_STATUS_QUEUE];
 static u32 child_status_count;
 static u32 worker_a_runs;
@@ -345,11 +347,14 @@ static struct x86_64_process *find_process_by_pid(u32 pid)
 
 static struct x86_64_process *find_next_ready_process(void)
 {
-    for (u32 i = 0; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
-        if (process_table[i].state == X86_64_PROCESS_READY &&
-            process_table[i].mode == X86_64_PROCESS_MODE_KERNEL &&
-            process_table[i].entry != (x86_64_process_entry_t)0) {
-            return &process_table[i];
+    for (u32 scanned = 0U; scanned < X86_64_PROCESS_MAX_PROCESSES; ++scanned) {
+        u32 index = (kernel_schedule_cursor + scanned) % X86_64_PROCESS_MAX_PROCESSES;
+
+        if (process_table[index].state == X86_64_PROCESS_READY &&
+            process_table[index].mode == X86_64_PROCESS_MODE_KERNEL &&
+            process_table[index].entry != (x86_64_process_entry_t)0) {
+            kernel_schedule_cursor = (index + 1U) % X86_64_PROCESS_MAX_PROCESSES;
+            return &process_table[index];
         }
     }
 
@@ -358,11 +363,14 @@ static struct x86_64_process *find_next_ready_process(void)
 
 static struct x86_64_process *find_next_ready_user_process(void)
 {
-    for (u32 i = 0; i < X86_64_PROCESS_MAX_PROCESSES; ++i) {
-        if (process_table[i].state == X86_64_PROCESS_READY &&
-            process_table[i].mode == X86_64_PROCESS_MODE_USER &&
-            process_table[i].user_entry != 0ULL) {
-            return &process_table[i];
+    for (u32 scanned = 0U; scanned < X86_64_PROCESS_MAX_PROCESSES; ++scanned) {
+        u32 index = (user_schedule_cursor + scanned) % X86_64_PROCESS_MAX_PROCESSES;
+
+        if (process_table[index].state == X86_64_PROCESS_READY &&
+            process_table[index].mode == X86_64_PROCESS_MODE_USER &&
+            process_table[index].user_entry != 0ULL) {
+            user_schedule_cursor = (index + 1U) % X86_64_PROCESS_MAX_PROCESSES;
+            return &process_table[index];
         }
     }
 
@@ -665,6 +673,8 @@ void x86_64_process_initialize(struct x86_64_process_smoke_state *state)
     clear_bytes(child_status_queue, sizeof(child_status_queue));
     next_pid = X86_64_PROCESS_FIRST_PID;
     next_address_space_id = 1ULL;
+    kernel_schedule_cursor = 0U;
+    user_schedule_cursor = 0U;
     child_status_count = 0U;
     worker_a_runs = 0U;
     worker_b_runs = 0U;
