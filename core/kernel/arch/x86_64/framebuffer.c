@@ -77,7 +77,9 @@ void x86_64_framebuffer_init(struct x86_64_framebuffer_state *state,
     }
 
     state->boot_info_ready = boot_info->framebuffer_rgb_format_ok;
-    state->mapping_ready = paging_builder->framebuffer_entry_ok;
+    state->mapping_ready =
+        ((paging_builder->builder_ok != 0U) &&
+         (paging_builder->framebuffer_entry_ok != 0U)) ? 1U : 0U;
     state->format_ready =
         ((boot_info->framebuffer_bpp == 24U || boot_info->framebuffer_bpp == 32U) &&
          boot_info->framebuffer_pitch >=

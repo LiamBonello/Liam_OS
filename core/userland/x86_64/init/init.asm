@@ -38,13 +38,15 @@ bits 64
 %define LIAM_STAT_SIZE_OFFSET (LIAM_MODE_BUFFER_LEN + LIAM_READ_BUFFER_LEN + LIAM_LINE_BUFFER_LEN)
 %define LIAM_DEC_BUFFER_OFFSET (LIAM_STAT_SIZE_OFFSET + 8)
 %define LIAM_PS_BUFFER_OFFSET (LIAM_DEC_BUFFER_OFFSET + LIAM_DEC_BUFFER_LEN)
-%define LIAM_STACK_BYTES 832
+%define LIAM_SERVICE_STARTED_OFFSET (LIAM_PS_BUFFER_OFFSET + LIAM_PS_BUFFER_LEN)
+%define LIAM_STACK_BYTES 1280
 
 section .text
 global _start
 
 _start:
     sub rsp, LIAM_STACK_BYTES
+    mov byte [rsp + LIAM_SERVICE_STARTED_OFFSET], 0
     xor r15d, r15d
 
     mov eax, LIAM_SYSCALL_GETPID
@@ -59,16 +61,16 @@ _start:
     mov edx, shell_banner_len
     syscall
 
-    mov eax, LIAM_SYSCALL_WRITE
-    mov edi, LIAM_STDOUT
-    lea rsi, [rel shell_prompt]
-    mov edx, shell_prompt_len
-    syscall
-
     mov eax, LIAM_SYSCALL_GET_ARG
     mov edi, LIAM_ARG_SHELL_MODE
     lea rsi, [rsp + LIAM_MODE_BUFFER_OFFSET]
     mov edx, LIAM_MODE_BUFFER_LEN
+    syscall
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel shell_prompt]
+    mov edx, shell_prompt_len
     syscall
 
 shell_loop:
@@ -87,6 +89,37 @@ shell_loop:
 
 process_input:
     mov r13, rax
+
+    cmp byte [rsp + LIAM_SERVICE_STARTED_OFFSET], 1
+    je init_services_done
+    mov byte [rsp + LIAM_SERVICE_STARTED_OFFSET], 1
+
+    mov eax, LIAM_SYSCALL_SPAWN
+    lea rdi, [rel windowd_service_exec_path]
+    syscall
+    test rax, rax
+    jle init_windowd_service_failed
+
+    mov r12, rax
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel init_service_pid_text]
+    mov edx, init_service_pid_text_len
+    syscall
+
+    mov rax, r12
+    call write_rax_decimal_newline
+    jmp init_services_done
+
+init_windowd_service_failed:
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel init_service_failed_text]
+    mov edx, init_service_failed_text_len
+    syscall
+
+init_services_done:
     xor ebx, ebx
 
 scan_input:
@@ -1108,6 +1141,8 @@ hello_exec_path:
     db "/bin/hello", 0
 sysinfo_exec_path:
     db "/bin/sysinfo", 0
+windowd_service_exec_path:
+    db "/bin/windowd-service", 0
 session_path:
     db "/tmp/session.txt", 0
 session_text:
@@ -1197,6 +1232,14 @@ wait_no_child_text_len equ $ - wait_no_child_text
 wait_error_text:
     db "wait: failed", 10
 wait_error_text_len equ $ - wait_error_text
+
+init_service_pid_text:
+    db "init: service pid "
+init_service_pid_text_len equ $ - init_service_pid_text
+
+init_service_failed_text:
+    db "init: service failed", 10
+init_service_failed_text_len equ $ - init_service_failed_text
 
 service_pid_text:
     db "service: pid "

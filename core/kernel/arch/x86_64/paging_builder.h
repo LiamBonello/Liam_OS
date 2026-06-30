@@ -9,7 +9,8 @@
 #define X86_64_PAGING_BUILDER_ENTRIES 512U
 #define X86_64_FRAMEBUFFER_VIRTUAL_BASE 0xFFFF900000000000ULL
 #define X86_64_PAGING_BUILDER_TABLE_PAGES 13U
-#define X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES 2U
+#define X86_64_PAGING_BUILDER_USER_CODE_PAGES 2U
+#define X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES (X86_64_PAGING_BUILDER_USER_CODE_PAGES + 1U)
 #define X86_64_PAGING_BUILDER_ALLOCATED_PAGES \
     (X86_64_PAGING_BUILDER_TABLE_PAGES + X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES)
 
@@ -28,6 +29,7 @@ struct x86_64_paging_builder_state {
     u64 user_stack_pd_table;
     u64 user_stack_pt_table;
     u64 user_code_page;
+    u64 user_code_pages[X86_64_PAGING_BUILDER_USER_CODE_PAGES];
     u64 user_stack_page;
     u64 user_code_virtual;
     u64 user_stack_virtual;
@@ -43,6 +45,7 @@ struct x86_64_paging_builder_state {
     u32 pmm_backed;
     u32 allocated_table_pages;
     u32 allocated_user_pages;
+    u32 user_code_page_count;
     u32 pmm_free_pages_before;
     u32 pmm_free_pages_after;
     u32 allocation_ok;
@@ -58,6 +61,7 @@ struct x86_64_paging_builder_state {
     u32 user_image_embedded;
     u32 user_image_source_ok;
     u32 user_image_bytes;
+    u32 user_image_pages;
     u32 user_image_checksum;
     u32 user_image_loaded;
     u32 user_stack_zeroed;

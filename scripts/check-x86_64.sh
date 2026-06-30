@@ -22,8 +22,6 @@ timeout 45s sh -c '
     sleep 1
     printf "pid\n"
     sleep 1
-    printf "service /bin/windowd-service\n"
-    sleep 2
     printf "ps\n"
     sleep 1
     printf "exec /bin/windowd\n"
@@ -79,7 +77,7 @@ require_marker "Desktop services smoke ok: 1"
 require_marker "Liam_OS Core x86_64 0.8.69-dev"
 require_marker "pid: 1"
 require_marker "PID STATE MODE NAME"
-require_marker "service: pid "
+require_marker "init: service pid "
 require_marker "/bin/windowd-service"
 require_marker "created 2 user-created 1 user-exited 0 user-reaped 0"
 require_marker "wait: pid "

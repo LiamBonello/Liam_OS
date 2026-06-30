@@ -14,6 +14,8 @@
 #define X86_64_PAGE_MASK (X86_64_PAGE_SIZE - 1ULL)
 #define X86_64_HUGE_PAGE_MASK (X86_64_HUGE_PAGE_SIZE - 1ULL)
 #define X86_64_USER_IMAGE_MAX_BYTES 65536U
+#define X86_64_EMBEDDED_INIT_MAX_BYTES \
+    (X86_64_PAGING_BUILDER_USER_CODE_PAGES * X86_64_USER_PAGE_BYTES)
 
 extern const u8 x86_64_user_init_image_start[];
 extern const u8 x86_64_user_init_image_end[];
@@ -80,6 +82,16 @@ static u32 pt_index_for(u64 address)
 static u32 align_page_count(u64 bytes)
 {
     return (u32)((bytes + X86_64_PAGE_MASK) / X86_64_PAGE_SIZE);
+}
+
+static u64 code_page_for_offset(struct x86_64_paging_builder_state *state, u64 offset)
+{
+    u32 page_index = (u32)(offset / X86_64_USER_PAGE_BYTES);
+    if (page_index >= X86_64_PAGING_BUILDER_USER_CODE_PAGES) {
+        return 0ULL;
+    }
+
+    return state->user_code_pages[page_index];
 }
 
 static u32 huge_page_count_for(u64 bytes)
@@ -170,6 +182,13 @@ static const struct x86_64_elf_program_header *program_header_at(const u8 *image
 
 static u32 tables_are_aligned(const struct x86_64_paging_builder_state *state)
 {
+    u32 user_code_pages_aligned = 1U;
+    for (u32 i = 0U; i < X86_64_PAGING_BUILDER_USER_CODE_PAGES; ++i) {
+        if (is_page_aligned(state->user_code_pages[i]) == 0U) {
+            user_code_pages_aligned = 0U;
+        }
+    }
+
     return ((is_page_aligned(state->pml4_table) != 0U) &&
             (is_page_aligned(state->identity_pdpt_table) != 0U) &&
             (is_page_aligned(state->identity_pd_table) != 0U) &&
@@ -183,7 +202,7 @@ static u32 tables_are_aligned(const struct x86_64_paging_builder_state *state)
             (is_page_aligned(state->user_code_pt_table) != 0U) &&
             (is_page_aligned(state->user_stack_pd_table) != 0U) &&
             (is_page_aligned(state->user_stack_pt_table) != 0U) &&
-            (is_page_aligned(state->user_code_page) != 0U) &&
+            (user_code_pages_aligned != 0U) &&
             (is_page_aligned(state->user_stack_page) != 0U)) ? 1U : 0U;
 }
 
@@ -225,7 +244,6 @@ static void load_embedded_user_image(struct x86_64_paging_builder_state *state)
     u32 image_bytes = embedded_user_image_size();
     const struct x86_64_elf_header *header = (const struct x86_64_elf_header *)image;
     const struct x86_64_elf_program_header *load_phdr = (const struct x86_64_elf_program_header *)0;
-    u8 *code = (u8 *)state->user_code_page;
     u8 *stack = (u8 *)state->user_stack_page;
 
     state->user_image_embedded =
@@ -278,7 +296,7 @@ static void load_embedded_user_image(struct x86_64_paging_builder_state *state)
         state->elf64_segment_ok =
             ((load_phdr->virtual_address == X86_64_USER_CODE_BASE) &&
              (load_phdr->file_size <= load_phdr->memory_size) &&
-             (load_phdr->memory_size <= X86_64_PAGE_SIZE) &&
+             (load_phdr->memory_size <= X86_64_EMBEDDED_INIT_MAX_BYTES) &&
              (range_fits(load_phdr->offset, load_phdr->file_size, image_bytes) != 0U)) ? 1U : 0U;
     }
 
@@ -287,18 +305,38 @@ static void load_embedded_user_image(struct x86_64_paging_builder_state *state)
         (state->elf64_entry_ok != 0U) &&
         (state->elf64_segment_ok != 0U)) {
         const u8 *segment = image + load_phdr->offset;
+        u32 image_pages = align_page_count(load_phdr->memory_size);
         for (u64 i = 0ULL; i < load_phdr->file_size; ++i) {
-            code[i] = segment[i];
+            u64 page = code_page_for_offset(state, i);
+            ((u8 *)page)[i & (X86_64_USER_PAGE_BYTES - 1ULL)] = segment[i];
         }
         for (u64 i = load_phdr->file_size; i < load_phdr->memory_size; ++i) {
-            code[i] = 0U;
+            u64 page = code_page_for_offset(state, i);
+            ((u8 *)page)[i & (X86_64_USER_PAGE_BYTES - 1ULL)] = 0U;
         }
 
         state->user_image_bytes = (u32)load_phdr->file_size;
-        state->user_image_checksum = checksum_bytes(code, state->user_image_bytes);
-        state->user_image_loaded =
-            ((page_prefix_matches(code, segment, state->user_image_bytes) != 0U) &&
-             (state->user_image_checksum == checksum_bytes(segment, state->user_image_bytes))) ? 1U : 0U;
+        state->user_image_pages = image_pages;
+        state->user_image_checksum = checksum_bytes(segment, state->user_image_bytes);
+
+        u32 pages_loaded = 1U;
+        for (u32 page_index = 0U; page_index < image_pages; ++page_index) {
+            u64 page_offset = (u64)page_index * X86_64_USER_PAGE_BYTES;
+            u64 remaining = (page_offset < load_phdr->file_size) ?
+                (load_phdr->file_size - page_offset) : 0ULL;
+            u32 compare_bytes = remaining > X86_64_USER_PAGE_BYTES ?
+                (u32)X86_64_USER_PAGE_BYTES : (u32)remaining;
+
+            if (compare_bytes == 0U) {
+                continue;
+            }
+            if (page_prefix_matches((const u8 *)state->user_code_pages[page_index],
+                                    segment + page_offset,
+                                    compare_bytes) == 0U) {
+                pages_loaded = 0U;
+            }
+        }
+        state->user_image_loaded = pages_loaded;
     }
 
     state->user_stack_zeroed = page_is_zeroed(stack);
@@ -336,8 +374,12 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     u64 *builder_user_code_pt = (u64 *)0;
     u64 *builder_user_stack_pd = (u64 *)0;
     u64 *builder_user_stack_pt = (u64 *)0;
-    u64 user_code_page = 0ULL;
+    u64 user_code_pages[X86_64_PAGING_BUILDER_USER_CODE_PAGES];
     u64 user_stack_page = 0ULL;
+
+    for (u32 i = 0U; i < X86_64_PAGING_BUILDER_USER_CODE_PAGES; ++i) {
+        user_code_pages[i] = 0ULL;
+    }
 
     if (allocate_table(&builder_pml4, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_identity_pdpt, allocated_pages, &allocated_count) == 0U ||
@@ -351,9 +393,21 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
         allocate_table(&builder_kernel_pt, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_user_code_pt, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_user_stack_pd, allocated_pages, &allocated_count) == 0U ||
-        allocate_table(&builder_user_stack_pt, allocated_pages, &allocated_count) == 0U ||
-        allocate_page(&user_code_page, allocated_pages, &allocated_count) == 0U ||
-        allocate_page(&user_stack_page, allocated_pages, &allocated_count) == 0U) {
+        allocate_table(&builder_user_stack_pt, allocated_pages, &allocated_count) == 0U) {
+        rollback_allocated_pages(allocated_pages, allocated_count);
+        state->pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
+        return;
+    }
+
+    for (u32 i = 0U; i < X86_64_PAGING_BUILDER_USER_CODE_PAGES; ++i) {
+        if (allocate_page(&user_code_pages[i], allocated_pages, &allocated_count) == 0U) {
+            rollback_allocated_pages(allocated_pages, allocated_count);
+            state->pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
+            return;
+        }
+    }
+
+    if (allocate_page(&user_stack_page, allocated_pages, &allocated_count) == 0U) {
         rollback_allocated_pages(allocated_pages, allocated_count);
         state->pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
         return;
@@ -372,13 +426,17 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     state->user_code_pt_table = (u64)builder_user_code_pt;
     state->user_stack_pd_table = (u64)builder_user_stack_pd;
     state->user_stack_pt_table = (u64)builder_user_stack_pt;
-    state->user_code_page = user_code_page;
+    state->user_code_page = user_code_pages[0];
+    for (u32 i = 0U; i < X86_64_PAGING_BUILDER_USER_CODE_PAGES; ++i) {
+        state->user_code_pages[i] = user_code_pages[i];
+    }
     state->user_stack_page = user_stack_page;
     state->user_code_virtual = X86_64_USER_CODE_BASE;
     state->user_stack_virtual = X86_64_USER_STACK_TOP - X86_64_PAGE_SIZE;
     state->pmm_backed = 1U;
     state->allocated_table_pages = X86_64_PAGING_BUILDER_TABLE_PAGES;
     state->allocated_user_pages = X86_64_PAGING_BUILDER_USER_PHYSICAL_PAGES;
+    state->user_code_page_count = X86_64_PAGING_BUILDER_USER_CODE_PAGES;
     state->pmm_free_pages_after = x86_64_pmm_get_state()->free_pages;
     state->allocation_ok = (allocated_count == X86_64_PAGING_BUILDER_ALLOCATED_PAGES) ? 1U : 0U;
     load_embedded_user_image(state);
@@ -453,7 +511,10 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     builder_kernel_pdpt[kernel_pdpt_index] = ((u64)builder_kernel_pd) | X86_64_TABLE_FLAGS;
     builder_kernel_pd[kernel_pd_index] = ((u64)builder_kernel_pt) | X86_64_TABLE_FLAGS;
 
-    builder_user_code_pt[user_code_pt_index] = user_code_page | X86_64_USER_CODE_FLAGS;
+    for (u32 i = 0U; i < state->user_image_pages; ++i) {
+        builder_user_code_pt[user_code_pt_index + i] =
+            state->user_code_pages[i] | X86_64_USER_CODE_FLAGS;
+    }
     builder_identity_pd[user_code_pd_index] = ((u64)builder_user_code_pt) | X86_64_USER_TABLE_FLAGS;
     builder_user_stack_pt[user_stack_pt_index] = user_stack_page | X86_64_USER_STACK_FLAGS;
     builder_user_stack_pd[user_stack_pd_index] = ((u64)builder_user_stack_pt) | X86_64_USER_TABLE_FLAGS;
@@ -496,11 +557,23 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
          ((builder_kernel_pd[kernel_pd_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
          ((builder_kernel_pt[0] & X86_64_PAGE_PRESENT) != 0ULL) &&
          (kernel_pages_fit != 0U)) ? 1U : 0U;
+
+    u32 user_code_pages_present = 1U;
+    u32 user_code_pages_user = 1U;
+    for (u32 i = 0U; i < state->user_image_pages; ++i) {
+        if ((builder_user_code_pt[user_code_pt_index + i] & X86_64_PAGE_PRESENT) == 0ULL) {
+            user_code_pages_present = 0U;
+        }
+        if (entry_has_user(builder_user_code_pt[user_code_pt_index + i]) == 0U) {
+            user_code_pages_user = 0U;
+        }
+    }
     state->user_code_entry_ok =
         (((builder_pml4[user_code_pml4_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
          ((builder_identity_pdpt[user_code_pdpt_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
          ((builder_identity_pd[user_code_pd_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
-         ((builder_user_code_pt[user_code_pt_index] & X86_64_PAGE_PRESENT) != 0ULL)) ? 1U : 0U;
+         (state->user_image_pages != 0U) &&
+         (user_code_pages_present != 0U)) ? 1U : 0U;
     state->user_stack_entry_ok =
         (((builder_pml4[user_stack_pml4_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
          ((builder_identity_pdpt[user_stack_pdpt_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
@@ -510,7 +583,7 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
         ((entry_has_user(builder_pml4[user_code_pml4_index]) != 0U) &&
          (entry_has_user(builder_identity_pdpt[user_code_pdpt_index]) != 0U) &&
          (entry_has_user(builder_identity_pd[user_code_pd_index]) != 0U) &&
-         (entry_has_user(builder_user_code_pt[user_code_pt_index]) != 0U) &&
+         (user_code_pages_user != 0U) &&
          (entry_has_user(builder_user_stack_pd[user_stack_pd_index]) != 0U) &&
          (entry_has_user(builder_user_stack_pt[user_stack_pt_index]) != 0U)) ? 1U : 0U;
     state->user_mapping_ok =
