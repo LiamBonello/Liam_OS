@@ -195,7 +195,8 @@ Already in place:
 10. `/bin/windowd` userspace probe for desktop status and demo window drawing.
 11. Timer, sleep, input-status, and writable RAM-backed session-storage
     syscalls with `/bin/timed`, `/bin/inputd`, and `/bin/storaged` probes.
-12. Structured input-event syscall plumbing with `/bin/eventd` probe coverage.
+12. Structured, cursor-based input-event syscall plumbing with `/bin/eventd`
+    probe coverage.
 13. Shell-level `deskcheck` validation for desktop-readiness syscalls.
 14. Automated x86_64 QEMU smoke validation through `make check-x86_64`.
 
@@ -212,8 +213,8 @@ Still blocking a desktop handoff:
    early userland and now has writable RAM-backed session storage, but a desktop
    needs storage-backed files, directories, and executable loading that survive
    reboot.
-5. Expand the early input-event queue into a blocking, multi-client event
-   stream shared with long-running services.
+5. Expand the cursor-based input-event stream into blocking waits, per-window
+   routing, and compositor-owned subscriptions.
 6. Run an i386-vs-x86_64 parity pass before changing the default build.
 7. Keep i386 only until x86_64 can do what the current i386 path does, then
    retire it deliberately.

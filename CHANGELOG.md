@@ -1,5 +1,19 @@
 # Liam_OS Changelog
 
+## Core 0.8.69-dev
+
+### Added
+
+- Added sequence numbers to x86_64 input events so services can track stream position.
+- Added cursor-based input event reads in the syscall dispatcher, keeping events non-destructive for independent clients.
+- Exposed input-event oldest/latest sequence counters in input status and desktop service snapshots.
+- Added release, security, and legal packaging gates for future public or paid distributions.
+
+### Changed
+
+- Updated the x86_64 `/proc/version` text and Liam_OS version to `0.8.69-dev`.
+- Advanced the input-event plumbing from a single draining queue toward a multi-client desktop event stream.
+
 ## Core 0.8.68-dev
 
 ### Added

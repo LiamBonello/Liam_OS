@@ -71,6 +71,7 @@ static struct x86_64_input_event input_event_queue[X86_64_INPUT_EVENT_QUEUE_CAPA
 static u32 input_event_head;
 static u32 input_event_tail;
 static u32 input_event_count;
+static u32 input_event_next_sequence;
 
 static const u8 scancode_ascii_map[128] = {
     0, 27, '1', '2', '3', '4', '5', '6',
@@ -324,23 +325,32 @@ static void keyboard_buffer_reset(void)
     input_event_head = 0U;
     input_event_tail = 0U;
     input_event_count = 0U;
+    input_event_next_sequence = 1U;
     keyboard_state.buffered_chars = 0U;
     keyboard_state.buffer_capacity = X86_64_KEYBOARD_BUFFER_CAPACITY;
     keyboard_state.buffer_overflows = 0U;
     keyboard_state.event_queue_capacity = X86_64_INPUT_EVENT_QUEUE_CAPACITY;
     keyboard_state.event_queued = 0U;
     keyboard_state.event_drops = 0U;
+    keyboard_state.event_oldest_sequence = 0U;
+    keyboard_state.event_latest_sequence = 0U;
     keyboard_state.event_read_calls = 0U;
     keyboard_state.events_read = 0U;
     keyboard_state.read_calls = 0U;
     keyboard_state.bytes_read = 0U;
 }
 
+static u32 input_event_latest_sequence(void)
+{
+    return (input_event_next_sequence == 0U) ? 0U : (input_event_next_sequence - 1U);
+}
+
 static void input_event_push(u32 type, u32 code, u32 value, u32 flags)
 {
     if (input_event_count >= X86_64_INPUT_EVENT_QUEUE_CAPACITY) {
+        input_event_head = (input_event_head + 1U) % X86_64_INPUT_EVENT_QUEUE_CAPACITY;
+        input_event_count -= 1U;
         keyboard_state.event_drops += 1U;
-        return;
     }
 
     input_event_queue[input_event_tail].type = type;
@@ -348,10 +358,13 @@ static void input_event_push(u32 type, u32 code, u32 value, u32 flags)
     input_event_queue[input_event_tail].value = value;
     input_event_queue[input_event_tail].flags = flags;
     input_event_queue[input_event_tail].tick = timer_ticks;
-    input_event_queue[input_event_tail].reserved = 0U;
+    input_event_queue[input_event_tail].sequence = input_event_next_sequence++;
     input_event_tail = (input_event_tail + 1U) % X86_64_INPUT_EVENT_QUEUE_CAPACITY;
     input_event_count += 1U;
     keyboard_state.event_queued = input_event_count;
+    keyboard_state.event_oldest_sequence =
+        (input_event_count == 0U) ? 0U : input_event_queue[input_event_head].sequence;
+    keyboard_state.event_latest_sequence = input_event_latest_sequence();
 }
 
 static void keyboard_buffer_push(u8 ascii)
@@ -656,6 +669,9 @@ void x86_64_keyboard_get_state(struct x86_64_keyboard_state *state)
     keyboard_state.buffer_capacity = X86_64_KEYBOARD_BUFFER_CAPACITY;
     keyboard_state.event_queue_capacity = X86_64_INPUT_EVENT_QUEUE_CAPACITY;
     keyboard_state.event_queued = input_event_count;
+    keyboard_state.event_oldest_sequence =
+        (input_event_count == 0U) ? 0U : input_event_queue[input_event_head].sequence;
+    keyboard_state.event_latest_sequence = input_event_latest_sequence();
     *state = keyboard_state;
 }
 
@@ -682,7 +698,14 @@ u64 x86_64_keyboard_read(char *buffer, u64 size)
 
 u64 x86_64_input_events_read(struct x86_64_input_event *events, u64 max_events)
 {
+    static u32 legacy_cursor;
+    return x86_64_input_events_read_from(&legacy_cursor, events, max_events);
+}
+
+u64 x86_64_input_events_read_from(u32 *cursor, struct x86_64_input_event *events, u64 max_events)
+{
     if (events == (struct x86_64_input_event *)0 ||
+        cursor == (u32 *)0 ||
         max_events == 0ULL ||
         keyboard_state.initialized == 0U) {
         return 0ULL;
@@ -690,17 +713,38 @@ u64 x86_64_input_events_read(struct x86_64_input_event *events, u64 max_events)
 
     keyboard_state.event_read_calls += 1U;
 
+    u32 current_cursor = *cursor;
+    if (input_event_count == 0U) {
+        *cursor = input_event_latest_sequence();
+        keyboard_state.event_queued = 0U;
+        return 0ULL;
+    }
+
+    u32 oldest_sequence = input_event_queue[input_event_head].sequence;
+    if (current_cursor < oldest_sequence - 1U) {
+        current_cursor = oldest_sequence - 1U;
+    }
+
     u64 count = 0ULL;
-    while (count < max_events && input_event_count > 0U) {
-        events[count] = input_event_queue[input_event_head];
-        input_event_head = (input_event_head + 1U) % X86_64_INPUT_EVENT_QUEUE_CAPACITY;
-        input_event_count -= 1U;
-        count += 1ULL;
+    for (u32 i = 0U; i < input_event_count && count < max_events; ++i) {
+        u32 index = (input_event_head + i) % X86_64_INPUT_EVENT_QUEUE_CAPACITY;
+        if (input_event_queue[index].sequence > current_cursor) {
+            events[count] = input_event_queue[index];
+            *cursor = input_event_queue[index].sequence;
+            count += 1ULL;
+        }
     }
 
     keyboard_state.event_queued = input_event_count;
+    keyboard_state.event_oldest_sequence = oldest_sequence;
+    keyboard_state.event_latest_sequence = input_event_latest_sequence();
     keyboard_state.events_read += (u32)count;
     return count;
+}
+
+u32 x86_64_input_events_latest_sequence(void)
+{
+    return input_event_latest_sequence();
 }
 
 void x86_64_exception_handler(u64 vector, u64 error_code)

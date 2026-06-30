@@ -17,6 +17,8 @@ struct x86_64_desktop_services_state {
     u32 input_event_capacity;
     u32 input_event_queued;
     u32 input_event_drops;
+    u32 input_event_oldest_sequence;
+    u32 input_event_latest_sequence;
     u32 input_event_service_ready;
     u32 storage_readonly_vfs_ready;
     u32 storage_session_ready;

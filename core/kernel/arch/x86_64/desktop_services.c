@@ -86,6 +86,8 @@ static void refresh_desktop_state(void)
     desktop_state.input_event_capacity = keyboard.event_queue_capacity;
     desktop_state.input_event_queued = keyboard.event_queued;
     desktop_state.input_event_drops = keyboard.event_drops;
+    desktop_state.input_event_oldest_sequence = keyboard.event_oldest_sequence;
+    desktop_state.input_event_latest_sequence = keyboard.event_latest_sequence;
     desktop_state.input_event_service_ready =
         ((keyboard.keyboard_ok != 0U) &&
          (keyboard.event_queue_capacity == X86_64_INPUT_EVENT_QUEUE_CAPACITY)) ? 1U : 0U;
@@ -164,6 +166,12 @@ u64 x86_64_desktop_services_snapshot(char *buffer, u64 size)
     offset = append_char(buffer, size, offset, '\n');
     offset = append_string(buffer, size, offset, "input-events-drops ");
     offset = append_u32(buffer, size, offset, desktop_state.input_event_drops);
+    offset = append_char(buffer, size, offset, '\n');
+    offset = append_string(buffer, size, offset, "input-events-oldest ");
+    offset = append_u32(buffer, size, offset, desktop_state.input_event_oldest_sequence);
+    offset = append_char(buffer, size, offset, '\n');
+    offset = append_string(buffer, size, offset, "input-events-latest ");
+    offset = append_u32(buffer, size, offset, desktop_state.input_event_latest_sequence);
     offset = append_char(buffer, size, offset, '\n');
     offset = append_string(buffer, size, offset, "storage-readonly-vfs ");
     offset = append_u32(buffer, size, offset, desktop_state.storage_readonly_vfs_ready);

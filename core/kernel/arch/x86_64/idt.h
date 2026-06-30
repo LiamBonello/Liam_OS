@@ -26,7 +26,7 @@ struct x86_64_input_event {
     u32 value;
     u32 flags;
     u32 tick;
-    u32 reserved;
+    u32 sequence;
 };
 
 struct x86_64_idt_state {
@@ -91,6 +91,8 @@ struct x86_64_keyboard_state {
     u32 event_queue_capacity;
     u32 event_queued;
     u32 event_drops;
+    u32 event_oldest_sequence;
+    u32 event_latest_sequence;
     u32 event_read_calls;
     u32 events_read;
     u32 read_calls;
@@ -109,6 +111,8 @@ void x86_64_keyboard_initialize(void);
 void x86_64_keyboard_get_state(struct x86_64_keyboard_state *state);
 u64 x86_64_keyboard_read(char *buffer, u64 size);
 u64 x86_64_input_events_read(struct x86_64_input_event *events, u64 max_events);
+u64 x86_64_input_events_read_from(u32 *cursor, struct x86_64_input_event *events, u64 max_events);
+u32 x86_64_input_events_latest_sequence(void);
 void x86_64_exception_handler(u64 vector, u64 error_code);
 void x86_64_irq_handler(u64 vector);
 

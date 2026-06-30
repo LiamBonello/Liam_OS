@@ -1,6 +1,9 @@
 ./.gitignore
 ./CHANGELOG.md
+./LEGAL_PACKAGING.md
 ./Makefile
+./RELEASE_CHECKLIST.md
+./SECURITY.md
 ./SOURCE_MANIFEST.txt
 ./core/Makefile
 ./core/boot/grub-x86_64-exception-test.cfg

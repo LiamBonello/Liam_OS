@@ -75,6 +75,7 @@ struct x86_64_syscall_dispatch_state {
     u32 input_events_ok;
     u32 input_events_empty_ok;
     u32 input_events_fault_ok;
+    u32 input_event_cursor;
     u32 exec_fault_ok;
     u32 exec_path_found;
     u32 exec_type_ok;
@@ -266,6 +267,12 @@ static inline u64 x86_64_syscall_format_input_status(char *buffer, u64 size)
     offset = x86_64_syscall_append_string(buffer, size, offset, "event-drops ");
     offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.event_drops);
     offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "event-oldest ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.event_oldest_sequence);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
+    offset = x86_64_syscall_append_string(buffer, size, offset, "event-latest ");
+    offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.event_latest_sequence);
+    offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
     offset = x86_64_syscall_append_string(buffer, size, offset, "events-read ");
     offset = x86_64_syscall_append_u32(buffer, size, offset, keyboard.events_read);
     offset = x86_64_syscall_append_char(buffer, size, offset, '\n');
@@ -425,6 +432,7 @@ static inline void x86_64_syscall_dispatch_init(struct x86_64_syscall_dispatch_s
     state->input_events_ok = 0U;
     state->input_events_empty_ok = 0U;
     state->input_events_fault_ok = 0U;
+    state->input_event_cursor = x86_64_input_events_latest_sequence();
     state->exec_fault_ok = 0U;
     state->exec_path_found = 0U;
     state->exec_type_ok = 0U;
@@ -690,7 +698,8 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
     case X86_64_SYSCALL_SERVICE_INPUT_EVENTS: {
         u64 max_events = arg1;
         u64 byte_count = max_events * (u64)sizeof(struct x86_64_input_event);
-        if (max_events > X86_64_INPUT_EVENT_QUEUE_CAPACITY || byte_count / sizeof(struct x86_64_input_event) != max_events) {
+        if (max_events > X86_64_INPUT_EVENT_QUEUE_CAPACITY ||
+            byte_count / sizeof(struct x86_64_input_event) != max_events) {
             state->last_result = X86_64_SYSCALL_RET_EINVAL;
             return state->last_result;
         }
@@ -698,7 +707,9 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
             state->last_result = X86_64_SYSCALL_RET_EFAULT;
             return state->last_result;
         }
-        state->last_result = x86_64_input_events_read((struct x86_64_input_event *)arg0, max_events);
+        state->last_result = x86_64_input_events_read_from(&state->input_event_cursor,
+                                                           (struct x86_64_input_event *)arg0,
+                                                           max_events);
         state->input_events_ok = 1U;
         state->input_events_empty_ok = (state->last_result == 0ULL) ? 1U : 0U;
         return state->last_result;
