@@ -15,6 +15,13 @@ struct x86_64_ahci_state {
     u32 hba_command_slots;
     u32 hba_64bit_capable;
     u32 hba_ncq_capable;
+    u32 ports_scanned;
+    u32 device_ports;
+    u32 sata_device_ports;
+    u32 atapi_device_ports;
+    u32 first_device_port;
+    u32 first_device_signature;
+    u32 first_device_status;
     u32 driver_ready;
 };
 

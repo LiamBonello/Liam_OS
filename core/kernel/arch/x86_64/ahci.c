@@ -4,12 +4,30 @@
 #define X86_64_AHCI_CAP_SNCQ (1U << 30U)
 #define X86_64_AHCI_CAP_NCS_SHIFT 8U
 #define X86_64_AHCI_CAP_NCS_MASK 0x1FU
+#define X86_64_AHCI_MAX_PORTS 32U
+#define X86_64_AHCI_PORT_DET_PRESENT 0x03U
+#define X86_64_AHCI_PORT_IPM_ACTIVE 0x01U
+#define X86_64_AHCI_SIG_ATAPI 0xEB140101U
 
 struct x86_64_ahci_hba_memory {
     volatile u32 cap;
     volatile u32 ghc;
     volatile u32 is;
     volatile u32 pi;
+};
+
+struct x86_64_ahci_port_registers {
+    volatile u32 clb;
+    volatile u32 clbu;
+    volatile u32 fb;
+    volatile u32 fbu;
+    volatile u32 is;
+    volatile u32 ie;
+    volatile u32 cmd;
+    volatile u32 rsv0;
+    volatile u32 tfd;
+    volatile u32 sig;
+    volatile u32 ssts;
 };
 
 static void clear_ahci_state(struct x86_64_ahci_state *state)
@@ -24,6 +42,13 @@ static void clear_ahci_state(struct x86_64_ahci_state *state)
     state->hba_command_slots = 0U;
     state->hba_64bit_capable = 0U;
     state->hba_ncq_capable = 0U;
+    state->ports_scanned = 0U;
+    state->device_ports = 0U;
+    state->sata_device_ports = 0U;
+    state->atapi_device_ports = 0U;
+    state->first_device_port = 0U;
+    state->first_device_signature = 0U;
+    state->first_device_status = 0U;
     state->driver_ready = 0U;
 }
 
@@ -54,6 +79,41 @@ void x86_64_ahci_probe(struct x86_64_ahci_state *state,
         state->hba_64bit_capable = ((cap & X86_64_AHCI_CAP_S64A) != 0U) ? 1U : 0U;
         state->hba_ncq_capable = ((cap & X86_64_AHCI_CAP_SNCQ) != 0U) ? 1U : 0U;
         state->hba_registers_read = 1U;
+
+        for (u32 port = 0U; port < X86_64_AHCI_MAX_PORTS; ++port) {
+            u32 port_bit = 1U << port;
+            if ((state->hba_ports_implemented & port_bit) == 0U) {
+                continue;
+            }
+
+            const struct x86_64_ahci_port_registers *port_regs =
+                (const struct x86_64_ahci_port_registers *)
+                (storage->ahci_mmio_virtual_address + 0x100ULL + ((u64)port * 0x80ULL));
+            u32 ssts = port_regs->ssts;
+            u32 det = ssts & 0x0FU;
+            u32 ipm = (ssts >> 8U) & 0x0FU;
+            u32 sig = port_regs->sig;
+
+            if ((det != X86_64_AHCI_PORT_DET_PRESENT) ||
+                (ipm != X86_64_AHCI_PORT_IPM_ACTIVE)) {
+                continue;
+            }
+
+            state->device_ports |= port_bit;
+            if (state->ports_scanned == 0U) {
+                state->first_device_port = port;
+                state->first_device_signature = sig;
+                state->first_device_status = ssts;
+            }
+
+            if (sig == X86_64_AHCI_SIG_ATAPI) {
+                state->atapi_device_ports |= port_bit;
+            } else {
+                state->sata_device_ports |= port_bit;
+            }
+
+            state->ports_scanned++;
+        }
     }
 
     state->initialized = 1U;

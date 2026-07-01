@@ -31,6 +31,13 @@ static void report_ahci_state(const struct x86_64_ahci_state *state)
     x86_64_serial_write_u32("AHCI command slots: ", state->hba_command_slots);
     x86_64_serial_write_u32("AHCI 64-bit capable: ", state->hba_64bit_capable);
     x86_64_serial_write_u32("AHCI NCQ capable: ", state->hba_ncq_capable);
+    x86_64_serial_write_u32("AHCI ports scanned: ", state->ports_scanned);
+    x86_64_serial_write_hex32("AHCI device ports: 0x", state->device_ports);
+    x86_64_serial_write_hex32("AHCI SATA device ports: 0x", state->sata_device_ports);
+    x86_64_serial_write_hex32("AHCI ATAPI device ports: 0x", state->atapi_device_ports);
+    x86_64_serial_write_u32("AHCI first device port: ", state->first_device_port);
+    x86_64_serial_write_hex32("AHCI first device signature: 0x", state->first_device_signature);
+    x86_64_serial_write_hex32("AHCI first device status: 0x", state->first_device_status);
     x86_64_serial_write_u32("AHCI driver ready: ", state->driver_ready);
 }
 
