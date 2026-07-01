@@ -1,27 +1,29 @@
-.PHONY: all core core-debug run run-debug check-tools check-x86_64 x86_64-info x86_64-kernel x86_64-iso x86_64-run clean manifest dist structure
+.PHONY: all core core-debug run run-debug check-tools check-x86_64 x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-kernel x86_64-iso x86_64-run legacy-i386 legacy-i386-debug legacy-i386-run clean manifest dist structure
 
-all: core
+all: x86_64-iso
 
-core:
-	$(MAKE) -C core
+core: x86_64-iso
 
 core-debug:
-	$(MAKE) -C core debug
+	$(MAKE) -C core x86_64-kernel
 
-run:
-	$(MAKE) -C core run
+run: x86_64-run
 
-run-debug:
-	$(MAKE) -C core run-debug
+run-debug: x86_64-run
 
-check-tools:
-	$(MAKE) -C core check-tools
+check-tools: x86_64-iso-check-tools
 
 check-x86_64:
 	./scripts/check-x86_64.sh
 
 x86_64-info:
 	$(MAKE) -C core x86_64-info
+
+x86_64-check-tools:
+	$(MAKE) -C core x86_64-check-tools
+
+x86_64-iso-check-tools:
+	$(MAKE) -C core x86_64-iso-check-tools
 
 x86_64-kernel:
 	$(MAKE) -C core x86_64-kernel
@@ -31,6 +33,15 @@ x86_64-iso:
 
 x86_64-run:
 	$(MAKE) -C core x86_64-run
+
+legacy-i386:
+	$(MAKE) -C core ARCH=i386
+
+legacy-i386-debug:
+	$(MAKE) -C core ARCH=i386 debug
+
+legacy-i386-run:
+	$(MAKE) -C core ARCH=i386 run
 
 clean:
 	$(MAKE) -C core clean
