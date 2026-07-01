@@ -30,8 +30,14 @@ _start:
 
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
-    lea rsi, [rel features_text]
-    mov edx, features_text_len
+    lea rsi, [rel capabilities_text]
+    mov edx, capabilities_text_len
+    syscall
+
+    mov eax, LIAM_SYSCALL_WRITE
+    mov edi, LIAM_STDOUT
+    lea rsi, [rel limits_text]
+    mov edx, limits_text_len
     syscall
 
     mov eax, LIAM_SYSCALL_EXIT
@@ -86,9 +92,12 @@ title_text_len equ $ - title_text
 pid_label:
     db "pid: "
 pid_label_len equ $ - pid_label
-features_text:
-    db "features: syscall, vfs, exec, desktop-services, timer, input-events, session-storage", 10
-features_text_len equ $ - features_text
+capabilities_text:
+    db "capabilities: syscall, vfs, exec, scheduler, framebuffer, timer, keyboard, input-events", 10
+capabilities_text_len equ $ - capabilities_text
+limits_text:
+    db "storage: read-only VFS with volatile session file; persistent storage unavailable", 10
+limits_text_len equ $ - limits_text
 newline_text:
     db 10
 newline_text_len equ $ - newline_text
