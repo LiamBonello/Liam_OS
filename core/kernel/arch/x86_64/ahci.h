@@ -27,6 +27,9 @@ struct x86_64_ahci_state {
     u64 received_fis_page;
     u64 command_table_page;
     u64 dma_buffer_page;
+    u32 command_port_programmed;
+    u32 command_list_bound;
+    u32 received_fis_bound;
     u32 command_engine_ready;
     u32 driver_ready;
 };
