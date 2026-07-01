@@ -38,6 +38,12 @@ static void report_ahci_state(const struct x86_64_ahci_state *state)
     x86_64_serial_write_u32("AHCI first device port: ", state->first_device_port);
     x86_64_serial_write_hex32("AHCI first device signature: 0x", state->first_device_signature);
     x86_64_serial_write_hex32("AHCI first device status: 0x", state->first_device_status);
+    x86_64_serial_write_u32("AHCI command buffers allocated: ", state->command_buffers_allocated);
+    x86_64_serial_write_hex64("AHCI command list page: 0x", state->command_list_page);
+    x86_64_serial_write_hex64("AHCI received FIS page: 0x", state->received_fis_page);
+    x86_64_serial_write_hex64("AHCI command table page: 0x", state->command_table_page);
+    x86_64_serial_write_hex64("AHCI DMA buffer page: 0x", state->dma_buffer_page);
+    x86_64_serial_write_u32("AHCI command engine ready: ", state->command_engine_ready);
     x86_64_serial_write_u32("AHCI driver ready: ", state->driver_ready);
 }
 
