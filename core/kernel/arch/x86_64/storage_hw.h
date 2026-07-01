@@ -11,6 +11,11 @@ struct x86_64_storage_hw_state {
     u32 storage_controllers;
     u32 ahci_controllers;
     u32 nvme_controllers;
+    u32 ahci_controller_found;
+    u32 ahci_bar5_raw;
+    u64 ahci_mmio_base;
+    u32 ahci_mmio_bar_ready;
+    u32 ahci_mmio_mapped;
     u32 block_driver_ready;
     u32 persistent_ready;
 };
