@@ -28,6 +28,7 @@
 ./core/kernel/arch/i386/start.asm
 ./core/kernel/arch/i386/tss.c
 ./core/kernel/arch/i386/tss.h
+./core/kernel/arch/x86_64/CONTRACTS.md
 ./core/kernel/arch/x86_64/boot32.asm
 ./core/kernel/arch/x86_64/boot_context.c
 ./core/kernel/arch/x86_64/boot_context.h
@@ -163,6 +164,7 @@
 ./core/userland/x86_64/init/init.asm
 ./core/userland/x86_64/inputd/inputd.asm
 ./core/userland/x86_64/linker.ld
+./core/userland/x86_64/sessiond/sessiond.asm
 ./core/userland/x86_64/storaged/storaged.asm
 ./core/userland/x86_64/sysinfo/sysinfo.asm
 ./core/userland/x86_64/timed/timed.asm
