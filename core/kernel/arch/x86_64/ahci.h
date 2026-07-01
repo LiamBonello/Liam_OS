@@ -30,6 +30,8 @@ struct x86_64_ahci_state {
     u32 command_port_programmed;
     u32 command_list_bound;
     u32 received_fis_bound;
+    u32 command_engine_stopped;
+    u32 command_engine_started;
     u32 command_engine_ready;
     u32 driver_ready;
 };
