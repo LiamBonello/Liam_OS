@@ -8,6 +8,8 @@ global x86_64_user_hello_image_start
 global x86_64_user_hello_image_end
 global x86_64_user_inputd_image_start
 global x86_64_user_inputd_image_end
+global x86_64_user_sessiond_image_start
+global x86_64_user_sessiond_image_end
 global x86_64_user_storaged_image_start
 global x86_64_user_storaged_image_end
 global x86_64_user_sysinfo_image_start
@@ -44,6 +46,11 @@ align 16
 x86_64_user_inputd_image_start:
     incbin "build/x86_64/userland/inputd.elf"
 x86_64_user_inputd_image_end:
+
+align 16
+x86_64_user_sessiond_image_start:
+    incbin "build/x86_64/userland/sessiond.elf"
+x86_64_user_sessiond_image_end:
 
 align 16
 x86_64_user_storaged_image_start:
