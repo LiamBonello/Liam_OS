@@ -10,6 +10,11 @@
 #define X86_64_AHCI_PORT_IPM_ACTIVE 0x01U
 #define X86_64_AHCI_SIG_ATAPI 0xEB140101U
 #define X86_64_AHCI_COMMAND_ENGINE_PAGES 4U
+#define X86_64_AHCI_PORT_CMD_ST (1U << 0U)
+#define X86_64_AHCI_PORT_CMD_FRE (1U << 4U)
+#define X86_64_AHCI_PORT_CMD_FR (1U << 14U)
+#define X86_64_AHCI_PORT_CMD_CR (1U << 15U)
+#define X86_64_AHCI_ENGINE_SPIN_LIMIT 100000U
 
 struct x86_64_ahci_hba_memory {
     volatile u32 cap;
@@ -90,8 +95,23 @@ static void clear_ahci_state(struct x86_64_ahci_state *state)
     state->command_port_programmed = 0U;
     state->command_list_bound = 0U;
     state->received_fis_bound = 0U;
+    state->command_engine_stopped = 0U;
+    state->command_engine_started = 0U;
     state->command_engine_ready = 0U;
     state->driver_ready = 0U;
+}
+
+static void wait_for_port_bits_clear(struct x86_64_ahci_port_registers *port_regs,
+                                     u32 bits,
+                                     u32 *cleared)
+{
+    *cleared = 0U;
+    for (u32 i = 0U; i < X86_64_AHCI_ENGINE_SPIN_LIMIT; ++i) {
+        if ((port_regs->cmd & bits) == 0U) {
+            *cleared = 1U;
+            return;
+        }
+    }
 }
 
 static void allocate_command_engine_buffers(struct x86_64_ahci_state *state)
@@ -110,11 +130,19 @@ static void allocate_command_engine_buffers(struct x86_64_ahci_state *state)
     state->command_buffers_allocated = X86_64_AHCI_COMMAND_ENGINE_PAGES;
 }
 
+static struct x86_64_ahci_port_registers *selected_port_regs(
+    const struct x86_64_ahci_state *state,
+    const struct x86_64_storage_hw_state *storage)
+{
+    u64 port_base = storage->ahci_mmio_virtual_address +
+                    0x100ULL + ((u64)state->first_device_port * 0x80ULL);
+    return (struct x86_64_ahci_port_registers *)port_base;
+}
+
 static void bind_command_engine_buffers(struct x86_64_ahci_state *state,
                                         const struct x86_64_storage_hw_state *storage)
 {
     struct x86_64_ahci_port_registers *port_regs;
-    u64 port_base;
     u32 clb_hi = upper32(state->command_list_page);
     u32 fb_hi = upper32(state->received_fis_page);
 
@@ -126,8 +154,7 @@ static void bind_command_engine_buffers(struct x86_64_ahci_state *state,
         return;
     }
 
-    port_base = storage->ahci_mmio_virtual_address + 0x100ULL + ((u64)state->first_device_port * 0x80ULL);
-    port_regs = (struct x86_64_ahci_port_registers *)port_base;
+    port_regs = selected_port_regs(state, storage);
 
     port_regs->clb = lower32(state->command_list_page);
     port_regs->clbu = clb_hi;
@@ -143,7 +170,34 @@ static void bind_command_engine_buffers(struct x86_64_ahci_state *state,
     state->command_port_programmed =
         ((state->command_list_bound != 0U) &&
          (state->received_fis_bound != 0U)) ? 1U : 0U;
-    state->command_engine_ready = state->command_port_programmed;
+}
+
+static void start_command_engine(struct x86_64_ahci_state *state,
+                                 const struct x86_64_storage_hw_state *storage)
+{
+    struct x86_64_ahci_port_registers *port_regs;
+    u32 stopped;
+
+    if (state->command_port_programmed == 0U) {
+        return;
+    }
+
+    port_regs = selected_port_regs(state, storage);
+    port_regs->cmd &= ~(X86_64_AHCI_PORT_CMD_ST | X86_64_AHCI_PORT_CMD_FRE);
+    wait_for_port_bits_clear(port_regs,
+                             X86_64_AHCI_PORT_CMD_CR | X86_64_AHCI_PORT_CMD_FR,
+                             &stopped);
+    state->command_engine_stopped = stopped;
+    if (state->command_engine_stopped == 0U) {
+        return;
+    }
+
+    port_regs->cmd |= X86_64_AHCI_PORT_CMD_FRE;
+    port_regs->cmd |= X86_64_AHCI_PORT_CMD_ST;
+    state->command_engine_started =
+        ((port_regs->cmd & (X86_64_AHCI_PORT_CMD_ST | X86_64_AHCI_PORT_CMD_FRE)) ==
+         (X86_64_AHCI_PORT_CMD_ST | X86_64_AHCI_PORT_CMD_FRE)) ? 1U : 0U;
+    state->command_engine_ready = state->command_engine_started;
 }
 
 void x86_64_ahci_probe(struct x86_64_ahci_state *state,
@@ -211,6 +265,7 @@ void x86_64_ahci_probe(struct x86_64_ahci_state *state,
 
         allocate_command_engine_buffers(state);
         bind_command_engine_buffers(state, storage);
+        start_command_engine(state, storage);
     }
 
     state->initialized = 1U;
