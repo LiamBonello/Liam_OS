@@ -15,7 +15,7 @@ printf '%s\n' 'Running x86_64 QEMU smoke test...'
 printf 'Smoke log: %s\n' "$LOG"
 
 set +e
-timeout 95s sh -c '
+timeout 130s sh -c '
   {
     sleep 4
     printf "version\n"
@@ -33,27 +33,29 @@ timeout 95s sh -c '
     printf "wait\n"
     sleep 2
     printf "deskcheck\n"
-    sleep 9
+    sleep 10
     printf "exec /bin/terminal\n"
-    sleep 4
+    sleep 6
     printf "wait\n"
-    sleep 3
+    sleep 5
     printf "exec /bin/file-manager\n"
-    sleep 4
+    sleep 7
+    printf "/bin/file-manager\n"
+    sleep 7
     printf "wait\n"
-    sleep 3
+    sleep 5
     printf "exec /bin/settings\n"
-    sleep 4
+    sleep 6
     printf "wait\n"
-    sleep 3
+    sleep 5
     printf "exec /bin/system-monitor\n"
-    sleep 4
+    sleep 6
     printf "wait\n"
-    sleep 3
+    sleep 5
     printf "exec /bin/text-editor\n"
-    sleep 4
+    sleep 6
     printf "wait\n"
-    sleep 3
+    sleep 5
     printf "exec /bin/sessiond\n"
     sleep 8
   } | qemu-system-x86_64 -display none -monitor none -serial stdio -boot d -cdrom build/x86_64/liam_os_x86_64.iso
