@@ -14,7 +14,19 @@
 #define X86_64_AHCI_PORT_CMD_FRE (1U << 4U)
 #define X86_64_AHCI_PORT_CMD_FR (1U << 14U)
 #define X86_64_AHCI_PORT_CMD_CR (1U << 15U)
+#define X86_64_AHCI_TFD_STS_ERR (1U << 0U)
+#define X86_64_AHCI_TFD_STS_DRQ (1U << 3U)
+#define X86_64_AHCI_TFD_STS_BSY (1U << 7U)
+#define X86_64_AHCI_PxIS_TFES (1U << 30U)
+#define X86_64_AHCI_FIS_TYPE_REG_H2D 0x27U
+#define X86_64_AHCI_ATA_CMD_READ_DMA_EXT 0x25U
+#define X86_64_AHCI_COMMAND_HEADER_CFL_DWORDS 5U
+#define X86_64_AHCI_COMMAND_HEADER_PRDTL_ONE 1U
+#define X86_64_AHCI_COMMAND_HEADER_BYTES 32U
+#define X86_64_AHCI_COMMAND_TABLE_PRDT_OFFSET 0x80U
+#define X86_64_AHCI_SECTOR_BYTES 512U
 #define X86_64_AHCI_ENGINE_SPIN_LIMIT 100000U
+#define X86_64_AHCI_COMMAND_SPIN_LIMIT 1000000U
 
 struct x86_64_ahci_hba_memory {
     volatile u32 cap;
@@ -35,6 +47,28 @@ struct x86_64_ahci_port_registers {
     volatile u32 tfd;
     volatile u32 sig;
     volatile u32 ssts;
+    volatile u32 sctl;
+    volatile u32 serr;
+    volatile u32 sact;
+    volatile u32 ci;
+    volatile u32 sntf;
+    volatile u32 fbs;
+};
+
+struct x86_64_ahci_command_header {
+    volatile u16 flags;
+    volatile u16 prdtl;
+    volatile u32 prdbc;
+    volatile u32 ctba;
+    volatile u32 ctbau;
+    volatile u32 reserved[4];
+};
+
+struct x86_64_ahci_prdt_entry {
+    volatile u32 dba;
+    volatile u32 dbau;
+    volatile u32 reserved;
+    volatile u32 dbc;
 };
 
 static void clear_page(u64 page)
@@ -98,6 +132,13 @@ static void clear_ahci_state(struct x86_64_ahci_state *state)
     state->command_engine_stopped = 0U;
     state->command_engine_started = 0U;
     state->command_engine_ready = 0U;
+    state->read_slot_ready = 0U;
+    state->read_command_prepared = 0U;
+    state->read_command_issued = 0U;
+    state->read_command_completed = 0U;
+    state->read_sector_ready = 0U;
+    state->read_sector_zeroed = 0U;
+    state->read_error = 0U;
     state->driver_ready = 0U;
 }
 
@@ -200,6 +241,136 @@ static void start_command_engine(struct x86_64_ahci_state *state,
     state->command_engine_ready = state->command_engine_started;
 }
 
+static u32 sector_is_zeroed(u64 page)
+{
+    const u8 *bytes = (const u8 *)page;
+    for (usize i = 0U; i < X86_64_AHCI_SECTOR_BYTES; ++i) {
+        if (bytes[i] != 0U) {
+            return 0U;
+        }
+    }
+
+    return 1U;
+}
+
+static void prepare_read_dma_ext_command(struct x86_64_ahci_state *state)
+{
+    struct x86_64_ahci_command_header *header =
+        (struct x86_64_ahci_command_header *)state->command_list_page;
+    u8 *table = (u8 *)state->command_table_page;
+    struct x86_64_ahci_prdt_entry *prdt =
+        (struct x86_64_ahci_prdt_entry *)(state->command_table_page +
+                                          X86_64_AHCI_COMMAND_TABLE_PRDT_OFFSET);
+    u32 table_hi = upper32(state->command_table_page);
+    u32 buffer_hi = upper32(state->dma_buffer_page);
+
+    if (state->command_engine_ready == 0U) {
+        return;
+    }
+
+    if ((state->hba_64bit_capable == 0U) && ((table_hi != 0U) || (buffer_hi != 0U))) {
+        return;
+    }
+
+    clear_page(state->command_list_page);
+    clear_page(state->command_table_page);
+    clear_page(state->dma_buffer_page);
+
+    header[0].flags = X86_64_AHCI_COMMAND_HEADER_CFL_DWORDS;
+    header[0].prdtl = X86_64_AHCI_COMMAND_HEADER_PRDTL_ONE;
+    header[0].prdbc = 0U;
+    header[0].ctba = lower32(state->command_table_page);
+    header[0].ctbau = table_hi;
+
+    table[0] = X86_64_AHCI_FIS_TYPE_REG_H2D;
+    table[1] = 0x80U;
+    table[2] = X86_64_AHCI_ATA_CMD_READ_DMA_EXT;
+    table[7] = 1U << 6U;
+    table[12] = 1U;
+    table[13] = 0U;
+
+    prdt[0].dba = lower32(state->dma_buffer_page);
+    prdt[0].dbau = buffer_hi;
+    prdt[0].reserved = 0U;
+    prdt[0].dbc = (X86_64_AHCI_SECTOR_BYTES - 1U) | (1U << 31U);
+
+    state->read_command_prepared =
+        ((header[0].flags == X86_64_AHCI_COMMAND_HEADER_CFL_DWORDS) &&
+         (header[0].prdtl == X86_64_AHCI_COMMAND_HEADER_PRDTL_ONE) &&
+         (header[0].ctba == lower32(state->command_table_page)) &&
+         (header[0].ctbau == table_hi) &&
+         (table[0] == X86_64_AHCI_FIS_TYPE_REG_H2D) &&
+         (table[2] == X86_64_AHCI_ATA_CMD_READ_DMA_EXT) &&
+         (prdt[0].dba == lower32(state->dma_buffer_page)) &&
+         (prdt[0].dbau == buffer_hi)) ? 1U : 0U;
+}
+
+static void issue_read_dma_ext_command(struct x86_64_ahci_state *state,
+                                       const struct x86_64_storage_hw_state *storage)
+{
+    struct x86_64_ahci_port_registers *port_regs;
+
+    if (state->read_command_prepared == 0U) {
+        return;
+    }
+
+    port_regs = selected_port_regs(state, storage);
+    port_regs->is = 0xFFFFFFFFU;
+    port_regs->serr = 0xFFFFFFFFU;
+
+    for (u32 i = 0U; i < X86_64_AHCI_COMMAND_SPIN_LIMIT; ++i) {
+        if ((port_regs->tfd & (X86_64_AHCI_TFD_STS_BSY | X86_64_AHCI_TFD_STS_DRQ)) == 0U) {
+            state->read_slot_ready = 1U;
+            break;
+        }
+    }
+
+    if (state->read_slot_ready == 0U) {
+        return;
+    }
+
+    port_regs->ci = 1U;
+    state->read_command_issued = ((port_regs->ci & 1U) != 0U) ? 1U : 0U;
+    if (state->read_command_issued == 0U) {
+        return;
+    }
+
+    for (u32 i = 0U; i < X86_64_AHCI_COMMAND_SPIN_LIMIT; ++i) {
+        if ((port_regs->is & X86_64_AHCI_PxIS_TFES) != 0U) {
+            state->read_error = 1U;
+            return;
+        }
+
+        if ((port_regs->tfd & X86_64_AHCI_TFD_STS_ERR) != 0U) {
+            state->read_error = 1U;
+            return;
+        }
+
+        if ((port_regs->ci & 1U) == 0U) {
+            state->read_command_completed = 1U;
+            break;
+        }
+    }
+
+    if (state->read_command_completed == 0U) {
+        return;
+    }
+
+    state->read_sector_ready = 1U;
+    state->read_sector_zeroed = sector_is_zeroed(state->dma_buffer_page);
+    state->driver_ready =
+        ((state->read_sector_ready != 0U) &&
+         (state->read_sector_zeroed != 0U) &&
+         (state->read_error == 0U)) ? 1U : 0U;
+}
+
+static void run_read_smoke(struct x86_64_ahci_state *state,
+                           const struct x86_64_storage_hw_state *storage)
+{
+    prepare_read_dma_ext_command(state);
+    issue_read_dma_ext_command(state, storage);
+}
+
 void x86_64_ahci_probe(struct x86_64_ahci_state *state,
                        const struct x86_64_storage_hw_state *storage)
 {
@@ -266,6 +437,7 @@ void x86_64_ahci_probe(struct x86_64_ahci_state *state,
         allocate_command_engine_buffers(state);
         bind_command_engine_buffers(state, storage);
         start_command_engine(state, storage);
+        run_read_smoke(state, storage);
     }
 
     state->initialized = 1U;
