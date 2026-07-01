@@ -1,4 +1,5 @@
 #include "ahci.h"
+#include "console.h"
 #include "pmm.h"
 
 #define X86_64_AHCI_CAP_S64A (1U << 31U)
@@ -364,11 +365,23 @@ static void issue_read_dma_ext_command(struct x86_64_ahci_state *state,
          (state->read_error == 0U)) ? 1U : 0U;
 }
 
+static void report_read_smoke(const struct x86_64_ahci_state *state)
+{
+    x86_64_serial_write_u32("AHCI read slot ready: ", state->read_slot_ready);
+    x86_64_serial_write_u32("AHCI read command prepared: ", state->read_command_prepared);
+    x86_64_serial_write_u32("AHCI read command issued: ", state->read_command_issued);
+    x86_64_serial_write_u32("AHCI read command completed: ", state->read_command_completed);
+    x86_64_serial_write_u32("AHCI read sector ready: ", state->read_sector_ready);
+    x86_64_serial_write_u32("AHCI read sector zeroed: ", state->read_sector_zeroed);
+    x86_64_serial_write_u32("AHCI read error: ", state->read_error);
+}
+
 static void run_read_smoke(struct x86_64_ahci_state *state,
                            const struct x86_64_storage_hw_state *storage)
 {
     prepare_read_dma_ext_command(state);
     issue_read_dma_ext_command(state, storage);
+    report_read_smoke(state);
 }
 
 void x86_64_ahci_probe(struct x86_64_ahci_state *state,
