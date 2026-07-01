@@ -4,12 +4,15 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CORE="$ROOT/core"
 LOG="${TMPDIR:-/tmp}/liam_os_x86_64_smoke.log"
+DISK="${TMPDIR:-/tmp}/liam_os_x86_64_smoke_disk.img"
 
 cd "$CORE"
 make clean
 make x86_64-iso
 
-rm -f "$LOG"
+rm -f "$LOG" "$DISK"
+truncate -s 64M "$DISK"
+export DISK
 
 printf '%s\n' 'Running x86_64 QEMU smoke test...'
 printf 'Smoke log: %s\n' "$LOG"
@@ -64,7 +67,15 @@ timeout 150s sh -c '
     sleep 5
     printf "exec /bin/sessiond\n"
     sleep 8
-  } | qemu-system-x86_64 -display none -monitor none -serial stdio -boot d -cdrom build/x86_64/liam_os_x86_64.iso
+  } | qemu-system-x86_64 \
+    -display none \
+    -monitor none \
+    -serial stdio \
+    -boot d \
+    -cdrom build/x86_64/liam_os_x86_64.iso \
+    -device ich9-ahci,id=ahci \
+    -drive if=none,id=liamdisk,file="$DISK",format=raw \
+    -device ide-hd,drive=liamdisk,bus=ahci.0
 ' >"$LOG" 2>&1
 status=$?
 set -e
@@ -107,20 +118,21 @@ require_marker "x86_64 PCI bus discovery online"
 require_marker "PCI config I/O ready: 1"
 require_marker "PCI devices found: "
 require_marker "PCI storage controllers: "
-require_marker "PCI AHCI controllers: "
+require_marker "PCI AHCI controllers: 1"
 require_marker "PCI NVMe controllers: "
 require_marker "x86_64 storage hardware inventory online"
 require_marker "Storage hardware initialized: 1"
 require_marker "Storage PCI ready: 1"
-require_marker "Storage AHCI controller found: "
+require_marker "Storage AHCI controllers: 1"
+require_marker "Storage AHCI controller found: 1"
 require_marker "Storage AHCI BAR5 raw: 0x"
 require_marker "Storage AHCI MMIO base: 0x"
-require_marker "Storage AHCI MMIO BAR ready: "
+require_marker "Storage AHCI MMIO BAR ready: 1"
 require_marker "Storage AHCI MMIO mapped: 0"
 require_marker "x86_64 AHCI probe online"
 require_marker "AHCI initialized: 1"
-require_marker "AHCI controller found: "
-require_marker "AHCI BAR ready: "
+require_marker "AHCI controller found: 1"
+require_marker "AHCI BAR ready: 1"
 require_marker "AHCI MMIO mapped: 0"
 require_marker "AHCI HBA probe safe: 0"
 require_marker "AHCI HBA registers read: 0"
