@@ -10,6 +10,8 @@ extern const u8 x86_64_user_sysinfo_image_start[];
 extern const u8 x86_64_user_sysinfo_image_end[];
 extern const u8 x86_64_user_inputd_image_start[];
 extern const u8 x86_64_user_inputd_image_end[];
+extern const u8 x86_64_user_sessiond_image_start[];
+extern const u8 x86_64_user_sessiond_image_end[];
 extern const u8 x86_64_user_storaged_image_start[];
 extern const u8 x86_64_user_storaged_image_end[];
 extern const u8 x86_64_user_timed_image_start[];
@@ -39,6 +41,7 @@ static const char x86_64_vfs_dir_bin[] =
     "eventd\n"
     "hello\n"
     "inputd\n"
+    "sessiond\n"
     "storaged\n"
     "sysinfo\n"
     "timed\n"
@@ -81,6 +84,7 @@ static const char x86_64_vfs_file_help[] =
     "/bin/eventd\n"
     "/bin/hello\n"
     "/bin/inputd\n"
+    "/bin/sessiond\n"
     "/bin/storaged\n"
     "/bin/sysinfo\n"
     "/bin/timed\n"
@@ -94,6 +98,7 @@ static const char x86_64_vfs_file_files[] =
     "/bin/eventd\n"
     "/bin/hello\n"
     "/bin/inputd\n"
+    "/bin/sessiond\n"
     "/bin/storaged\n"
     "/bin/sysinfo\n"
     "/bin/timed\n"
@@ -125,6 +130,7 @@ static const struct x86_64_vfs_node x86_64_vfs_nodes[] = {
     {"/bin/eventd", x86_64_user_eventd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/hello", x86_64_user_hello_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/inputd", x86_64_user_inputd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/sessiond", x86_64_user_sessiond_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/storaged", x86_64_user_storaged_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/sysinfo", x86_64_user_sysinfo_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/timed", x86_64_user_timed_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
@@ -166,6 +172,10 @@ static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
 
     if (node->data == x86_64_user_inputd_image_start) {
         return (u64)(x86_64_user_inputd_image_end - x86_64_user_inputd_image_start);
+    }
+
+    if (node->data == x86_64_user_sessiond_image_start) {
+        return (u64)(x86_64_user_sessiond_image_end - x86_64_user_sessiond_image_start);
     }
 
     if (node->data == x86_64_user_storaged_image_start) {
@@ -369,12 +379,12 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
 
     u64 bin_bytes = x86_64_vfs_read(&probe, bin_fd, buffer, sizeof(buffer));
     if (bin_bytes != sizeof(buffer) ||
-        buffer[0] != 'h' ||
-        buffer[1] != 'e' ||
-        buffer[2] != 'l' ||
-        buffer[3] != 'l' ||
-        buffer[4] != 'o' ||
-        buffer[5] != '\n') {
+        buffer[0] != 'd' ||
+        buffer[1] != 'a' ||
+        buffer[2] != 't' ||
+        buffer[3] != 'a' ||
+        buffer[4] != 't' ||
+        buffer[5] != 'e') {
         return 0U;
     }
 
@@ -428,6 +438,15 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
 
     if (x86_64_vfs_type(&probe, "/bin/inputd", &type) != X86_64_VFS_RET_OK ||
         type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/bin/sessiond", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/bin/sessiond", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
         return 0U;
     }
 
