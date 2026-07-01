@@ -210,6 +210,7 @@ static void report_storage_hw_state(const struct x86_64_storage_hw_state *state)
     x86_64_serial_write_u32("Storage AHCI controller found: ", state->ahci_controller_found);
     x86_64_serial_write_hex32("Storage AHCI BAR5 raw: 0x", state->ahci_bar5_raw);
     x86_64_serial_write_hex64("Storage AHCI MMIO base: 0x", state->ahci_mmio_base);
+    x86_64_serial_write_hex64("Storage AHCI MMIO virtual: 0x", state->ahci_mmio_virtual_address);
     x86_64_serial_write_u32("Storage AHCI MMIO BAR ready: ", state->ahci_mmio_bar_ready);
     x86_64_serial_write_u32("Storage AHCI MMIO mapped: ", state->ahci_mmio_mapped);
     x86_64_serial_write_u32("Storage block driver ready: ", state->block_driver_ready);
@@ -356,6 +357,12 @@ static void report_paging_builder(const struct x86_64_paging_builder_state *stat
     x86_64_serial_write_u32("Paging builder framebuffer requested: ", state->framebuffer_requested);
     x86_64_serial_write_u32("Paging builder framebuffer entry ok: ", state->framebuffer_entry_ok);
     x86_64_serial_write_u32("Paging builder framebuffer mapped: ", state->framebuffer_mapped);
+    x86_64_serial_write_u32("Paging builder AHCI MMIO requested: ", state->ahci_mmio_requested);
+    x86_64_serial_write_hex64("Paging builder AHCI MMIO physical: 0x", state->ahci_mmio_physical_base);
+    x86_64_serial_write_hex64("Paging builder AHCI MMIO virtual: 0x", state->ahci_mmio_virtual_address);
+    x86_64_serial_write_u32("Paging builder AHCI MMIO huge pages: ", state->ahci_mmio_huge_pages);
+    x86_64_serial_write_u32("Paging builder AHCI MMIO entry ok: ", state->ahci_mmio_entry_ok);
+    x86_64_serial_write_u32("Paging builder AHCI MMIO mapped: ", state->ahci_mmio_mapped);
     x86_64_serial_write_u32("Paging builder kernel ok: ", state->kernel_entry_ok);
     x86_64_serial_write_u32("Paging builder tables aligned: ", state->tables_aligned);
     x86_64_serial_write_u32("Paging builder ok: ", state->builder_ok);
@@ -569,12 +576,13 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_cpuid_state_init(&cpuid_state);
     x86_64_pci_scan(&pci_state);
     x86_64_storage_hw_init(&storage_hw_state, &pci_state);
-    x86_64_ahci_probe(&ahci_state, &storage_hw_state);
     x86_64_paging_state_init(&paging_state);
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
     x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
-    x86_64_paging_builder_init(&paging_builder, &context.memory_layout, &paging_plan, &context.boot_info);
+    x86_64_paging_builder_init(&paging_builder, &context.memory_layout, &paging_plan, &context.boot_info, &storage_hw_state);
     x86_64_paging_builder_activate(&paging_activation, &paging_builder);
+    x86_64_storage_hw_apply_ahci_mapping(&storage_hw_state, &paging_builder);
+    x86_64_ahci_probe(&ahci_state, &storage_hw_state);
     x86_64_framebuffer_init(&framebuffer_state, &context.boot_info, &paging_builder);
     x86_64_framebuffer_run_smoke(&framebuffer_state);
     x86_64_heap_init(&heap_state, &paging_plan);

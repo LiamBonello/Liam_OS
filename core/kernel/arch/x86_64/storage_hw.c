@@ -1,4 +1,5 @@
 #include "storage_hw.h"
+#include "paging_builder.h"
 
 #define X86_64_PCI_BAR_IO_SPACE 0x00000001U
 #define X86_64_PCI_BAR_MEM_MASK 0xFFFFFFF0U
@@ -20,6 +21,7 @@ void x86_64_storage_hw_init(struct x86_64_storage_hw_state *state,
     state->ahci_controller_found = 0U;
     state->ahci_bar5_raw = 0U;
     state->ahci_mmio_base = 0ULL;
+    state->ahci_mmio_virtual_address = 0ULL;
     state->ahci_mmio_bar_ready = 0U;
     state->ahci_mmio_mapped = 0U;
     state->block_driver_ready = 0U;
@@ -45,4 +47,18 @@ void x86_64_storage_hw_init(struct x86_64_storage_hw_state *state,
     }
 
     state->initialized = 1U;
+}
+
+void x86_64_storage_hw_apply_ahci_mapping(struct x86_64_storage_hw_state *state,
+                                          const struct x86_64_paging_builder_state *builder)
+{
+    if ((state == 0) || (builder == 0)) {
+        return;
+    }
+
+    if ((state->ahci_mmio_bar_ready != 0U) &&
+        (builder->ahci_mmio_entry_ok != 0U)) {
+        state->ahci_mmio_virtual_address = builder->ahci_mmio_virtual_address;
+        state->ahci_mmio_mapped = 1U;
+    }
 }

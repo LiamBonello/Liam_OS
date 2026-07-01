@@ -46,7 +46,7 @@ void x86_64_ahci_probe(struct x86_64_ahci_state *state,
 
     if (state->hba_probe_safe != 0U) {
         const struct x86_64_ahci_hba_memory *hba =
-            (const struct x86_64_ahci_hba_memory *)storage->ahci_mmio_base;
+            (const struct x86_64_ahci_hba_memory *)storage->ahci_mmio_virtual_address;
         u32 cap = hba->cap;
         state->hba_ports_implemented = hba->pi;
         state->hba_command_slots = ((cap >> X86_64_AHCI_CAP_NCS_SHIFT) &

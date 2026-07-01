@@ -120,7 +120,7 @@ static u32 entry_has_user(u64 entry)
     return ((entry & X86_64_PAGE_USER) != 0ULL) ? 1U : 0U;
 }
 
-static u32 framebuffer_mapping_fits(u32 first_pd_index, u32 huge_pages)
+static u32 huge_mapping_fits(u32 first_pd_index, u32 huge_pages)
 {
     return ((huge_pages != 0U) &&
             (huge_pages <= X86_64_PAGING_BUILDER_ENTRIES) &&
@@ -352,7 +352,8 @@ static void load_embedded_user_image(struct x86_64_paging_builder_state *state)
 void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
                                 const struct x86_64_memory_layout *layout,
                                 const struct x86_64_paging_plan *plan,
-                                const struct x86_64_boot_summary *boot_info)
+                                const struct x86_64_boot_summary *boot_info,
+                                const struct x86_64_storage_hw_state *storage_hw)
 {
     clear_builder_state(state);
 
@@ -368,6 +369,8 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     u64 *builder_direct_pd = (u64 *)0;
     u64 *builder_framebuffer_pdpt = (u64 *)0;
     u64 *builder_framebuffer_pd = (u64 *)0;
+    u64 *builder_ahci_pdpt = (u64 *)0;
+    u64 *builder_ahci_pd = (u64 *)0;
     u64 *builder_kernel_pdpt = (u64 *)0;
     u64 *builder_kernel_pd = (u64 *)0;
     u64 *builder_kernel_pt = (u64 *)0;
@@ -388,6 +391,8 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
         allocate_table(&builder_direct_pd, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_framebuffer_pdpt, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_framebuffer_pd, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_ahci_pdpt, allocated_pages, &allocated_count) == 0U ||
+        allocate_table(&builder_ahci_pd, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_kernel_pdpt, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_kernel_pd, allocated_pages, &allocated_count) == 0U ||
         allocate_table(&builder_kernel_pt, allocated_pages, &allocated_count) == 0U ||
@@ -420,6 +425,8 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     state->direct_pd_table = (u64)builder_direct_pd;
     state->framebuffer_pdpt_table = (u64)builder_framebuffer_pdpt;
     state->framebuffer_pd_table = (u64)builder_framebuffer_pd;
+    state->ahci_pdpt_table = (u64)builder_ahci_pdpt;
+    state->ahci_pd_table = (u64)builder_ahci_pd;
     state->kernel_pdpt_table = (u64)builder_kernel_pdpt;
     state->kernel_pd_table = (u64)builder_kernel_pd;
     state->kernel_pt_table = (u64)builder_kernel_pt;
@@ -465,6 +472,9 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     u32 framebuffer_pml4_index = pml4_index_for(X86_64_FRAMEBUFFER_VIRTUAL_BASE);
     u32 framebuffer_pdpt_index = pdpt_index_for(X86_64_FRAMEBUFFER_VIRTUAL_BASE);
     u32 framebuffer_pd_index = pd_index_for(X86_64_FRAMEBUFFER_VIRTUAL_BASE);
+    u32 ahci_pml4_index = pml4_index_for(X86_64_AHCI_MMIO_VIRTUAL_BASE);
+    u32 ahci_pdpt_index = pdpt_index_for(X86_64_AHCI_MMIO_VIRTUAL_BASE);
+    u32 ahci_pd_index = pd_index_for(X86_64_AHCI_MMIO_VIRTUAL_BASE);
     if (state->framebuffer_requested != 0U) {
         u64 framebuffer_offset = boot_info->framebuffer_addr & X86_64_HUGE_PAGE_MASK;
         u64 framebuffer_bytes = ((u64)boot_info->framebuffer_pitch * (u64)boot_info->framebuffer_height) +
@@ -475,12 +485,34 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
         state->framebuffer_bytes = framebuffer_bytes;
         state->framebuffer_huge_pages = framebuffer_huge_pages;
 
-        if (framebuffer_mapping_fits(framebuffer_pd_index, framebuffer_huge_pages) != 0U) {
+        if (huge_mapping_fits(framebuffer_pd_index, framebuffer_huge_pages) != 0U) {
             builder_framebuffer_pdpt[framebuffer_pdpt_index] =
                 ((u64)builder_framebuffer_pd) | X86_64_TABLE_FLAGS;
             for (u32 i = 0; i < framebuffer_huge_pages; ++i) {
                 builder_framebuffer_pd[framebuffer_pd_index + i] =
                     (state->framebuffer_physical_base + ((u64)i * X86_64_HUGE_PAGE_SIZE)) |
+                    X86_64_HUGE_PAGE_FLAGS;
+            }
+        }
+    }
+
+    state->ahci_mmio_requested =
+        ((storage_hw != (const struct x86_64_storage_hw_state *)0) &&
+         (storage_hw->ahci_mmio_bar_ready != 0U)) ? 1U : 0U;
+    state->ahci_mmio_virtual_base = X86_64_AHCI_MMIO_VIRTUAL_BASE;
+    if (state->ahci_mmio_requested != 0U) {
+        u64 ahci_offset = storage_hw->ahci_mmio_base & X86_64_HUGE_PAGE_MASK;
+        u32 ahci_huge_pages = huge_page_count_for(ahci_offset + X86_64_PAGE_SIZE);
+        state->ahci_mmio_physical_base = align_down_huge(storage_hw->ahci_mmio_base);
+        state->ahci_mmio_virtual_address = X86_64_AHCI_MMIO_VIRTUAL_BASE + ahci_offset;
+        state->ahci_mmio_bytes = ahci_offset + X86_64_PAGE_SIZE;
+        state->ahci_mmio_huge_pages = ahci_huge_pages;
+
+        if (huge_mapping_fits(ahci_pd_index, ahci_huge_pages) != 0U) {
+            builder_ahci_pdpt[ahci_pdpt_index] = ((u64)builder_ahci_pd) | X86_64_TABLE_FLAGS;
+            for (u32 i = 0; i < ahci_huge_pages; ++i) {
+                builder_ahci_pd[ahci_pd_index + i] =
+                    (state->ahci_mmio_physical_base + ((u64)i * X86_64_HUGE_PAGE_SIZE)) |
                     X86_64_HUGE_PAGE_FLAGS;
             }
         }
@@ -523,6 +555,7 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
     builder_pml4[plan->identity_pml4_index] = ((u64)builder_identity_pdpt) | X86_64_USER_TABLE_FLAGS;
     builder_pml4[plan->direct_map_pml4_index] = ((u64)builder_direct_pdpt) | X86_64_TABLE_FLAGS;
     builder_pml4[framebuffer_pml4_index] = ((u64)builder_framebuffer_pdpt) | X86_64_TABLE_FLAGS;
+    builder_pml4[ahci_pml4_index] = ((u64)builder_ahci_pdpt) | X86_64_TABLE_FLAGS;
     builder_pml4[plan->kernel_pml4_index] = ((u64)builder_kernel_pdpt) | X86_64_TABLE_FLAGS;
 
     u32 split_identity_huge_pages = identity_pages;
@@ -551,6 +584,13 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
          ((builder_framebuffer_pd[framebuffer_pd_index] & X86_64_PAGE_PRESENT) != 0ULL)) ? 1U : 0U;
     state->framebuffer_mapped =
         ((state->framebuffer_requested == 0U) || (state->framebuffer_entry_ok != 0U)) ? 1U : 0U;
+    state->ahci_mmio_entry_ok =
+        ((state->ahci_mmio_requested != 0U) &&
+         ((builder_pml4[ahci_pml4_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
+         ((builder_ahci_pdpt[ahci_pdpt_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
+         ((builder_ahci_pd[ahci_pd_index] & X86_64_PAGE_PRESENT) != 0ULL)) ? 1U : 0U;
+    state->ahci_mmio_mapped =
+        ((state->ahci_mmio_requested == 0U) || (state->ahci_mmio_entry_ok != 0U)) ? 1U : 0U;
     state->kernel_entry_ok =
         (((builder_pml4[plan->kernel_pml4_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
          ((builder_kernel_pdpt[kernel_pdpt_index] & X86_64_PAGE_PRESENT) != 0ULL) &&
@@ -598,6 +638,7 @@ void x86_64_paging_builder_init(struct x86_64_paging_builder_state *state,
          (state->identity_entry_ok != 0U) &&
          (state->direct_map_entry_ok != 0U) &&
          (state->framebuffer_mapped != 0U) &&
+         (state->ahci_mmio_mapped != 0U) &&
          (state->kernel_entry_ok != 0U) &&
          (state->user_mapping_ok != 0U) &&
          (state->tables_aligned != 0U)) ? 1U : 0U;
