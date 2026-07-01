@@ -22,9 +22,10 @@ This file defines the stable kernel/userland contracts that must stay boring bef
 - Service startup must report success or failure through serial-visible status text until a richer service manager exists.
 - Service names should describe the subsystem they own, not test/demo behavior.
 
-Current core service:
+Current core services:
 
 - `/bin/windowd-service`: keeps the window service reachable while the desktop session is still being split out.
+- `/bin/sessiond`: smoke-tested desktop session entry point for status reporting, window presentation, input polling, and timer-paced execution.
 
 ## Framebuffer And Window Contract
 
@@ -57,7 +58,9 @@ Desktop work may rely on session storage for smoke/status checks, but user-facin
 
 ## Desktop Session Contract
 
-The next desktop milestone is a persistent `/bin/sessiond` process that owns:
+`/bin/sessiond` is wired into the x86_64 userland image and must remain covered by `make check`.
+
+The next desktop milestone is to make `/bin/sessiond` a persistent session owner for:
 
 - starting required services once
 - reporting service readiness
@@ -66,4 +69,4 @@ The next desktop milestone is a persistent `/bin/sessiond` process that owns:
 - presenting frames at a timer-paced cadence
 - exiting cleanly only when requested
 
-Until `/bin/sessiond` is wired into the image, `deskcheck` remains the smoke-test entry point for desktop readiness.
+Until `/bin/sessiond` owns the full session lifecycle, `deskcheck` remains the broad desktop readiness check.
