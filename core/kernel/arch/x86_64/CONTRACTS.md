@@ -15,6 +15,7 @@ This file defines the stable kernel/userland contracts that must stay boring bef
 - User processes are spawned through the x86_64 exec/spawn syscall path.
 - Child process completion is observed through `wait`.
 - `ps` must report enough state to validate core services.
+- Background service spawning currently creates ready user processes; true background user scheduling is the next kernel milestone.
 
 ## Service Startup Contract
 
@@ -58,7 +59,7 @@ Desktop work may rely on session storage for smoke/status checks, but user-facin
 
 ## Desktop Session Contract
 
-`/bin/sessiond` is wired into the x86_64 userland image, started as a service by the canonical smoke test, and must remain covered by `make check`.
+`/bin/sessiond` is wired into the x86_64 userland image, covered by `make check`, and currently launched as the final foreground desktop-session process in the smoke test.
 
 `/bin/sessiond` currently owns:
 
@@ -69,4 +70,4 @@ Desktop work may rely on session storage for smoke/status checks, but user-facin
 - polling input events in bounded batches
 - presenting frames at a timer-paced cadence
 
-The next desktop milestone is to let `/bin/sessiond` start and supervise required services itself, then replace `deskcheck` with a session-owned readiness report.
+The next desktop milestone is to add real background user scheduling so `/bin/sessiond` can start through `service /bin/sessiond`, keep running while `/bin/init` remains interactive, and eventually supervise required services itself.
