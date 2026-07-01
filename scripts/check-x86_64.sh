@@ -15,7 +15,7 @@ printf '%s\n' 'Running x86_64 QEMU smoke test...'
 printf 'Smoke log: %s\n' "$LOG"
 
 set +e
-timeout 130s sh -c '
+timeout 145s sh -c '
   {
     sleep 4
     printf "version\n"
@@ -34,6 +34,10 @@ timeout 130s sh -c '
     sleep 2
     printf "deskcheck\n"
     sleep 10
+    printf "exec /bin/storaged\n"
+    sleep 6
+    printf "wait\n"
+    sleep 4
     printf "exec /bin/terminal\n"
     sleep 6
     printf "wait\n"
