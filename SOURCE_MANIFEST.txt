@@ -5,6 +5,7 @@
 ./core/boot/grub-x86_64-exception-test.cfg
 ./core/boot/grub-x86_64.cfg
 ./core/boot/grub.cfg
+./core/kernel/arch/README.md
 ./core/kernel/arch/i386/context.h
 ./core/kernel/arch/i386/context_switch.asm
 ./core/kernel/arch/i386/gdt.c
@@ -156,6 +157,7 @@
 ./core/userland/flat/syscheck/syscheck.asm
 ./core/userland/flat/ticks/ticks.asm
 ./core/userland/flat/uptime/uptime.asm
+./core/userland/x86_64/datatest/datatest.asm
 ./core/userland/x86_64/eventd/eventd.asm
 ./core/userland/x86_64/hello/hello.asm
 ./core/userland/x86_64/init/init.asm
@@ -164,6 +166,7 @@
 ./core/userland/x86_64/storaged/storaged.asm
 ./core/userland/x86_64/sysinfo/sysinfo.asm
 ./core/userland/x86_64/timed/timed.asm
+./core/userland/x86_64/windowd-service/windowd-service.asm
 ./core/userland/x86_64/windowd/windowd.asm
 ./scripts/check-core.sh
 ./scripts/check-x86_64.sh
