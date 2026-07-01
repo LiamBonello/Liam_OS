@@ -794,7 +794,7 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         return state->last_result;
 
     case X86_64_SYSCALL_SERVICE_WINDOW_PRESENT:
-        state->last_result = x86_64_desktop_services_present_demo_window();
+        state->last_result = x86_64_desktop_services_present_system_window();
         state->window_present_ok = (state->last_result == 1ULL) ? 1U : 0U;
         return state->last_result;
 

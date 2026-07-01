@@ -40,10 +40,6 @@ void x86_64_desktop_services_init(const struct x86_64_framebuffer_state *framebu
 void x86_64_desktop_services_get_state(struct x86_64_desktop_services_state *state);
 u64 x86_64_desktop_services_snapshot(char *buffer, u64 size);
 u64 x86_64_desktop_services_present_system_window(void);
-static inline u64 x86_64_desktop_services_present_demo_window(void)
-{
-    return x86_64_desktop_services_present_system_window();
-}
 void x86_64_desktop_services_run_smoke(struct x86_64_desktop_services_state *state);
 
 #endif
