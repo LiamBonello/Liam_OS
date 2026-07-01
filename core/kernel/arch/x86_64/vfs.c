@@ -4,6 +4,8 @@ extern const u8 x86_64_user_eventd_image_start[];
 extern const u8 x86_64_user_eventd_image_end[];
 extern const u8 x86_64_user_datatest_image_start[];
 extern const u8 x86_64_user_datatest_image_end[];
+extern const u8 x86_64_user_file_manager_image_start[];
+extern const u8 x86_64_user_file_manager_image_end[];
 extern const u8 x86_64_user_hello_image_start[];
 extern const u8 x86_64_user_hello_image_end[];
 extern const u8 x86_64_user_sysinfo_image_start[];
@@ -12,14 +14,23 @@ extern const u8 x86_64_user_inputd_image_start[];
 extern const u8 x86_64_user_inputd_image_end[];
 extern const u8 x86_64_user_sessiond_image_start[];
 extern const u8 x86_64_user_sessiond_image_end[];
+extern const u8 x86_64_user_settings_image_start[];
+extern const u8 x86_64_user_settings_image_end[];
 extern const u8 x86_64_user_storaged_image_start[];
 extern const u8 x86_64_user_storaged_image_end[];
+extern const u8 x86_64_user_system_monitor_image_start[];
+extern const u8 x86_64_user_system_monitor_image_end[];
+extern const u8 x86_64_user_terminal_image_start[];
+extern const u8 x86_64_user_terminal_image_end[];
+extern const u8 x86_64_user_text_editor_image_start[];
+extern const u8 x86_64_user_text_editor_image_end[];
 extern const u8 x86_64_user_timed_image_start[];
 extern const u8 x86_64_user_timed_image_end[];
 extern const u8 x86_64_user_windowd_image_start[];
 extern const u8 x86_64_user_windowd_image_end[];
 extern const u8 x86_64_user_windowd_service_image_start[];
 extern const u8 x86_64_user_windowd_service_image_end[];
+
 
 struct x86_64_vfs_node {
     const char *path;
@@ -39,11 +50,16 @@ static const char x86_64_vfs_dir_root[] =
 static const char x86_64_vfs_dir_bin[] =
     "datatest\n"
     "eventd\n"
+    "file-manager\n"
     "hello\n"
     "inputd\n"
     "sessiond\n"
+    "settings\n"
     "storaged\n"
     "sysinfo\n"
+    "system-monitor\n"
+    "terminal\n"
+    "text-editor\n"
     "timed\n"
     "windowd\n"
     "windowd-service\n";
@@ -82,11 +98,16 @@ static const char x86_64_vfs_file_help[] =
     "Executable files:\n"
     "/bin/datatest\n"
     "/bin/eventd\n"
+    "/bin/file-manager\n"
     "/bin/hello\n"
     "/bin/inputd\n"
     "/bin/sessiond\n"
+    "/bin/settings\n"
     "/bin/storaged\n"
     "/bin/sysinfo\n"
+    "/bin/system-monitor\n"
+    "/bin/terminal\n"
+    "/bin/text-editor\n"
     "/bin/timed\n"
     "/bin/windowd\n"
     "/bin/windowd-service\n";
@@ -96,11 +117,16 @@ static const char x86_64_vfs_file_files[] =
     "/bin\n"
     "/bin/datatest\n"
     "/bin/eventd\n"
+    "/bin/file-manager\n"
     "/bin/hello\n"
     "/bin/inputd\n"
     "/bin/sessiond\n"
+    "/bin/settings\n"
     "/bin/storaged\n"
     "/bin/sysinfo\n"
+    "/bin/system-monitor\n"
+    "/bin/terminal\n"
+    "/bin/text-editor\n"
     "/bin/timed\n"
     "/bin/windowd\n"
     "/bin/windowd-service\n"
@@ -128,11 +154,16 @@ static const struct x86_64_vfs_node x86_64_vfs_nodes[] = {
     {"/usr/share", (const u8 *)x86_64_vfs_dir_usr_share, sizeof(x86_64_vfs_dir_usr_share) - 1ULL, X86_64_VFS_NODE_DIRECTORY},
     {"/bin/datatest", x86_64_user_datatest_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/eventd", x86_64_user_eventd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/file-manager", x86_64_user_file_manager_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/hello", x86_64_user_hello_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/inputd", x86_64_user_inputd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/sessiond", x86_64_user_sessiond_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/settings", x86_64_user_settings_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/storaged", x86_64_user_storaged_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/sysinfo", x86_64_user_sysinfo_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/system-monitor", x86_64_user_system_monitor_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/terminal", x86_64_user_terminal_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
+    {"/bin/text-editor", x86_64_user_text_editor_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/timed", x86_64_user_timed_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/windowd", x86_64_user_windowd_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
     {"/bin/windowd-service", x86_64_user_windowd_service_image_start, 0ULL, X86_64_VFS_NODE_EXECUTABLE},
@@ -166,6 +197,10 @@ static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
         return (u64)(x86_64_user_datatest_image_end - x86_64_user_datatest_image_start);
     }
 
+    if (node->data == x86_64_user_file_manager_image_start) {
+        return (u64)(x86_64_user_file_manager_image_end - x86_64_user_file_manager_image_start);
+    }
+
     if (node->data == x86_64_user_hello_image_start) {
         return (u64)(x86_64_user_hello_image_end - x86_64_user_hello_image_start);
     }
@@ -178,12 +213,28 @@ static u64 x86_64_vfs_node_size(const struct x86_64_vfs_node *node)
         return (u64)(x86_64_user_sessiond_image_end - x86_64_user_sessiond_image_start);
     }
 
+    if (node->data == x86_64_user_settings_image_start) {
+        return (u64)(x86_64_user_settings_image_end - x86_64_user_settings_image_start);
+    }
+
     if (node->data == x86_64_user_storaged_image_start) {
         return (u64)(x86_64_user_storaged_image_end - x86_64_user_storaged_image_start);
     }
 
     if (node->data == x86_64_user_sysinfo_image_start) {
         return (u64)(x86_64_user_sysinfo_image_end - x86_64_user_sysinfo_image_start);
+    }
+
+    if (node->data == x86_64_user_system_monitor_image_start) {
+        return (u64)(x86_64_user_system_monitor_image_end - x86_64_user_system_monitor_image_start);
+    }
+
+    if (node->data == x86_64_user_terminal_image_start) {
+        return (u64)(x86_64_user_terminal_image_end - x86_64_user_terminal_image_start);
+    }
+
+    if (node->data == x86_64_user_text_editor_image_start) {
+        return (u64)(x86_64_user_text_editor_image_end - x86_64_user_text_editor_image_start);
     }
 
     if (node->data == x86_64_user_timed_image_start) {
@@ -432,6 +483,15 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
+    if (x86_64_vfs_type(&probe, "/bin/file-manager", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/bin/file-manager", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+        return 0U;
+    }
+
     if (x86_64_vfs_stat(&probe, "/bin/./hello", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
         return 0U;
     }
@@ -450,6 +510,15 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
+    if (x86_64_vfs_type(&probe, "/bin/settings", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/bin/settings", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+        return 0U;
+    }
+
     if (x86_64_vfs_type(&probe, "/bin/storaged", &type) != X86_64_VFS_RET_OK ||
         type != X86_64_VFS_NODE_EXECUTABLE) {
         return 0U;
@@ -460,7 +529,34 @@ u32 x86_64_vfs_ready(const struct x86_64_vfs_state *state)
         return 0U;
     }
 
-    if (x86_64_vfs_stat(&probe, "/bin/../bin/sysinfo", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+        if (x86_64_vfs_stat(&probe, "/bin/../bin/sysinfo", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/bin/system-monitor", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/bin/system-monitor", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/bin/terminal", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/bin/terminal", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_type(&probe, "/bin/text-editor", &type) != X86_64_VFS_RET_OK ||
+        type != X86_64_VFS_NODE_EXECUTABLE) {
+        return 0U;
+    }
+
+    if (x86_64_vfs_stat(&probe, "/bin/text-editor", &size) != X86_64_VFS_RET_OK || size <= 64ULL) {
         return 0U;
     }
 
