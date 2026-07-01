@@ -8,8 +8,10 @@
 #define X86_64_VFS_RET_EINVAL 0xFFFFFFFFFFFFFFEAULL
 #define X86_64_VFS_RET_ENOENT 0xFFFFFFFFFFFFFFFEULL
 #define X86_64_VFS_RET_EBADF 0xFFFFFFFFFFFFFFF7ULL
+#define X86_64_VFS_RET_ENOSPC 0xFFFFFFFFFFFFFFE4ULL
+#define X86_64_VFS_RET_ENOTEMPTY 0xFFFFFFFFFFFFFFD9ULL
 #define X86_64_VFS_FD_BASE 3ULL
-#define X86_64_VFS_MAX_OPEN_FILES 4U
+#define X86_64_VFS_MAX_OPEN_FILES 8U
 #define X86_64_VFS_PATH_MAX_BYTES 64ULL
 #define X86_64_VFS_NO_NODE 0xFFFFFFFFU
 #define X86_64_VFS_NO_FILE X86_64_VFS_NO_NODE
@@ -20,7 +22,8 @@
 #define X86_64_VFS_OPEN_WRITE 1ULL
 #define X86_64_VFS_OPEN_CREATE 2ULL
 #define X86_64_VFS_OPEN_TRUNCATE 4ULL
-#define X86_64_VFS_RAM_FILE_BYTES 256ULL
+#define X86_64_VFS_RAM_FILE_BYTES 512ULL
+#define X86_64_VFS_RAM_NODE_COUNT 16U
 
 struct x86_64_vfs_state {
     u32 initialized;
@@ -40,8 +43,12 @@ u64 x86_64_vfs_write(struct x86_64_vfs_state *state, u64 fd, const char *buffer,
 u64 x86_64_vfs_close(struct x86_64_vfs_state *state, u64 fd);
 u64 x86_64_vfs_stat(const struct x86_64_vfs_state *state, const char *path, u64 *size_out);
 u64 x86_64_vfs_type(const struct x86_64_vfs_state *state, const char *path, u64 *type_out);
+u64 x86_64_vfs_mkdir(struct x86_64_vfs_state *state, const char *path);
+u64 x86_64_vfs_unlink(struct x86_64_vfs_state *state, const char *path);
 u64 x86_64_vfs_resolve(const struct x86_64_vfs_state *state, const char *path,
                        const u8 **data_out, u64 *size_out, u64 *type_out);
 u32 x86_64_vfs_session_storage_ready(void);
+u32 x86_64_vfs_ram_storage_ready(void);
+u32 x86_64_vfs_persistent_storage_ready(void);
 
 #endif
