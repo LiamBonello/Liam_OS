@@ -1,7 +1,7 @@
 bits 64
 
-%define LIAM_SYSCALL_EXIT 1
 %define LIAM_SYSCALL_WRITE 2
+%define LIAM_SYSCALL_YIELD 10
 %define LIAM_SYSCALL_DESKTOP_STATUS 13
 %define LIAM_SYSCALL_WINDOW_PRESENT 14
 %define LIAM_SYSCALL_TICKS 15
@@ -14,6 +14,7 @@ bits 64
 %define LIAM_STACK_BYTES (LIAM_STATUS_BUFFER_LEN + LIAM_EVENT_BUFFER_LEN)
 %define LIAM_EVENT_BUFFER_OFFSET 0
 %define LIAM_STATUS_BUFFER_OFFSET LIAM_EVENT_BUFFER_LEN
+%define LIAM_SESSION_FRAME_TICKS 2
 
 section .text
 global _start
@@ -59,7 +60,7 @@ _start:
     lea rsi, [rel present_ok_text]
     mov edx, present_ok_text_len
     syscall
-    jmp .poll_input
+    jmp .ready
 
 .present_failed:
     mov eax, LIAM_SYSCALL_WRITE
@@ -68,37 +69,38 @@ _start:
     mov edx, present_failed_text_len
     syscall
 
-.poll_input:
-    mov eax, LIAM_SYSCALL_INPUT_STATUS
-    lea rdi, [rsp + LIAM_STATUS_BUFFER_OFFSET]
-    mov esi, LIAM_STATUS_BUFFER_LEN
-    syscall
-    test rax, rax
-    jle .sleep_once
-
-    mov eax, LIAM_SYSCALL_INPUT_EVENTS
-    lea rdi, [rsp + LIAM_EVENT_BUFFER_OFFSET]
-    mov esi, 2
-    syscall
-
-.sleep_once:
-    mov eax, LIAM_SYSCALL_SLEEP_TICKS
-    mov edi, 2
-    syscall
-
+.ready:
     mov eax, LIAM_SYSCALL_WRITE
     mov edi, LIAM_STDOUT
     lea rsi, [rel ready_text]
     mov edx, ready_text_len
     syscall
 
-    mov eax, LIAM_SYSCALL_EXIT
-    xor edi, edi
+.session_loop:
+    mov eax, LIAM_SYSCALL_INPUT_STATUS
+    lea rdi, [rsp + LIAM_STATUS_BUFFER_OFFSET]
+    mov esi, LIAM_STATUS_BUFFER_LEN
+    syscall
+    test rax, rax
+    jle .present_frame
+
+    mov eax, LIAM_SYSCALL_INPUT_EVENTS
+    lea rdi, [rsp + LIAM_EVENT_BUFFER_OFFSET]
+    mov esi, 2
     syscall
 
-.halt:
-    hlt
-    jmp .halt
+.present_frame:
+    mov eax, LIAM_SYSCALL_WINDOW_PRESENT
+    syscall
+
+    mov eax, LIAM_SYSCALL_SLEEP_TICKS
+    mov edi, LIAM_SESSION_FRAME_TICKS
+    syscall
+
+    mov eax, LIAM_SYSCALL_YIELD
+    syscall
+
+    jmp .session_loop
 
 section .rodata
 title_text:
