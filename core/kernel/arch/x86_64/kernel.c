@@ -10,8 +10,10 @@
 #include "paging.h"
 #include "paging_builder.h"
 #include "paging_plan.h"
+#include "pci.h"
 #include "pmm.h"
 #include "runtime.h"
+#include "storage_hw.h"
 #include "tss.h"
 #include "user_mode.h"
 
@@ -166,6 +168,30 @@ static void report_cpu_state(const struct x86_64_cpuid_state *state)
     x86_64_serial_write_u32("CPU long mode: ", state->has_long_mode);
     x86_64_serial_write_u32("CPU hypervisor: ", state->hypervisor_present);
     x86_64_serial_write_u32("CPU baseline ok: ", state->baseline_ok);
+}
+
+static void report_pci_state(const struct x86_64_pci_state *state)
+{
+    x86_64_serial_write_line("x86_64 PCI bus discovery online");
+    x86_64_serial_write_u32("PCI config I/O ready: ", state->config_io_ready);
+    x86_64_serial_write_u32("PCI devices found: ", state->devices_found);
+    x86_64_serial_write_u32("PCI multifunction devices: ", state->multifunction_devices);
+    x86_64_serial_write_u32("PCI storage controllers: ", state->storage_controllers);
+    x86_64_serial_write_u32("PCI AHCI controllers: ", state->ahci_controllers);
+    x86_64_serial_write_u32("PCI NVMe controllers: ", state->nvme_controllers);
+}
+
+static void report_storage_hw_state(const struct x86_64_storage_hw_state *state)
+{
+    x86_64_serial_write_line("x86_64 storage hardware inventory online");
+    x86_64_serial_write_u32("Storage hardware initialized: ", state->initialized);
+    x86_64_serial_write_u32("Storage PCI ready: ", state->pci_ready);
+    x86_64_serial_write_u32("Storage PCI devices: ", state->pci_devices);
+    x86_64_serial_write_u32("Storage controllers: ", state->storage_controllers);
+    x86_64_serial_write_u32("Storage AHCI controllers: ", state->ahci_controllers);
+    x86_64_serial_write_u32("Storage NVMe controllers: ", state->nvme_controllers);
+    x86_64_serial_write_u32("Storage block driver ready: ", state->block_driver_ready);
+    x86_64_serial_write_u32("Storage persistent ready: ", state->persistent_ready);
 }
 
 static void report_idt_state(const struct x86_64_idt_state *state)
@@ -507,7 +533,9 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     struct x86_64_paging_builder_state paging_builder;
     struct x86_64_paging_activation_state paging_activation;
     struct x86_64_paging_probe_state paging_probe;
+    struct x86_64_pci_state pci_state;
     struct x86_64_runtime_entry_state runtime_entry;
+    struct x86_64_storage_hw_state storage_hw_state;
     struct x86_64_tss_state tss_state;
     struct x86_64_user_mode_state user_mode_state;
 
@@ -516,6 +544,8 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 
     x86_64_boot_context_init(boot_magic, boot_info, &context);
     x86_64_cpuid_state_init(&cpuid_state);
+    x86_64_pci_scan(&pci_state);
+    x86_64_storage_hw_init(&storage_hw_state, &pci_state);
     x86_64_paging_state_init(&paging_state);
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
     x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
@@ -542,6 +572,8 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_framebuffer_mapping_summary(&paging_builder);
     report_framebuffer_surface(&framebuffer_state);
     report_desktop_services(&desktop_services_state);
+    report_pci_state(&pci_state);
+    report_storage_hw_state(&storage_hw_state);
     x86_64_user_mode_start_init(&user_mode_state, &paging_builder, 1U);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
