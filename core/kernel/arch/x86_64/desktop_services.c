@@ -203,7 +203,7 @@ u64 x86_64_desktop_services_snapshot(char *buffer, u64 size)
     return bytes;
 }
 
-u64 x86_64_desktop_services_present_demo_window(void)
+u64 x86_64_desktop_services_present_system_window(void)
 {
     refresh_desktop_state();
 
@@ -257,7 +257,7 @@ void x86_64_desktop_services_run_smoke(struct x86_64_desktop_services_state *sta
 {
     char buffer[1024];
     u64 snapshot_bytes = x86_64_desktop_services_snapshot(buffer, sizeof(buffer));
-    u64 present_result = x86_64_desktop_services_present_demo_window();
+    u64 present_result = x86_64_desktop_services_present_system_window();
 
     refresh_desktop_state();
     desktop_state.snapshot_ok = (snapshot_bytes > 0ULL && snapshot_bytes < sizeof(buffer)) ? 1U : 0U;
