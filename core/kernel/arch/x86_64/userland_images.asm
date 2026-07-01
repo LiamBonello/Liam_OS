@@ -4,16 +4,26 @@ global x86_64_user_datatest_image_start
 global x86_64_user_datatest_image_end
 global x86_64_user_eventd_image_start
 global x86_64_user_eventd_image_end
+global x86_64_user_file_manager_image_start
+global x86_64_user_file_manager_image_end
 global x86_64_user_hello_image_start
 global x86_64_user_hello_image_end
 global x86_64_user_inputd_image_start
 global x86_64_user_inputd_image_end
 global x86_64_user_sessiond_image_start
 global x86_64_user_sessiond_image_end
+global x86_64_user_settings_image_start
+global x86_64_user_settings_image_end
 global x86_64_user_storaged_image_start
 global x86_64_user_storaged_image_end
 global x86_64_user_sysinfo_image_start
 global x86_64_user_sysinfo_image_end
+global x86_64_user_system_monitor_image_start
+global x86_64_user_system_monitor_image_end
+global x86_64_user_terminal_image_start
+global x86_64_user_terminal_image_end
+global x86_64_user_text_editor_image_start
+global x86_64_user_text_editor_image_end
 global x86_64_user_timed_image_start
 global x86_64_user_timed_image_end
 global x86_64_user_windowd_image_start
@@ -38,6 +48,11 @@ x86_64_user_eventd_image_start:
 x86_64_user_eventd_image_end:
 
 align 16
+x86_64_user_file_manager_image_start:
+    incbin "build/x86_64/userland/file-manager.elf"
+x86_64_user_file_manager_image_end:
+
+align 16
 x86_64_user_hello_image_start:
     incbin "build/x86_64/userland/hello.elf"
 x86_64_user_hello_image_end:
@@ -53,6 +68,11 @@ x86_64_user_sessiond_image_start:
 x86_64_user_sessiond_image_end:
 
 align 16
+x86_64_user_settings_image_start:
+    incbin "build/x86_64/userland/settings.elf"
+x86_64_user_settings_image_end:
+
+align 16
 x86_64_user_storaged_image_start:
     incbin "build/x86_64/userland/storaged.elf"
 x86_64_user_storaged_image_end:
@@ -61,6 +81,21 @@ align 16
 x86_64_user_sysinfo_image_start:
     incbin "build/x86_64/userland/sysinfo.elf"
 x86_64_user_sysinfo_image_end:
+
+align 16
+x86_64_user_system_monitor_image_start:
+    incbin "build/x86_64/userland/system-monitor.elf"
+x86_64_user_system_monitor_image_end:
+
+align 16
+x86_64_user_terminal_image_start:
+    incbin "build/x86_64/userland/terminal.elf"
+x86_64_user_terminal_image_end:
+
+align 16
+x86_64_user_text_editor_image_start:
+    incbin "build/x86_64/userland/text-editor.elf"
+x86_64_user_text_editor_image_end:
 
 align 16
 x86_64_user_timed_image_start:
