@@ -45,10 +45,10 @@ _start:
 
 section .rodata
 ok_text:
-    db "data-write ok", 10
+    db "selfcheck: writable data segment ok", 10
 ok_text_len equ $ - ok_text
 failed_text:
-    db "data-write failed", 10
+    db "selfcheck: writable data segment failed", 10
 failed_text_len equ $ - failed_text
 
 section .data
