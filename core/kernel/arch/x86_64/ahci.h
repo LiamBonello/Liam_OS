@@ -33,6 +33,13 @@ struct x86_64_ahci_state {
     u32 command_engine_stopped;
     u32 command_engine_started;
     u32 command_engine_ready;
+    u32 read_slot_ready;
+    u32 read_command_prepared;
+    u32 read_command_issued;
+    u32 read_command_completed;
+    u32 read_sector_ready;
+    u32 read_sector_zeroed;
+    u32 read_error;
     u32 driver_ready;
 };
 
