@@ -1,4 +1,4 @@
-.PHONY: all core core-debug run run-debug check-tools check-x86_64 x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-kernel x86_64-iso x86_64-run legacy-i386 legacy-i386-debug legacy-i386-run clean manifest dist structure
+.PHONY: all core core-debug run run-debug check check-tools check-x86_64 x86_64-info x86_64-check-tools x86_64-iso-check-tools x86_64-kernel x86_64-iso x86_64-run legacy-i386 legacy-i386-debug legacy-i386-run clean manifest dist structure
 
 all: x86_64-iso
 
@@ -11,6 +11,8 @@ run: x86_64-run
 
 run-debug: x86_64-run
 
+check: check-x86_64
+
 check-tools: x86_64-iso-check-tools
 
 check-x86_64:
@@ -18,7 +20,7 @@ check-x86_64:
 
 x86_64-info:
 	@echo "Liam_OS x86_64 is the active development target."
-	@echo "Top-level defaults: make, make run, and make check-tools target x86_64."
+	@echo "Top-level defaults: make, make run, make check, and make check-tools target x86_64."
 	@echo "Legacy i386 reference targets: make legacy-i386, make legacy-i386-run, make legacy-i386-debug."
 	@echo "Architecture status: core/kernel/arch/README.md"
 
