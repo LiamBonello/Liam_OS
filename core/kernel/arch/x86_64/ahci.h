@@ -22,6 +22,12 @@ struct x86_64_ahci_state {
     u32 first_device_port;
     u32 first_device_signature;
     u32 first_device_status;
+    u32 command_buffers_allocated;
+    u64 command_list_page;
+    u64 received_fis_page;
+    u64 command_table_page;
+    u64 dma_buffer_page;
+    u32 command_engine_ready;
     u32 driver_ready;
 };
 
