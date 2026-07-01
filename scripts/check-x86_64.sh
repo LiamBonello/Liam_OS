@@ -31,6 +31,10 @@ timeout 45s sh -c '
     printf "exec /bin/windowd\n"
     sleep 2
     printf "wait\n"
+    sleep 1
+    printf "exec /bin/sessiond\n"
+    sleep 2
+    printf "wait\n"
     sleep 2
     printf "deskcheck\n"
     sleep 10
@@ -95,6 +99,9 @@ require_marker "Liam_OS window service"
 require_marker "storage-session 1"
 require_marker "window-service-ready 1"
 require_marker "window-present ok"
+require_marker "Liam_OS desktop session"
+require_marker "sessiond: system window presented"
+require_marker "sessiond: ready"
 require_marker "Liam_OS desktop readiness check"
 require_marker "Liam_OS timer service"
 require_marker "sleep-ticks ok"
