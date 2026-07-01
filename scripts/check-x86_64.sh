@@ -15,7 +15,7 @@ printf '%s\n' 'Running x86_64 QEMU smoke test...'
 printf 'Smoke log: %s\n' "$LOG"
 
 set +e
-timeout 45s sh -c '
+timeout 70s sh -c '
   {
     sleep 4
     printf "version\n"
@@ -34,6 +34,26 @@ timeout 45s sh -c '
     sleep 2
     printf "deskcheck\n"
     sleep 8
+    printf "exec /bin/terminal\n"
+    sleep 2
+    printf "wait\n"
+    sleep 1
+    printf "exec /bin/file-manager\n"
+    sleep 2
+    printf "wait\n"
+    sleep 1
+    printf "exec /bin/settings\n"
+    sleep 2
+    printf "wait\n"
+    sleep 1
+    printf "exec /bin/system-monitor\n"
+    sleep 2
+    printf "wait\n"
+    sleep 1
+    printf "exec /bin/text-editor\n"
+    sleep 2
+    printf "wait\n"
+    sleep 1
     printf "exec /bin/sessiond\n"
     sleep 8
   } | qemu-system-x86_64 -display none -monitor none -serial stdio -boot d -cdrom build/x86_64/liam_os_x86_64.iso
@@ -108,6 +128,21 @@ require_marker "events read 0"
 require_marker "Liam_OS storage service"
 require_marker "session storage ok"
 require_marker "storage-write ok"
+require_marker "exec /bin/terminal"
+require_marker "Liam_OS Terminal"
+require_marker "terminal: ready"
+require_marker "exec /bin/file-manager"
+require_marker "Liam_OS File Manager"
+require_marker "file-manager: ready"
+require_marker "exec /bin/settings"
+require_marker "Liam_OS Settings"
+require_marker "settings: ready"
+require_marker "exec /bin/system-monitor"
+require_marker "Liam_OS System Monitor"
+require_marker "system-monitor: ready"
+require_marker "exec /bin/text-editor"
+require_marker "Liam_OS Text Editor"
+require_marker "text-editor: ready"
 require_marker "exec /bin/sessiond"
 require_marker "Liam_OS desktop session"
 require_marker "sessiond: system window presented"
