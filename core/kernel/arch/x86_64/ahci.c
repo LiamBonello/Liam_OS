@@ -1,4 +1,5 @@
 #include "ahci.h"
+#include "pmm.h"
 
 #define X86_64_AHCI_CAP_S64A (1U << 31U)
 #define X86_64_AHCI_CAP_SNCQ (1U << 30U)
@@ -8,6 +9,7 @@
 #define X86_64_AHCI_PORT_DET_PRESENT 0x03U
 #define X86_64_AHCI_PORT_IPM_ACTIVE 0x01U
 #define X86_64_AHCI_SIG_ATAPI 0xEB140101U
+#define X86_64_AHCI_COMMAND_ENGINE_PAGES 4U
 
 struct x86_64_ahci_hba_memory {
     volatile u32 cap;
@@ -30,6 +32,27 @@ struct x86_64_ahci_port_registers {
     volatile u32 ssts;
 };
 
+static void clear_page(u64 page)
+{
+    u8 *bytes = (u8 *)page;
+    for (usize i = 0U; i < X86_64_PAGE_SIZE; ++i) {
+        bytes[i] = 0U;
+    }
+}
+
+static u32 allocate_page(u64 *page)
+{
+    u64 allocated = x86_64_pmm_alloc_page();
+    if (allocated == X86_64_PMM_INVALID_PAGE) {
+        *page = 0ULL;
+        return 0U;
+    }
+
+    clear_page(allocated);
+    *page = allocated;
+    return 1U;
+}
+
 static void clear_ahci_state(struct x86_64_ahci_state *state)
 {
     state->initialized = 0U;
@@ -49,7 +72,30 @@ static void clear_ahci_state(struct x86_64_ahci_state *state)
     state->first_device_port = 0U;
     state->first_device_signature = 0U;
     state->first_device_status = 0U;
+    state->command_buffers_allocated = 0U;
+    state->command_list_page = 0ULL;
+    state->received_fis_page = 0ULL;
+    state->command_table_page = 0ULL;
+    state->dma_buffer_page = 0ULL;
+    state->command_engine_ready = 0U;
     state->driver_ready = 0U;
+}
+
+static void allocate_command_engine_buffers(struct x86_64_ahci_state *state)
+{
+    if (state->sata_device_ports == 0U) {
+        return;
+    }
+
+    if ((allocate_page(&state->command_list_page) == 0U) ||
+        (allocate_page(&state->received_fis_page) == 0U) ||
+        (allocate_page(&state->command_table_page) == 0U) ||
+        (allocate_page(&state->dma_buffer_page) == 0U)) {
+        return;
+    }
+
+    state->command_buffers_allocated = X86_64_AHCI_COMMAND_ENGINE_PAGES;
+    state->command_engine_ready = 1U;
 }
 
 void x86_64_ahci_probe(struct x86_64_ahci_state *state,
@@ -114,6 +160,8 @@ void x86_64_ahci_probe(struct x86_64_ahci_state *state,
 
             state->ports_scanned++;
         }
+
+        allocate_command_engine_buffers(state);
     }
 
     state->initialized = 1U;
