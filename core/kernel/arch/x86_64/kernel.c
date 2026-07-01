@@ -46,6 +46,8 @@ static void report_ahci_state(const struct x86_64_ahci_state *state)
     x86_64_serial_write_u32("AHCI command port programmed: ", state->command_port_programmed);
     x86_64_serial_write_u32("AHCI command list bound: ", state->command_list_bound);
     x86_64_serial_write_u32("AHCI received FIS bound: ", state->received_fis_bound);
+    x86_64_serial_write_u32("AHCI command engine stopped: ", state->command_engine_stopped);
+    x86_64_serial_write_u32("AHCI command engine started: ", state->command_engine_started);
     x86_64_serial_write_u32("AHCI command engine ready: ", state->command_engine_ready);
     x86_64_serial_write_u32("AHCI driver ready: ", state->driver_ready);
 }
