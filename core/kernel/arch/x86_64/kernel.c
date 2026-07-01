@@ -1,3 +1,4 @@
+#include "ahci.h"
 #include "boot_context.h"
 #include "console.h"
 #include "cpuid.h"
@@ -16,6 +17,22 @@
 #include "storage_hw.h"
 #include "tss.h"
 #include "user_mode.h"
+
+static void report_ahci_state(const struct x86_64_ahci_state *state)
+{
+    x86_64_serial_write_line("x86_64 AHCI probe online");
+    x86_64_serial_write_u32("AHCI initialized: ", state->initialized);
+    x86_64_serial_write_u32("AHCI controller found: ", state->controller_found);
+    x86_64_serial_write_u32("AHCI BAR ready: ", state->bar_ready);
+    x86_64_serial_write_u32("AHCI MMIO mapped: ", state->mmio_mapped);
+    x86_64_serial_write_u32("AHCI HBA probe safe: ", state->hba_probe_safe);
+    x86_64_serial_write_u32("AHCI HBA registers read: ", state->hba_registers_read);
+    x86_64_serial_write_u32("AHCI ports implemented: ", state->hba_ports_implemented);
+    x86_64_serial_write_u32("AHCI command slots: ", state->hba_command_slots);
+    x86_64_serial_write_u32("AHCI 64-bit capable: ", state->hba_64bit_capable);
+    x86_64_serial_write_u32("AHCI NCQ capable: ", state->hba_ncq_capable);
+    x86_64_serial_write_u32("AHCI driver ready: ", state->driver_ready);
+}
 
 static void report_boot_summary(const struct x86_64_boot_summary *summary)
 {
@@ -525,6 +542,7 @@ static void report_descriptor_summary(const struct x86_64_idt_state *idt_state,
 
 void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
 {
+    struct x86_64_ahci_state ahci_state;
     struct x86_64_boot_context context;
     struct x86_64_cpuid_state cpuid_state;
     struct x86_64_desktop_services_state desktop_services_state;
@@ -551,6 +569,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     x86_64_cpuid_state_init(&cpuid_state);
     x86_64_pci_scan(&pci_state);
     x86_64_storage_hw_init(&storage_hw_state, &pci_state);
+    x86_64_ahci_probe(&ahci_state, &storage_hw_state);
     x86_64_paging_state_init(&paging_state);
     x86_64_pmm_init(&context.boot_info, &context.memory_layout);
     x86_64_paging_plan_init(&paging_plan, &context.memory_layout, &context.pmm_plan);
@@ -579,6 +598,7 @@ void kernel_main_x86_64(u32 boot_magic, u32 boot_info)
     report_desktop_services(&desktop_services_state);
     report_pci_state(&pci_state);
     report_storage_hw_state(&storage_hw_state);
+    report_ahci_state(&ahci_state);
     x86_64_user_mode_start_init(&user_mode_state, &paging_builder, 1U);
 
     x86_64_console_write_at("Liam_OS x86_64 kernel diagnostics", 0, 0);
