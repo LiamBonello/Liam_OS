@@ -17,7 +17,10 @@ check-x86_64:
 	./scripts/check-x86_64.sh
 
 x86_64-info:
-	$(MAKE) -C core x86_64-info
+	@echo "Liam_OS x86_64 is the active development target."
+	@echo "Top-level defaults: make, make run, and make check-tools target x86_64."
+	@echo "Legacy i386 reference targets: make legacy-i386, make legacy-i386-run, make legacy-i386-debug."
+	@echo "Architecture status: core/kernel/arch/README.md"
 
 x86_64-check-tools:
 	$(MAKE) -C core x86_64-check-tools
