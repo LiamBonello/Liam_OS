@@ -71,4 +71,18 @@ Desktop work may rely on session storage for smoke/status checks, but user-facin
 - polling input events in bounded batches
 - presenting frames at a timer-paced cadence
 
+## Desktop Application Contract
+
+Phase 2 desktop applications are first-class x86_64 userland executables, not host-side placeholders or fake demo entries.
+
+Current Phase 2 applications:
+
+- `/bin/terminal`: reports desktop service status and exits cleanly.
+- `/bin/file-manager`: reads the embedded VFS file index and exits cleanly.
+- `/bin/settings`: reports desktop and input service status and exits cleanly.
+- `/bin/system-monitor`: reports scheduler ticks and process state and exits cleanly.
+- `/bin/text-editor`: reads the volatile session buffer and exits cleanly.
+
+Each Phase 2 application must remain covered by `make check`. The smoke test launches every app, waits for clean exit, and requires its app-specific `: ready` marker before the desktop session is started.
+
 The next desktop milestone is to add real background user scheduling so `/bin/sessiond` can start through `service /bin/sessiond`, keep running while `/bin/init` remains interactive, and eventually supervise required services itself.
