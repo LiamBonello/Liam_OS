@@ -77,9 +77,7 @@ static void refresh_desktop_state(void)
     desktop_state.scheduler_observed_slices =
         timer.ticks / desktop_state.scheduler_quantum_ticks;
     desktop_state.scheduler_tick_ready =
-        ((timer.timer_ok != 0U) &&
-         (timer.frequency_hz != 0U) &&
-         (desktop_state.scheduler_observed_ticks != 0U)) ? 1U : 0U;
+        (desktop_state.scheduler_observed_ticks != 0U) ? 1U : 0U;
     desktop_state.input_ready = keyboard.keyboard_ok;
     desktop_state.input_buffer_capacity = keyboard.buffer_capacity;
     desktop_state.input_buffered_chars = keyboard.buffered_chars;
