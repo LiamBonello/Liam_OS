@@ -40,6 +40,16 @@ static void clear_page(u64 page)
     }
 }
 
+static u32 lower32(u64 value)
+{
+    return (u32)(value & 0xFFFFFFFFULL);
+}
+
+static u32 upper32(u64 value)
+{
+    return (u32)((value >> 32U) & 0xFFFFFFFFULL);
+}
+
 static u32 allocate_page(u64 *page)
 {
     u64 allocated = x86_64_pmm_alloc_page();
@@ -77,6 +87,9 @@ static void clear_ahci_state(struct x86_64_ahci_state *state)
     state->received_fis_page = 0ULL;
     state->command_table_page = 0ULL;
     state->dma_buffer_page = 0ULL;
+    state->command_port_programmed = 0U;
+    state->command_list_bound = 0U;
+    state->received_fis_bound = 0U;
     state->command_engine_ready = 0U;
     state->driver_ready = 0U;
 }
@@ -95,7 +108,42 @@ static void allocate_command_engine_buffers(struct x86_64_ahci_state *state)
     }
 
     state->command_buffers_allocated = X86_64_AHCI_COMMAND_ENGINE_PAGES;
-    state->command_engine_ready = 1U;
+}
+
+static void bind_command_engine_buffers(struct x86_64_ahci_state *state,
+                                        const struct x86_64_storage_hw_state *storage)
+{
+    struct x86_64_ahci_port_registers *port_regs;
+    u64 port_base;
+    u32 clb_hi = upper32(state->command_list_page);
+    u32 fb_hi = upper32(state->received_fis_page);
+
+    if (state->command_buffers_allocated != X86_64_AHCI_COMMAND_ENGINE_PAGES) {
+        return;
+    }
+
+    if ((state->hba_64bit_capable == 0U) && ((clb_hi != 0U) || (fb_hi != 0U))) {
+        return;
+    }
+
+    port_base = storage->ahci_mmio_virtual_address + 0x100ULL + ((u64)state->first_device_port * 0x80ULL);
+    port_regs = (struct x86_64_ahci_port_registers *)port_base;
+
+    port_regs->clb = lower32(state->command_list_page);
+    port_regs->clbu = clb_hi;
+    port_regs->fb = lower32(state->received_fis_page);
+    port_regs->fbu = fb_hi;
+
+    state->command_list_bound =
+        ((port_regs->clb == lower32(state->command_list_page)) &&
+         (port_regs->clbu == clb_hi)) ? 1U : 0U;
+    state->received_fis_bound =
+        ((port_regs->fb == lower32(state->received_fis_page)) &&
+         (port_regs->fbu == fb_hi)) ? 1U : 0U;
+    state->command_port_programmed =
+        ((state->command_list_bound != 0U) &&
+         (state->received_fis_bound != 0U)) ? 1U : 0U;
+    state->command_engine_ready = state->command_port_programmed;
 }
 
 void x86_64_ahci_probe(struct x86_64_ahci_state *state,
@@ -162,6 +210,7 @@ void x86_64_ahci_probe(struct x86_64_ahci_state *state,
         }
 
         allocate_command_engine_buffers(state);
+        bind_command_engine_buffers(state, storage);
     }
 
     state->initialized = 1U;
