@@ -831,7 +831,7 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->input_status_ok = (state->last_result != 0ULL) ? 1U : 0U;
         return state->last_result;
 
-    case X86_64_SYSCALL_SERVICE_INPUT_EVENTS: {
+        case X86_64_SYSCALL_SERVICE_INPUT_EVENTS: {
         u64 max_events = arg1;
         u64 byte_count = max_events * (u64)sizeof(struct x86_64_input_event);
         if (max_events > X86_64_INPUT_EVENT_QUEUE_CAPACITY ||
@@ -850,6 +850,24 @@ static inline u64 x86_64_syscall_dispatch(struct x86_64_syscall_dispatch_state *
         state->input_events_empty_ok = (state->last_result == 0ULL) ? 1U : 0U;
         return state->last_result;
     }
+
+    case X86_64_SYSCALL_SERVICE_MKDIR:
+        if (x86_64_syscall_user_path_ok(arg0) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        state->last_result = x86_64_vfs_mkdir(&state->vfs, (const char *)arg0);
+        state->file_count = x86_64_vfs_file_count();
+        return state->last_result;
+
+    case X86_64_SYSCALL_SERVICE_UNLINK:
+        if (x86_64_syscall_user_path_ok(arg0) == 0U) {
+            state->last_result = X86_64_SYSCALL_RET_EFAULT;
+            return state->last_result;
+        }
+        state->last_result = x86_64_vfs_unlink(&state->vfs, (const char *)arg0);
+        state->file_count = x86_64_vfs_file_count();
+        return state->last_result;
 
     default:
         state->last_result = X86_64_SYSCALL_RET_ENOSYS;
