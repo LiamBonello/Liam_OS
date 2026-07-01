@@ -45,6 +45,7 @@ Current core services:
 
 - Ticks must be monotonically observable.
 - `sleep-ticks` must return after at least the requested number of ticks.
+- Desktop scheduler readiness for this phase is based on nonzero observed ticks.
 - Desktop/session code should use ticks for pacing instead of busy drawing loops.
 
 ## Storage Contract
