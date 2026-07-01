@@ -190,6 +190,11 @@ static void report_storage_hw_state(const struct x86_64_storage_hw_state *state)
     x86_64_serial_write_u32("Storage controllers: ", state->storage_controllers);
     x86_64_serial_write_u32("Storage AHCI controllers: ", state->ahci_controllers);
     x86_64_serial_write_u32("Storage NVMe controllers: ", state->nvme_controllers);
+    x86_64_serial_write_u32("Storage AHCI controller found: ", state->ahci_controller_found);
+    x86_64_serial_write_hex32("Storage AHCI BAR5 raw: 0x", state->ahci_bar5_raw);
+    x86_64_serial_write_hex64("Storage AHCI MMIO base: 0x", state->ahci_mmio_base);
+    x86_64_serial_write_u32("Storage AHCI MMIO BAR ready: ", state->ahci_mmio_bar_ready);
+    x86_64_serial_write_u32("Storage AHCI MMIO mapped: ", state->ahci_mmio_mapped);
     x86_64_serial_write_u32("Storage block driver ready: ", state->block_driver_ready);
     x86_64_serial_write_u32("Storage persistent ready: ", state->persistent_ready);
 }
